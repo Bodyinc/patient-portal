@@ -109,7 +109,7 @@ function LoginForm() {
       }
       toast.success("Welcome back");
       await router.invalidate();
-      navigate({ to: "/" });
+      navigate({ to: "/dashboard" });
     } finally {
       setBusy(false);
     }
@@ -201,7 +201,7 @@ function SignupForm() {
       }
       toast.success("Account created");
       await router.invalidate();
-      navigate({ to: "/" });
+      navigate({ to: "/dashboard" });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not sign up");
     } finally {
