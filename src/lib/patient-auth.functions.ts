@@ -23,16 +23,6 @@ export const signUpPatient = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<SignupResult> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Look up existing auth user by email
-    const { data: existing, error: lookupErr } = await supabaseAdmin
-      .from("user_roles")
-      .select("user_id, role")
-      .limit(1)
-      .maybeSingle();
-    // We need a different lookup — use auth admin listUsers by email via filter
-    void existing;
-    void lookupErr;
-
     const { data: list, error: listErr } = await supabaseAdmin.auth.admin.listUsers({
       page: 1,
       perPage: 200,
