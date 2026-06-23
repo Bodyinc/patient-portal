@@ -1,10 +1,9 @@
 "use server";
 
 import { z } from "zod";
+import { PORTAL_ROLE } from "@/lib/auth/constants";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-
-const PORTAL_ROLE = "patient" as const;
 
 const signupSchema = z.object({
   email: z.string().trim().email().max(255),
@@ -25,6 +24,18 @@ export type SignupResult =
 
 export type MyRoleResult = { role: "patient" | "provider" | "admin" | null };
 
+async function findAuthUserByEmail(email: string) {
+  const normalized = email.toLowerCase();
+  for (let page = 1; page <= 5; page++) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 200 });
+    if (error) return { user: null, error };
+    const found = data.users.find((u) => (u.email ?? "").toLowerCase() === normalized);
+    if (found) return { user: found, error: null };
+    if (data.users.length < 200) break;
+  }
+  return { user: null, error: null };
+}
+
 async function getAuthenticatedClient() {
   const supabase = await createClient();
   const {
@@ -42,14 +53,11 @@ async function getAuthenticatedClient() {
 export async function signUpPatient(input: z.infer<typeof signupSchema>): Promise<SignupResult> {
   const data = signupSchema.parse(input);
 
-  const { data: list, error: listErr } = await supabaseAdmin.auth.admin.listUsers({
-    page: 1,
-    perPage: 200,
-  });
-  if (listErr) {
+  const { user: found, error: lookupErr } = await findAuthUserByEmail(data.email);
+
+  if (lookupErr) {
     return { ok: false, code: "error", message: "Could not verify email. Try again." };
   }
-  const found = list.users.find((u) => (u.email ?? "").toLowerCase() === data.email.toLowerCase());
 
   if (found) {
     const { data: roleRow } = await supabaseAdmin

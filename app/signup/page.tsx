@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { signUpPatient } from "@/lib/actions/patient-auth";
+import { onLoginSuccess } from "@/lib/auth/on-login-success";
 import { createClient } from "@/lib/supabase/client";
 
 const signupSchema = z.object({
@@ -63,9 +64,7 @@ export default function SignupPage() {
         router.push("/auth");
         return;
       }
-      toast.success("Account created");
-      router.push("/dashboard");
-      router.refresh();
+      await onLoginSuccess(router, "Account created");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not sign up");
     } finally {

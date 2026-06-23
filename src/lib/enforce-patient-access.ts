@@ -1,5 +1,6 @@
 import { toast } from "sonner";
 import { ensurePatientRole, getMyRole } from "@/lib/actions/patient-auth";
+import { PORTAL_ROLE, wrongPortalMessage } from "@/lib/auth/constants";
 import { createClient } from "@/lib/supabase/client";
 
 export async function enforcePatientPortalAccess(): Promise<boolean> {
@@ -13,17 +14,19 @@ export async function enforcePatientPortalAccess(): Promise<boolean> {
     role = null;
   }
 
-  if (role && role !== "patient") {
+  if (role && role !== PORTAL_ROLE) {
     await supabase.auth.signOut();
-    toast.error(
-      `This email is registered on the ${role} portal. Please sign in at ${role}.bodyinc.com — you cannot use the patient portal.`,
-      { duration: 8000 },
-    );
+    toast.error(wrongPortalMessage(role), { duration: 8000 });
     return false;
   }
 
   if (!role) {
-    await ensurePatientRole();
+    const healed = await ensurePatientRole();
+    if (healed.role && healed.role !== PORTAL_ROLE) {
+      await supabase.auth.signOut();
+      toast.error(wrongPortalMessage(healed.role), { duration: 8000 });
+      return false;
+    }
   }
 
   return true;

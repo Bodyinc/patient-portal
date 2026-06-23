@@ -1,15 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { enforcePatientPortalAccess } from "@/lib/enforce-patient-access";
+import { onLoginSuccess } from "@/lib/auth/on-login-success";
+import { WRONG_PORTAL_GENERIC_MESSAGE } from "@/lib/auth/constants";
 import { createClient } from "@/lib/supabase/client";
 
 const loginSchema = z.object({
@@ -17,8 +18,18 @@ const loginSchema = z.object({
   password: z.string().min(1, "Enter your password"),
 });
 
-export default function AuthPage() {
+function AuthPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const error = searchParams.get("error");
+    if (error === "wrong_portal") {
+      toast.error(WRONG_PORTAL_GENERIC_MESSAGE, { duration: 8000 });
+    } else if (error === "auth_callback") {
+      toast.error("Could not complete sign-in. Please try again.");
+    }
+  }, [searchParams]);
 
   return (
     <div className="flex min-h-screen flex-col bg-white">
@@ -67,6 +78,14 @@ export default function AuthPage() {
   );
 }
 
+export default function AuthPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center" />}>
+      <AuthPageContent />
+    </Suspense>
+  );
+}
+
 function LoginForm() {
   const router = useRouter();
   const supabase = createClient();
@@ -92,12 +111,7 @@ function LoginForm() {
         return;
       }
 
-      const allowed = await enforcePatientPortalAccess();
-      if (!allowed) return;
-
-      toast.success("Welcome back");
-      router.push("/dashboard");
-      router.refresh();
+      await onLoginSuccess(router);
     } finally {
       setBusy(false);
     }

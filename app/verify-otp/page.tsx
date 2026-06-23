@@ -6,7 +6,8 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { enforcePatientPortalAccess } from "@/lib/enforce-patient-access";
+import { OTP_LENGTH } from "@/lib/auth/constants";
+import { onLoginSuccess } from "@/lib/auth/on-login-success";
 import { createClient } from "@/lib/supabase/client";
 
 function VerifyOTPContent() {
@@ -18,8 +19,8 @@ function VerifyOTPContent() {
   const [busy, setBusy] = useState(false);
 
   async function verify() {
-    if (otp.length < 8) {
-      toast.error("Enter the 8-digit code");
+    if (otp.length < OTP_LENGTH) {
+      toast.error(`Enter the ${OTP_LENGTH}-digit code`);
       return;
     }
     setBusy(true);
@@ -34,12 +35,7 @@ function VerifyOTPContent() {
         return;
       }
 
-      const allowed = await enforcePatientPortalAccess();
-      if (!allowed) return;
-
-      toast.success("Welcome back");
-      router.push("/dashboard");
-      router.refresh();
+      await onLoginSuccess(router);
     } finally {
       setBusy(false);
     }
@@ -62,7 +58,7 @@ function VerifyOTPContent() {
         <p className="mb-6 font-medium">{email}</p>
 
         <div className="flex justify-center gap-2">
-          {[0, 1, 2, 3, 4, 5, 6, 7].map((index) => (
+          {Array.from({ length: OTP_LENGTH }, (_, index) => (
             <Input
               key={index}
               maxLength={1}

@@ -18,14 +18,23 @@ export default function ResetPasswordPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.includes("type=recovery") || hash.includes("access_token")) {
+      setReady(true);
+    }
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") setReady(true);
+      if (event === "PASSWORD_RECOVERY") setReady(true);
     });
+
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setReady(true);
+      if (data.session && hash.includes("type=recovery")) {
+        setReady(true);
+      }
     });
+
     return () => subscription.unsubscribe();
   }, [supabase.auth]);
 
@@ -47,9 +56,7 @@ export default function ResetPasswordPage() {
         return;
       }
       toast.success("Password updated. Please sign in.");
-      await supabase.auth.signOut();
-      router.push("/auth");
-      router.refresh();
+      window.location.href = "/auth/signout";
     } finally {
       setBusy(false);
     }

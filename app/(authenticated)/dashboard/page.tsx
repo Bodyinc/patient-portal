@@ -1,13 +1,11 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 
 export default function DashboardPage() {
-  const router = useRouter();
   const supabase = createClient();
 
   const { data: profile } = useQuery({
@@ -21,10 +19,8 @@ export default function DashboardPage() {
     },
   });
 
-  async function signOut() {
-    await supabase.auth.signOut();
-    router.push("/auth");
-    router.refresh();
+  function signOut() {
+    window.location.href = "/auth/signout";
   }
 
   return (
