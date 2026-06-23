@@ -51,10 +51,28 @@
       "namedRegex": "^/forgot\\-password(?:/)?$"
     },
     {
+      "page": "/otp-login",
+      "regex": "^/otp\\-login(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/otp\\-login(?:/)?$"
+    },
+    {
       "page": "/reset-password",
       "regex": "^/reset\\-password(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/reset\\-password(?:/)?$"
+    },
+    {
+      "page": "/signup",
+      "regex": "^/signup(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/signup(?:/)?$"
+    },
+    {
+      "page": "/verify-otp",
+      "regex": "^/verify\\-otp(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/verify\\-otp(?:/)?$"
     }
   ],
   "dataRoutes": [],

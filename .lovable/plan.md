@@ -7,6 +7,7 @@ Build email/password login + signup for `patient.bodyinc.com`, sharing one Supab
 Single source of truth for "which portal does this user belong to" — already partly in place (`user_roles`, `app_role` enum, `has_role`, `get_user_portal`).
 
 Migration:
+
 - Ensure `app_role` enum has values: `patient`, `provider`, `admin`.
 - Enforce **one role per user**: add `UNIQUE(user_id)` on `public.user_roles` (drop the older `(user_id, role)` unique if present).
 - Add `public.profiles` table:
@@ -36,6 +37,7 @@ Auth state listener wired once in `src/routes/__root.tsx` per the stack rules.
 The patient portal must reject any account whose role is not `patient`. Two checkpoints:
 
 **A. Signup flow** (`signup` form):
+
 1. Call a server function `signUpPatient({ email, password, fullName, phone, dob })`.
 2. Server fn uses the admin client to look up an existing user by email:
    - If user exists AND has a role → return `{ error: "An account with this email already exists on the {role} portal. Please sign in there." }`. No account modification.
@@ -44,6 +46,7 @@ The patient portal must reject any account whose role is not `patient`. Two chec
 3. Frontend then signs the user in with the entered password.
 
 **B. Login flow** (`login` form):
+
 1. `supabase.auth.signInWithPassword`.
 2. Immediately call `get_my_role()` (single round trip).
 3. If role !== `'patient'`: `supabase.auth.signOut()` and show:  

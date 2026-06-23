@@ -1,10 +1,23 @@
-<!-- LOVABLE:BEGIN -->
-> [!IMPORTANT]
-> This project is connected to [Lovable](https://lovable.dev). Avoid rewriting
-> published git history — force pushing, or rebasing/amending/squashing commits
-> that are already pushed — as it rewrites history on Lovable's side and the
-> user will likely lose their project history.
->
-> Commits you push to the connected branch sync back to Lovable and show up in
-> the editor, so keep the branch in a working state.
-<!-- LOVABLE:END -->
+# Patient Portal
+
+Next.js App Router patient portal with Supabase auth (cookie-based SSR), shadcn/ui, and Tailwind CSS v4.
+
+## Stack
+
+- **Framework:** Next.js 15 (App Router)
+- **Auth/Data:** Supabase (`@supabase/ssr`)
+- **UI:** shadcn/ui + Tailwind v4
+- **State:** TanStack React Query (client-side data fetching)
+
+## Development
+
+```bash
+npm install
+npm run dev
+```
+
+## Environment variables
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (server-only, required for signup)
