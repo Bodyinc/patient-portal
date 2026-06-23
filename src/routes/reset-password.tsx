@@ -62,9 +62,15 @@ function ResetPasswordPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4 py-12">
-      <div className="w-full max-w-md rounded-lg border bg-card p-6 shadow-sm">
-        <h1 className="text-xl font-semibold">Set a new password</h1>
+    <div className="flex min-h-screen flex-col items-center justify-center bg-white px-4 py-12">
+      <div className="w-full max-w-md rounded-lg border bg-white p-8 shadow-sm">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold">Reset Password</h1>
+
+          <p className="mt-3 text-gray-500">
+          Enter your new password below.
+         </p>
+        </div>
         {!ready ? (
           <p className="mt-4 text-sm text-muted-foreground">
             Open this page from the reset link in your email.
@@ -96,11 +102,20 @@ function ResetPasswordPage() {
               />
             </div>
             <Button type="submit" className="w-full" disabled={busy}>
-              {busy ? "Updating…" : "Update password"}
+             {busy ? "Updating..." : "Continue"}
             </Button>
           </form>
         )}
       </div>
+      <footer className="mt-8 text-center text-xs text-gray-400">
+  <div className="mb-2 flex justify-center gap-4">
+    <a href="#">Privacy Policy</a>
+    <a href="#">Terms of Service</a>
+    <a href="#">Contact Support</a>
+  </div>
+
+  <p>© 2026 BodyInc</p>
+</footer>
     </div>
   );
 }
