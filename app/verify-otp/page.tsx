@@ -3,7 +3,8 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { toast } from "sonner";
-
+import Image from "next/image";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { OTP_LENGTH } from "@/lib/auth/constants";
@@ -51,13 +52,48 @@ function VerifyOTPContent() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-white px-4">
-      <div className="w-full max-w-md rounded-lg border bg-white p-8 text-center shadow-sm">
-        <h1 className="mb-2 text-3xl font-bold">Enter Verification Code</h1>
-        <p className="mb-2 text-sm text-gray-500">Enter the code sent to</p>
-        <p className="mb-6 font-medium">{email}</p>
+  <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-white via-purple-50 to-white">
 
-        <div className="flex justify-center gap-2">
+    <Image
+      src="/background-curve.svg"
+      alt=""
+      fill
+      className="pointer-events-none object-cover opacity-40"
+    />
+
+    <div className="absolute left-8 top-8 z-10">
+      <Image
+        src="/logo.svg"
+        alt="BodyInc"
+        width={160}
+        height={50}
+        priority
+      />
+    </div>
+
+    <main className="relative z-10 flex min-h-screen items-center justify-center px-4">
+      <div className="w-full max-w-md text-center">
+
+        <h1 className="text-3xl font-bold text-[#4F1DDB]">
+          Enter Verification Code
+        </h1>
+
+        <p className="mt-4 text-[#4F1DDB]">
+          Enter the {OTP_LENGTH}-digit code sent to
+        </p>
+
+        <p className="mt-2 font-semibold text-[#4F1DDB]">
+          {email}
+        </p>
+
+        <Link
+          href="/otp-login"
+          className="mt-2 block text-sm text-[#4F1DDB] underline"
+        >
+          Change email
+        </Link>
+
+        <div className="mt-8 flex justify-center gap-2">
           {Array.from({ length: OTP_LENGTH }, (_, index) => (
             <Input
               key={index}
@@ -74,20 +110,39 @@ function VerifyOTPContent() {
           ))}
         </div>
 
-        <Button className="mt-4 w-full" onClick={verify} disabled={busy}>
+        <Button
+          className="mt-6 w-full bg-[#4F1DDB] hover:bg-[#4420c9]"
+          onClick={verify}
+          disabled={busy}
+        >
           {busy ? "Verifying…" : "Verify"}
         </Button>
-        <button type="button" className="mt-4 text-sm text-gray-500 underline" onClick={resend}>
-          Resend Code
-        </button>
-      </div>
-    </div>
-  );
-}
 
+        <p className="mt-6 text-sm text-[#4F1DDB]">
+          Didn't receive the code?{" "}
+          <button
+            type="button"
+            onClick={resend}
+            className="font-semibold underline"
+          >
+            Resend code
+          </button>
+        </p>
+
+      </div>
+    </main>
+
+  </div>
+  
+);
+}
 export default function VerifyOTPPage() {
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center" />}>
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center" />
+      }
+    >
       <VerifyOTPContent />
     </Suspense>
   );

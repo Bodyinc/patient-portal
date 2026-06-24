@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
-
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,49 +34,97 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-white px-4 py-12">
-      <div className="w-full max-w-md rounded-lg border bg-white p-8 shadow-sm">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold">Reset Password</h1>
-          <p className="mt-3 text-gray-500">
-            Enter your email address below and we&apos;ll send you a link to reset your password.
-          </p>
-        </div>
+  <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-white via-purple-50 to-white">
+    <Image
+      src="/background-curve.svg"
+      alt=""
+      fill
+      className="pointer-events-none object-cover opacity-40"
+    />
 
+    <div className="absolute left-8 top-8 z-10">
+      <Image
+        src="/logo.svg"
+        alt="BodyInc"
+        width={160}
+        height={50}
+        priority
+      />
+    </div>
+
+    <main className="relative z-10 flex min-h-screen items-center justify-center px-4">
+      <div className="w-full max-w-md text-center">
         {sent ? (
-          <div className="mt-8 text-center">
-            <p className="text-gray-700">Check your inbox for a link to set a new password.</p>
-            <Link href="/auth" className="mt-6 block text-sm text-gray-500 hover:text-black">
-              ← Back to Login
+          <div>
+            <h2 className="text-4xl font-bold text-[#4F1DDB]">
+              Check Your Email
+            </h2>
+
+            <p className="mt-4 text-[#4F1DDB]">
+              We've sent a password reset link to your email address.
+            </p>
+
+            <Link
+              href="/auth"
+              className="mt-8 block text-[#4F1DDB] underline"
+            >
+              ← Back to login options
             </Link>
           </div>
         ) : (
-          <form onSubmit={onSubmit} className="mt-8 space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="fp-email">Email Address</Label>
-              <Input
-                id="fp-email"
-                type="email"
-                autoComplete="email"
-                placeholder="name@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={busy}>
-              {busy ? "Sending..." : "Send Verification Code"}
-            </Button>
-            <Link href="/auth" className="block text-center text-sm text-gray-500 hover:text-black">
-              ← Back to Login
-            </Link>
-          </form>
+          <>
+            <h1 className="text-4xl font-bold text-[#4F1DDB]">
+              Reset Password
+            </h1>
+
+            <p className="mt-4 text-[#4F1DDB]">
+              Enter your email address below and we'll send you
+              a link to reset your password.
+            </p>
+
+            <form
+              onSubmit={onSubmit}
+              className="mt-8 space-y-4 text-left"
+            >
+              <div className="space-y-2">
+                <Label
+                  htmlFor="fp-email"
+                  className="text-[#4F1DDB]"
+                >
+                  Email Address
+                </Label>
+
+                <Input
+                  id="fp-email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="name@company.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full bg-[#4F1DDB] hover:bg-[#4420c9]"
+                disabled={busy}
+              >
+                {busy ? "Sending..." : "Send Verification Code"}
+              </Button>
+
+              <Link
+                href="/auth"
+                className="block text-center text-[#4F1DDB] underline"
+              >
+                ← Back to login options
+              </Link>
+            </form>
+          </>
         )}
       </div>
-
-      <footer className="mt-8 text-center text-xs text-gray-400">
-        <p>© 2026 BodyInc</p>
-      </footer>
-    </div>
-  );
+    </main>
+  </div>
+);
+    
 }

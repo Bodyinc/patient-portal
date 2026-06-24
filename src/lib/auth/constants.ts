@@ -20,7 +20,7 @@ export const GUEST_REDIRECT_PATHS = [
 /** Routes that must never auto-redirect authenticated users away */
 export const AUTH_FLOW_PATHS = ["/reset-password", "/auth/callback", "/auth/signout"];
 
-export const OTP_LENGTH = 6;
+export const OTP_LENGTH = 8;
 
 export function wrongPortalMessage(role: string) {
   return `This email is registered on the ${role} portal. Please sign in at ${role}.bodyinc.com — you cannot use the patient portal.`;
