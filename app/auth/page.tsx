@@ -34,22 +34,15 @@ function AuthPageContent() {
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-white via-purple-50 to-white">
       <Image
-       src="/background-curve.svg"
-       alt="Background Shape"
-       fill
-       className="pointer-events-none object-cover opacity-40"
-       />
+        src="/background-curve.svg"
+        alt="Background Shape"
+        fill
+        className="pointer-events-none object-cover opacity-40"
+      />
 
       <div className="absolute left-8 top-8 z-10">
-      <Image
-       src="/logo.svg"
-       alt="BodyInc"
-       width={160}
-       height={50}
-       priority
-       />
-       </div>
-      
+        <Image src="/logo.svg" alt="BodyInc" width={160} height={50} priority />
+      </div>
 
       <main className="relative z-10 flex min-h-screen items-center justify-center px-4">
         <div className="w-full max-w-md">
@@ -85,9 +78,7 @@ function AuthPageContent() {
         </div>
       </main>
 
-      <footer className="py-8 text-center text-sm text-gray-500">
-        © 2026 BodyInc
-      </footer>
+      <footer className="py-8 text-center text-sm text-gray-500">© 2026 BodyInc</footer>
     </div>
   );
 }
@@ -134,7 +125,9 @@ function LoginForm() {
   return (
     <form onSubmit={onSubmit} className="mt-4 space-y-4 rounded-lg border bg-card p-6 shadow-sm">
       <div className="space-y-2">
-        <Label htmlFor="login-email" className="text-[#4F1DDB]">Email</Label>
+        <Label htmlFor="login-email" className="text-[#4F1DDB]">
+          Email
+        </Label>
         <Input
           id="login-email"
           type="email"
@@ -145,7 +138,9 @@ function LoginForm() {
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="login-password" className="text-[#4F1DDB]">Password</Label>
+        <Label htmlFor="login-password" className="text-[#4F1DDB]">
+          Password
+        </Label>
         <Input
           id="login-password"
           type="password"
@@ -155,20 +150,12 @@ function LoginForm() {
           required
         />
         <div className="flex justify-end pt-2">
-          <Link
-            href="/forgot-password"
-            className="text-sm text-[#4F1DDB] hover:text-[#4F1DDB]"
-
-          >
+          <Link href="/forgot-password" className="text-sm text-[#4F1DDB] hover:text-[#4F1DDB]">
             Forgot Password?
           </Link>
         </div>
       </div>
-      <Button
-        type="submit"
-        className="w-full bg-[#4F1DDB] hover:bg-[#4420c9]"
-        disabled={busy}
-         >
+      <Button type="submit" className="w-full bg-[#4F1DDB] hover:bg-[#4420c9]" disabled={busy}>
         {busy ? "Signing in…" : "Log in"}
       </Button>
     </form>
