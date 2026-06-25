@@ -31,56 +31,59 @@ function AuthPageContent() {
     }
   }, [searchParams]);
 
-  return (
-    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-white via-purple-50 to-white">
+ return (
+  <div className="relative min-h-screen overflow-hidden bg-white">
+    <Image
+      src="/background-curve.svg"
+      alt="Background Shape"
+      fill
+      className="pointer-events-none object-cover opacity-40"
+    />
+
+    <div className="absolute left-8 top-8 z-10">
       <Image
-        src="/background-curve.svg"
-        alt="Background Shape"
-        fill
-        className="pointer-events-none object-cover opacity-40"
+        src="/logo.svg"
+        alt="BodyInc"
+        width={160}
+        height={50}
+        priority
       />
-
-      <div className="absolute left-8 top-8 z-10">
-        <Image src="/logo.svg" alt="BodyInc" width={160} height={50} priority />
-      </div>
-
-      <main className="relative z-10 flex min-h-screen items-center justify-center px-4">
-        <div className="w-full max-w-md">
-          <div className="mb-8 text-center">
-            <h2 className="text-4xl font-bold text-[#4F1DDB]">Welcome Back</h2>
-            <p className="mt-3 text-gray-500">
-              Please enter your credentials to access your portal.
-            </p>
-          </div>
-
-          <LoginForm />
-
-          <div className="mt-4">
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full border-[#4F1DDB] text-[#4F1DDB]"
-              onClick={() => router.push("/otp-login")}
-            >
-              Login with OTP
-            </Button>
-          </div>
-
-          <div className="my-4 flex items-center">
-            <div className="h-px flex-1 bg-gray-200" />
-            <span className="px-3 text-sm text-gray-400">OR</span>
-            <div className="h-px flex-1 bg-gray-200" />
-          </div>
-
-          <Button type="button" variant="outline" className="w-full" asChild>
-            <Link href="/signup">Create Account</Link>
-          </Button>
-        </div>
-      </main>
-
-      <footer className="py-8 text-center text-sm text-gray-500">© 2026 BodyInc</footer>
     </div>
-  );
+
+    <main className="relative z-10 flex min-h-screen items-center justify-center px-6">
+      <div className="w-full max-w-[502px]">
+        <div className="mb-10 text-center">
+          <h2 className="text-[37px] font-bold leading-none tracking-[0] text-[#2E00AB]">
+            Welcome Back
+          </h2>
+
+          <p className="mt-4 text-center text-[20px] font-normal leading-[20px] text-[#2E00AB]">
+            Sign to manage your care and track progress.
+          </p>
+        </div>
+
+        <LoginForm />
+
+        <div className="mt-5">
+          <Button
+  type="button"
+  variant="outline"
+  onClick={() => router.push("/otp-login")}
+  className="h-[52px] w-full rounded-md border border-[#8E71F5] bg-white text-[18px] font-semibold text-[#2E00AB] shadow-none transition-colors hover:bg-[#F8F5FF] hover:text-[#2E00AB] hover:border-[#8E71F5]"
+>
+  Login with OTP
+</Button>
+        </div>
+
+        
+      </div>
+    </main>
+
+    <footer className="pb-8 pt-4 text-center text-[13px] text-[#A6A6A6]">
+      © 2026 BodyInc
+    </footer>
+  </div>
+);
 }
 
 export default function AuthPage() {
@@ -123,41 +126,74 @@ function LoginForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="mt-4 space-y-4 rounded-lg border bg-card p-6 shadow-sm">
-      <div className="space-y-2">
-        <Label htmlFor="login-email" className="text-[#4F1DDB]">
-          Email
-        </Label>
-        <Input
-          id="login-email"
-          type="email"
-          autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
+  <form
+    onSubmit={onSubmit}
+    className="mt-8 space-y-7"
+  >
+    <div className="space-y-2">
+      <Label
+        htmlFor="login-email"
+        className="text-[14px] font-semibold leading-5 text-[#2E00AB]"
+      >
+        Email Address
+      </Label>
+
+      <Input
+        id="login-email"
+        type="email"
+        autoComplete="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="name@company.com"
+        className="h-[51px] rounded-md border border-[#F2F2F2] bg-white px-4 text-[15px] text-[#2E00AB] placeholder:text-[#7C63D6] shadow-none focus-visible:border-[#2E00AB] focus-visible:ring-1 focus-visible:ring-[#2E00AB]"
+        required
+      />
+    </div>
+
+    <div className="space-y-2">
+      <Label
+        htmlFor="login-password"
+        className="text-[14px] font-semibold leading-5 text-[#2E00AB]"
+      >
+        Password
+      </Label>
+
+      <Input
+        id="login-password"
+        type="password"
+        autoComplete="current-password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        placeholder="••••••••"
+        className="h-[51px] rounded-md border border-[#F2F2F2] bg-white px-4 text-[15px] text-[#2E00AB] placeholder:text-[#7C63D6] shadow-none focus-visible:border-[#2E00AB] focus-visible:ring-1 focus-visible:ring-[#2E00AB]"
+        required
+      />
+
+      <div className="mt-3 flex items-center justify-between">
+        <label className="flex cursor-pointer items-center gap-2 text-[14px] text-[#8B6FD8]">
+          <input
+            type="checkbox"
+            className="h-4 w-4 rounded border-[#E5E5E5]"
+          />
+          Remember Me
+        </label>
+
+        <Link
+          href="/forgot-password"
+          className="text-[14px] font-medium text-[#2E00AB] hover:underline"
+        >
+          Forgot Password?
+        </Link>
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="login-password" className="text-[#4F1DDB]">
-          Password
-        </Label>
-        <Input
-          id="login-password"
-          type="password"
-          autoComplete="current-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
-        <div className="flex justify-end pt-2">
-          <Link href="/forgot-password" className="text-sm text-[#4F1DDB] hover:text-[#4F1DDB]">
-            Forgot Password?
-          </Link>
-        </div>
-      </div>
-      <Button type="submit" className="w-full bg-[#4F1DDB] hover:bg-[#4420c9]" disabled={busy}>
-        {busy ? "Signing in…" : "Log in"}
-      </Button>
-    </form>
-  );
+    </div>
+
+    <Button
+      type="submit"
+      className="h-[52px] w-full rounded-md bg-[#2E00AB] text-[18px] font-semibold text-white shadow-none hover:bg-[#25008D]"
+      disabled={busy}
+    >
+      {busy ? "Signing in..." : "Login →"}
+    </Button>
+  </form>
+);
 }
