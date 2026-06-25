@@ -90,7 +90,7 @@ export default function ForgotPasswordPage() {
                   className="w-full bg-[#4F1DDB] hover:bg-[#4420c9]"
                   disabled={busy}
                 >
-                  {busy ? "Sending..." : "Send Verification Code"}
+                  {busy ? "Sending..." : "Send Reset Link"}
                 </Button>
 
                 <Link href="/auth" className="block text-center text-[#4F1DDB] underline">
