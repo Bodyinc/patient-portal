@@ -18,17 +18,9 @@ export const metadata: Metadata = {
   description: "Access your BodyInc patient account, appointments, and care plan.",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html
-      lang="en"
-      suppressHydrationWarning
-      className={dmSans.className}
-    >
+    <html lang="en" suppressHydrationWarning className={dmSans.className}>
       <body suppressHydrationWarning>
         <Providers>{children}</Providers>
       </body>
