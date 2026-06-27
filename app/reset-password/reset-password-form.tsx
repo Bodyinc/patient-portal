@@ -1,10 +1,15 @@
 "use client";
-import Image from "next/image";
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import AuthPageShell, {
+  AuthHeading,
+  authButtonClassName,
+  authInputClassName,
+} from "@/components/AuthPageShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -101,127 +106,95 @@ export function ResetPasswordForm({ recovery, error }: ResetPasswordFormProps) {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-white via-purple-50 to-white">
-      <Image
-        src="/background-curve.svg"
-        alt=""
-        fill
-        className="pointer-events-none object-cover opacity-40"
-      />
+    <AuthPageShell footer={null}>
+      <div className="text-center">
+        {pageState === "loading" ? (
+          <p className="text-base text-[#2E00AB] sm:text-[18px]">Verifying reset link...</p>
+        ) : pageState === "invalid" ? (
+          <>
+            <AuthHeading
+              title="Reset Password"
+              description="This reset link has expired or was already used."
+            />
 
-      {/* Logo */}
-      <div className="absolute left-8 top-8 z-10">
-        <Image src="/logo.svg" alt="BodyInc" width={160} height={50} priority />
-      </div>
+            <Link
+              href="/forgot-password"
+              className="inline-block text-base text-[#2E00AB] underline underline-offset-4 sm:text-[18px]"
+            >
+              Request a new reset link
+            </Link>
+          </>
+        ) : (
+          <>
+            <AuthHeading
+              title="Create New Password"
+              description="Set a new password to secure your account and regain access to your Body Inc. portal."
+            />
 
-      <main className="relative z-10 flex min-h-screen items-center justify-center px-6">
-        <div className="w-full max-w-[522px] text-center">
-          {pageState === "loading" ? (
-            <p className="text-[18px] text-[#2E00AB]">Verifying reset link...</p>
-          ) : pageState === "invalid" ? (
-            <>
-              <h1 className="text-[37px] font-bold text-[#2E00AB]">Reset Password</h1>
+            <form onSubmit={onSubmit} className="space-y-5 text-left">
+              <div>
+                <Label htmlFor="np" className="mb-2 block text-[14px] font-semibold text-[#2E00AB]">
+                  New Password
+                </Label>
 
-              <p className="mt-6 text-[20px] text-[#2E00AB]">
-                This reset link has expired or was already used.
-              </p>
+                <Input
+                  id="np"
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="Enter your new password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={8}
+                  className={authInputClassName}
+                />
+              </div>
 
-              <Link
-                href="/forgot-password"
-                className="mt-8 inline-block text-[18px] text-[#2E00AB] underline underline-offset-4"
-              >
-                Request a new reset link
-              </Link>
-            </>
-          ) : (
-            <>
-              {/* Heading */}
-              <h1 className="text-[37px] font-bold leading-none text-[#2E00AB]">
-                Create New Password
-              </h1>
-
-              {/* Description */}
-              <p className="mx-auto mt-6 max-w-[522px] text-[20px] leading-none text-[#2E00AB]">
-                Set a new password to secure your account and regain access to your Body Inc.
-                portal.
-              </p>
-
-              {/* Form */}
-              <form
-                onSubmit={onSubmit}
-                className="mx-auto mt-10 w-full max-w-[502px] space-y-5 text-left"
-              >
-                <div>
-                  <Label
-                    htmlFor="np"
-                    className="mb-2 block text-[14px] font-semibold text-[#2E00AB]"
-                  >
-                    New Password
-                  </Label>
-
-                  <Input
-                    id="np"
-                    type="password"
-                    autoComplete="new-password"
-                    placeholder="Enter your new password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    minLength={8}
-                    className="h-[51px] rounded-[6px] border-[#F2F2F2] bg-white px-4"
-                  />
-                </div>
-
-                <div>
-                  <Label
-                    htmlFor="np2"
-                    className="mb-2 block text-[14px] font-semibold text-[#2E00AB]"
-                  >
-                    Confirm Password
-                  </Label>
-
-                  <Input
-                    id="np2"
-                    type="password"
-                    autoComplete="new-password"
-                    placeholder="Re-enter your new password"
-                    value={confirm}
-                    onChange={(e) => setConfirm(e.target.value)}
-                    required
-                    minLength={8}
-                    className="h-[51px] rounded-[6px] border-[#F2F2F2] bg-white px-4"
-                  />
-                </div>
-
-                <Button
-                  type="submit"
-                  disabled={busy}
-                  className="h-[56px] w-full rounded-[8px] bg-[#2E00AB] text-[18px] font-semibold hover:bg-[#25008D]"
+              <div>
+                <Label
+                  htmlFor="np2"
+                  className="mb-2 block text-[14px] font-semibold text-[#2E00AB]"
                 >
-                  {busy ? "Saving..." : "Save & Continue →"}
-                </Button>
+                  Confirm Password
+                </Label>
 
-                <p className="text-center text-[16px] text-[#2E00AB]">
-                  Can't access your email?{" "}
-                  <button type="button" className="font-semibold underline underline-offset-4">
-                    Contact support
-                  </button>{" "}
-                  for assistance.
-                </p>
+                <Input
+                  id="np2"
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="Re-enter your new password"
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
+                  required
+                  minLength={8}
+                  className={authInputClassName}
+                />
+              </div>
 
-                <div className="text-center">
-                  <Link
-                    href="/auth"
-                    className="text-[18px] text-[#2E00AB] underline underline-offset-4"
-                  >
-                    ← Back to login options
-                  </Link>
-                </div>
-              </form>
-            </>
-          )}
-        </div>
-      </main>
-    </div>
+              <Button type="submit" disabled={busy} className={authButtonClassName}>
+                {busy ? "Saving..." : "Save & Continue →"}
+              </Button>
+
+              <p className="break-words text-center text-sm leading-snug text-[#2E00AB] sm:text-base">
+                Can&apos;t access your email?{" "}
+                <button type="button" className="font-semibold underline underline-offset-4">
+                  Contact support
+                </button>{" "}
+                for assistance.
+              </p>
+
+              <div className="text-center">
+                <Link
+                  href="/auth"
+                  className="text-base text-[#2E00AB] underline underline-offset-4 sm:text-[18px]"
+                >
+                  ← Back to login options
+                </Link>
+              </div>
+            </form>
+          </>
+        )}
+      </div>
+    </AuthPageShell>
   );
 }
