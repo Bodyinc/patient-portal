@@ -1,11 +1,42 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+
 import OnboardingShell from "../_components/OnboardingShell";
+import OnboardingFooter from "../_components/OnboardingFooter";
 import PageHeader from "./components/PageHeader";
 import InfoCard from "./components/InfoCard";
 import PaymentForm from "./components/PaymentForm";
 import OrderSummary from "./components/OrderSummary";
 import TermsCheckbox from "./components/TermsCheckbox";
+import {
+  CONSULTATION_FEE,
+  getMedicationById,
+  getStateName,
+  PLAN_PRICING,
+} from "../_lib/onboarding-config";
+import { getPrevStepPath } from "../_lib/onboarding-navigation";
+import { useOnboarding } from "../_lib/onboarding-store";
 
 export default function BillingCheckoutPage() {
+  const router = useRouter();
+  const { state } = useOnboarding();
+
+  const medication = getMedicationById(state.medicationId);
+  const plan = state.planMonths ? PLAN_PRICING[state.planMonths] : null;
+  const medicationTotal = medication
+    ? medication.priceMonthly * (state.planMonths === "3" ? 3 : 1)
+    : 0;
+  const subtotal = medicationTotal + CONSULTATION_FEE;
+  const processingFee = 5;
+  const discount = state.planMonths === "3" ? 22 : 0;
+  const total = subtotal + processingFee - discount;
+
+  function handleBack() {
+    const prev = getPrevStepPath("/onboarding/billing-checkout", state);
+    if (prev) router.push(prev);
+  }
+
   return (
     <OnboardingShell>
       <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col overflow-hidden px-2 lg:px-6">
@@ -17,18 +48,18 @@ export default function BillingCheckoutPage() {
               <InfoCard
                 title="Patient Information"
                 items={[
-                  { label: "Name", value: "John Doe" },
-                  { label: "Email Address", value: "patient@example.com" },
-                  { label: "Phone Number", value: "(555) 000-0000" },
+                  { label: "Name", value: state.fullName || "—" },
+                  { label: "Email Address", value: state.email || "—" },
+                  { label: "Phone Number", value: state.phone || "—" },
                 ]}
               />
 
               <InfoCard
-                title="Billing Address"
+                title="Clinical Profile"
                 items={[
-                  { label: "Street Address", value: "123 Wellness Way, Apt 4B" },
-                  { label: "City & State", value: "San Francisco, CA 94105" },
-                  { label: "Country", value: "United States" },
+                  { label: "State", value: getStateName(state.state) || "—" },
+                  { label: "Date of Birth", value: state.dob || "—" },
+                  { label: "BMI", value: state.bmi !== null ? String(state.bmi) : "—" },
                 ]}
               />
             </div>
@@ -37,8 +68,18 @@ export default function BillingCheckoutPage() {
             <TermsCheckbox />
           </div>
 
-          <OrderSummary />
+          <OrderSummary
+            medicationName={medication?.name ?? "Selected Medication"}
+            planLabel={plan?.label ?? "Treatment Plan"}
+            medicationTotal={medicationTotal}
+            subtotal={subtotal}
+            processingFee={processingFee}
+            discount={discount}
+            total={total}
+          />
         </div>
+
+        <OnboardingFooter onBack={handleBack} showContinue={false} />
       </div>
     </OnboardingShell>
   );

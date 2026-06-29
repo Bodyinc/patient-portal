@@ -1,16 +1,40 @@
 "use client";
 
 import Image from "next/image";
-import { Card } from "@/components/ui/card";
+
+import type { Medication } from "../_lib/onboarding-config";
 
 type MedicationCardProps = {
+  medication: Medication;
   selected?: boolean;
+  onSelect?: (id: string) => void;
+  onViewDetails?: (id: string) => void;
 };
 
-export default function MedicationCard({ selected = false }: MedicationCardProps) {
+export default function MedicationCard({
+  medication,
+  selected = false,
+  onSelect,
+  onViewDetails,
+}: MedicationCardProps) {
   return (
-    <Card className="flex h-full flex-col overflow-hidden rounded-[20px] border border-[#2E00AB]/20 bg-white p-2 shadow-none">
-      <div className="relative flex min-h-[140px] flex-[2] items-center justify-center overflow-hidden rounded-[16px] bg-[#F3EEFF] sm:min-h-[200px]">
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onSelect?.(medication.id)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect?.(medication.id);
+        }
+      }}
+      className={`flex h-full cursor-pointer flex-col overflow-hidden rounded-[20px] border bg-white p-2 shadow-none transition-all ${
+        selected
+          ? "border-[#2E00AB] ring-2 ring-[#2E00AB]/20"
+          : "border-[#2E00AB]/20 hover:border-[#2E00AB]/50"
+      }`}
+    >
+      <div className="relative flex min-h-[140px] flex-[2] items-center justify-center overflow-hidden rounded-[16px] bg-[#F3EEFF] sm:min-h-[180px]">
         <Image
           src="/curve-line.svg"
           alt=""
@@ -20,7 +44,7 @@ export default function MedicationCard({ selected = false }: MedicationCardProps
         />
 
         <Image
-          src="/syrup.svg"
+          src={medication.imageSrc ?? "/syrup.svg"}
           alt="Medication"
           width={200}
           height={200}
@@ -36,36 +60,35 @@ export default function MedicationCard({ selected = false }: MedicationCardProps
         </div>
       </div>
 
-      <div className="flex flex-[3] flex-col gap-3 p-4 sm:gap-4 sm:p-6">
+      <div className="flex flex-[3] flex-col gap-2 p-4 sm:gap-3 sm:p-5">
         <div className="flex items-start justify-between gap-3">
-          <h2 className="text-xl font-medium text-[#2E00AB] sm:text-2xl">Wegovy®</h2>
-          <span className="shrink-0 rounded-md border border-[#2E00AB]/15 bg-[#F8F4FF] px-3 py-1 text-sm font-medium text-[#2E00AB]">
-            GLP-1
+          <h2 className="text-lg font-medium text-[#2E00AB] sm:text-xl">{medication.name}</h2>
+          <span className="shrink-0 rounded-md border border-[#2E00AB]/15 bg-[#F8F4FF] px-2.5 py-1 text-xs font-medium text-[#2E00AB] sm:text-sm">
+            {medication.tag}
           </span>
         </div>
 
-        <p className="line-clamp-3 text-sm leading-relaxed text-[#2E00AB]/80 sm:text-base">
-          Personalized GLP-1 treatment designed to support appetite control, sustainable weight
-          loss, and long-term wellness goals.
+        <p className="line-clamp-2 text-sm leading-relaxed text-[#2E00AB]/80">
+          {medication.description}
         </p>
 
-        <div className="mt-auto space-y-3 sm:space-y-4">
-          <h3 className="text-2xl font-semibold leading-none text-[#2E00AB] sm:text-3xl lg:text-[36px]">
-            $199/mo
+        <div className="mt-auto space-y-3 pt-2">
+          <h3 className="text-xl font-semibold leading-none text-[#2E00AB] sm:text-2xl">
+            ${medication.priceMonthly}/mo
           </h3>
 
           <button
             type="button"
-            className={`w-full rounded-md border py-3 text-sm font-medium transition-all sm:py-3.5 sm:text-base ${
-              selected
-                ? "border-[#2E00AB] bg-[#2E00AB] text-white"
-                : "border-[#2E00AB]/30 bg-white text-[#2E00AB] hover:bg-[#F8F4FF]"
-            }`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onViewDetails?.(medication.id);
+            }}
+            className="w-full rounded-md border border-[#2E00AB]/30 bg-white py-2.5 text-sm font-medium text-[#2E00AB] transition-all hover:bg-[#F8F4FF] sm:py-3 sm:text-base"
           >
             View Details
           </button>
         </div>
       </div>
-    </Card>
+    </div>
   );
 }

@@ -2,7 +2,29 @@
 
 import { useRouter } from "next/navigation";
 
-export default function OrderSummary() {
+type OrderSummaryProps = {
+  medicationName: string;
+  planLabel: string;
+  medicationTotal: number;
+  subtotal: number;
+  processingFee: number;
+  discount: number;
+  total: number;
+};
+
+function formatMoney(amount: number) {
+  return `$${amount.toFixed(2)}`;
+}
+
+export default function OrderSummary({
+  medicationName,
+  planLabel,
+  medicationTotal,
+  subtotal,
+  processingFee,
+  discount,
+  total,
+}: OrderSummaryProps) {
   const router = useRouter();
 
   return (
@@ -14,10 +36,12 @@ export default function OrderSummary() {
       <div className="mt-3 flex flex-col gap-3">
         <div className="flex justify-between gap-4">
           <div>
-            <p className="text-base font-medium text-[#2E00AB]">Personalized Wellness Plan</p>
-            <p className="mt-0.5 text-sm text-[#2E00AB]/70">3-Month Membership Program</p>
+            <p className="text-base font-medium text-[#2E00AB]">{medicationName}</p>
+            <p className="mt-0.5 text-sm text-[#2E00AB]/70">{planLabel}</p>
           </div>
-          <p className="shrink-0 text-base font-semibold text-[#2E00AB]">$149.00</p>
+          <p className="shrink-0 text-base font-semibold text-[#2E00AB]">
+            {formatMoney(medicationTotal)}
+          </p>
         </div>
 
         <div className="flex justify-between gap-4 border-b border-[#2E00AB]/10 pb-3">
@@ -31,16 +55,18 @@ export default function OrderSummary() {
         <div className="space-y-2 text-sm text-[#2E00AB]">
           <div className="flex justify-between">
             <span>Subtotal</span>
-            <span>$184.00</span>
+            <span>{formatMoney(subtotal)}</span>
           </div>
           <div className="flex justify-between">
             <span>Processing Fee</span>
-            <span>$5.00</span>
+            <span>{formatMoney(processingFee)}</span>
           </div>
-          <div className="flex justify-between">
-            <span>Discount (WELCOME20)</span>
-            <span>-$22.00</span>
-          </div>
+          {discount > 0 ? (
+            <div className="flex justify-between">
+              <span>Discount (WELCOME20)</span>
+              <span>-{formatMoney(discount)}</span>
+            </div>
+          ) : null}
           <div className="flex justify-between">
             <span>Tax</span>
             <span>$0.00</span>
@@ -51,7 +77,7 @@ export default function OrderSummary() {
 
         <div className="flex items-center justify-between">
           <p className="text-base font-medium text-[#2E00AB]">Total Due Today</p>
-          <p className="text-3xl font-bold leading-none text-[#2E00AB]">$167.00</p>
+          <p className="text-3xl font-bold leading-none text-[#2E00AB]">{formatMoney(total)}</p>
         </div>
 
         <div className="flex gap-2">
