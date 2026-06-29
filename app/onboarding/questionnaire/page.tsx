@@ -79,19 +79,18 @@ export default function QuestionnairePage() {
         onBack={handleBack}
         onContinue={handleContinue}
         maxWidth="2xl"
-        layout="fill"
       >
-        <div className="space-y-4">
+        <div className="grid gap-2 lg:grid-cols-3 lg:gap-3">
           {questionnaire.questions.map((question) => (
-            <div key={question.id} className="space-y-3 rounded-xl border border-[#2E00AB]/15 p-4">
-              <p className="font-medium text-[#2E00AB]">{question.text}</p>
-              <div className="space-y-2">
+            <div key={question.id} className="space-y-2 rounded-xl border border-[#2E00AB]/15 p-3">
+              <p className="text-sm font-medium text-[#2E00AB]">{question.text}</p>
+              <div className="space-y-1.5">
                 {question.options.map((option) => {
                   const checked = (answers[question.id] ?? []).includes(option.id);
                   return (
                     <label
                       key={option.id}
-                      className="flex cursor-pointer items-start gap-3 rounded-lg border border-[#2E00AB]/10 px-3 py-2.5 hover:bg-[#F8F4FF]"
+                      className="flex cursor-pointer items-start gap-2 rounded-lg border border-[#2E00AB]/10 px-2 py-1.5 hover:bg-[#F8F4FF]"
                     >
                       <Checkbox
                         checked={checked}
@@ -100,7 +99,7 @@ export default function QuestionnairePage() {
                         }
                         className="mt-0.5"
                       />
-                      <span className="text-sm text-[#2E00AB]">{option.label}</span>
+                      <span className="text-xs text-[#2E00AB] sm:text-sm">{option.label}</span>
                     </label>
                   );
                 })}

@@ -201,6 +201,20 @@ export const MEDICATIONS: Medication[] = [
     goalIds: ["muscle_recovery", "longevity"],
     requiresQuestionnaire: false,
   },
+  {
+    id: "mounjaro",
+    name: "Mounjaro®",
+    tag: "GLP-1",
+    description: "Dual-action GLP-1/GIP therapy for metabolic health and body composition goals.",
+    detailDescription: GLP1_DETAIL_DESCRIPTION,
+    importantInfo: GLP1_IMPORTANT_INFO,
+    notice: GLP1_NOTICE,
+    imageSrc: "/syrup.svg",
+    priceMonthly: 209,
+    goalIds: ["longevity", "energy", "muscle_recovery"],
+    requiresQuestionnaire: true,
+    questionnaireId: "glp1-screening",
+  },
 ];
 
 export const QUESTIONNAIRES: Questionnaire[] = [

@@ -34,13 +34,13 @@ export default function GoalPage() {
         continueDisabled={!selected}
         showBack={false}
       >
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
           {GOALS.map((goal) => (
             <button
               key={goal.id}
               type="button"
               onClick={() => setSelected(goal.id)}
-              className={`rounded-xl border px-4 py-4 text-left transition-all ${
+              className={`rounded-xl border px-3 py-3 text-left transition-all sm:px-4 sm:py-3.5 ${
                 selected === goal.id
                   ? "border-[#2E00AB] bg-[#2E00AB]/5"
                   : "border-[#2E00AB]/20 hover:border-[#2E00AB]"

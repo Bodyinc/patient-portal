@@ -16,7 +16,7 @@ type OnboardingStepLayoutProps = {
   showBack?: boolean;
   showProgress?: boolean;
   maxWidth?: "md" | "lg" | "xl" | "2xl" | "4xl" | "7xl";
-  /** Center compact steps vertically; use "fill" for scrollable long forms. */
+  /** Center compact steps vertically; use "fill" for taller content that fills middle zone. */
   layout?: "centered" | "fill";
 };
 
@@ -45,14 +45,14 @@ export default function OnboardingStepLayout({
   const isCentered = layout === "centered";
 
   const middleZoneClass = isCentered
-    ? "flex min-h-0 flex-1 flex-col justify-center overflow-y-auto"
-    : "flex min-h-0 flex-1 flex-col";
+    ? "flex min-h-0 flex-1 flex-col justify-center"
+    : "flex min-h-0 flex-1 flex-col justify-center";
 
   const cardClass = isCentered
     ? "shrink-0 overflow-hidden rounded-2xl border-[#2E00AB]/20 p-4 shadow-none sm:p-5"
-    : "flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border-[#2E00AB]/20 p-4 shadow-none sm:p-5";
+    : "flex min-h-0 max-h-full shrink flex-col overflow-hidden rounded-2xl border-[#2E00AB]/20 p-3 shadow-none sm:p-4";
 
-  const contentClass = isCentered ? "mt-4" : "mt-4 min-h-0 flex-1 overflow-y-auto";
+  const contentClass = isCentered ? "mt-3 sm:mt-4" : "mt-3 min-h-0 sm:mt-4";
 
   return (
     <div className={`mx-auto flex min-h-0 w-full flex-1 flex-col ${maxWidthClass[maxWidth]}`}>
@@ -61,9 +61,9 @@ export default function OnboardingStepLayout({
       <div className={middleZoneClass}>
         <Card className={cardClass}>
           <div className="shrink-0">
-            <h1 className="text-xl font-semibold text-[#2E00AB] sm:text-2xl">{title}</h1>
+            <h1 className="text-lg font-semibold text-[#2E00AB] sm:text-xl lg:text-2xl">{title}</h1>
             {description ? (
-              <p className="mt-2 text-sm text-[#2E00AB]/80 sm:text-base">{description}</p>
+              <p className="mt-1 text-sm text-[#2E00AB]/80 sm:text-base">{description}</p>
             ) : null}
           </div>
 

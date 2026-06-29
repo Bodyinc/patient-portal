@@ -28,13 +28,13 @@ export default function MedicationCard({
           onSelect?.(medication.id);
         }
       }}
-      className={`flex h-full cursor-pointer flex-col overflow-hidden rounded-[20px] border bg-white p-2 shadow-none transition-all ${
+      className={`flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl border bg-white p-1.5 shadow-none transition-all ${
         selected
           ? "border-[#2E00AB] ring-2 ring-[#2E00AB]/20"
           : "border-[#2E00AB]/20 hover:border-[#2E00AB]/50"
       }`}
     >
-      <div className="relative flex min-h-[140px] flex-[2] items-center justify-center overflow-hidden rounded-[16px] bg-[#F3EEFF] sm:min-h-[180px]">
+      <div className="relative flex min-h-[88px] flex-[2] items-center justify-center overflow-hidden rounded-xl bg-[#F3EEFF] sm:min-h-[100px] lg:min-h-[110px]">
         <Image
           src="/curve-line.svg"
           alt=""
@@ -48,32 +48,38 @@ export default function MedicationCard({
           alt="Medication"
           width={200}
           height={200}
-          className="relative z-10 h-auto max-h-[75%] w-auto object-contain"
+          className="relative z-10 h-auto max-h-[70%] w-auto object-contain"
         />
 
         <div
-          className={`absolute right-4 top-4 flex h-7 w-7 items-center justify-center rounded-full border-2 ${
+          className={`absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full border-2 ${
             selected ? "border-[#2E00AB] bg-[#2E00AB]" : "border-[#2E00AB]/25 bg-white"
           }`}
         >
-          {selected && <div className="h-3 w-3 rounded-full bg-white" />}
+          {selected && <div className="h-2.5 w-2.5 rounded-full bg-white" />}
         </div>
       </div>
 
-      <div className="flex flex-[3] flex-col gap-2 p-4 sm:gap-3 sm:p-5">
-        <div className="flex items-start justify-between gap-3">
-          <h2 className="text-lg font-medium text-[#2E00AB] sm:text-xl">{medication.name}</h2>
-          <span className="shrink-0 rounded-md border border-[#2E00AB]/15 bg-[#F8F4FF] px-2.5 py-1 text-xs font-medium text-[#2E00AB] sm:text-sm">
+      <div className="flex flex-[3] flex-col gap-1.5 p-3 sm:gap-2 sm:p-3">
+        <div className="flex items-start justify-between gap-2">
+          <h2 className="text-base font-medium text-[#2E00AB] sm:text-lg">{medication.name}</h2>
+          <span className="shrink-0 rounded-md border border-[#2E00AB]/15 bg-[#F8F4FF] px-2 py-0.5 text-[11px] font-medium text-[#2E00AB] sm:text-xs">
             {medication.tag}
           </span>
         </div>
 
-        <p className="line-clamp-2 text-sm leading-relaxed text-[#2E00AB]/80">
+        {medication.requiresQuestionnaire ? (
+          <span className="w-fit rounded-md bg-[#2E00AB]/10 px-2 py-0.5 text-[11px] font-medium text-[#2E00AB]">
+            Screening required
+          </span>
+        ) : null}
+
+        <p className="line-clamp-2 text-xs leading-snug text-[#2E00AB]/80 sm:text-sm">
           {medication.description}
         </p>
 
-        <div className="mt-auto space-y-3 pt-2">
-          <h3 className="text-xl font-semibold leading-none text-[#2E00AB] sm:text-2xl">
+        <div className="mt-auto space-y-2 pt-1">
+          <h3 className="text-lg font-semibold leading-none text-[#2E00AB] sm:text-xl">
             ${medication.priceMonthly}/mo
           </h3>
 
@@ -83,7 +89,7 @@ export default function MedicationCard({
               e.stopPropagation();
               onViewDetails?.(medication.id);
             }}
-            className="w-full rounded-md border border-[#2E00AB]/30 bg-white py-2.5 text-sm font-medium text-[#2E00AB] transition-all hover:bg-[#F8F4FF] sm:py-3 sm:text-base"
+            className="w-full rounded-md border border-[#2E00AB]/30 bg-white py-2 text-xs font-medium text-[#2E00AB] transition-all hover:bg-[#F8F4FF] sm:text-sm"
           >
             View Details
           </button>

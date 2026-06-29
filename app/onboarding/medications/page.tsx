@@ -48,27 +48,27 @@ export default function MedicationsPage() {
 
   return (
     <OnboardingShell>
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col px-2 lg:px-6">
+      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col overflow-hidden px-2 lg:px-6">
         <OnboardingProgress />
 
-        <div className="mb-3 shrink-0 text-center sm:mb-4">
-          <h1 className="text-2xl font-semibold text-[#2E00AB] sm:text-[28px] lg:text-[32px]">
+        <div className="mb-2 shrink-0 text-center sm:mb-3">
+          <h1 className="text-xl font-semibold text-[#2E00AB] sm:text-2xl lg:text-[28px]">
             Medications for your goal
           </h1>
-          <p className="mx-auto mt-2 max-w-3xl text-sm text-[#2E00AB]/80 sm:text-base">
+          <p className="mx-auto mt-1 max-w-3xl text-xs text-[#2E00AB]/80 sm:text-sm">
             {goal
               ? `Based on your goal of ${goal.label.toLowerCase()}, here are recommended options.`
               : "Select the treatment that best fits your needs."}
           </p>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="flex min-h-0 flex-1 flex-col justify-center">
           {medications.length === 0 ? (
-            <p className="py-8 text-center text-[#2E00AB]/80">
+            <p className="py-4 text-center text-[#2E00AB]/80">
               No medications available for this goal.
             </p>
           ) : (
-            <div className="grid grid-cols-1 items-stretch gap-4 pb-2 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 lg:gap-6">
+            <div className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:gap-4">
               {medications.map((medication) => (
                 <MedicationCard
                   key={medication.id}

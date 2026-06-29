@@ -20,7 +20,7 @@ export default function OnboardingFooter({
   showContinue = true,
 }: OnboardingFooterProps) {
   return (
-    <div className="mt-4 shrink-0 pt-0 pb-1 sm:mt-5 sm:pb-2">
+    <div className="mt-3 shrink-0 pt-0 pb-1 sm:mt-4 sm:pb-2">
       <div
         className={`flex gap-3 ${showBack && showContinue ? "flex-col-reverse sm:flex-row sm:justify-between" : "flex-col sm:flex-row sm:justify-end"}`}
       >

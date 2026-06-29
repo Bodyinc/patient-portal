@@ -42,8 +42,8 @@ export default function BillingCheckoutPage() {
       <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col overflow-hidden px-2 lg:px-6">
         <PageHeader />
 
-        <div className="grid min-h-0 flex-1 grid-cols-1 items-start gap-4 overflow-y-auto lg:grid-cols-[1.65fr_1fr] lg:overflow-hidden">
-          <div className="flex min-h-0 flex-col gap-3 overflow-y-auto lg:overflow-hidden">
+        <div className="grid min-h-0 flex-1 grid-cols-1 items-stretch gap-3 lg:grid-cols-[1.65fr_1fr]">
+          <div className="flex min-h-0 flex-col justify-center gap-2 lg:gap-3">
             <div className="grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-2">
               <InfoCard
                 title="Patient Information"
