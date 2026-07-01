@@ -25,27 +25,27 @@ export default function DashboardPage() {
 
   return (
     <DashboardShell>
-      <main className="min-w-0 flex-1 p-3 sm:p-4">
+      <main className="min-w-0 flex-1 p-3">
         <DashboardHeader fullName={profile?.full_name} />
 
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[2fr_1.4fr]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1.4fr]">
           <div className="overflow-hidden rounded-xl border border-[#DDD4FF] bg-white">
             <div className="grid grid-cols-1 lg:grid-cols-2">
-              <div className="flex flex-col justify-center px-5 py-6 sm:px-7 sm:py-8">
-                <div className="mb-4 inline-flex h-[36px] w-[140px] items-center rounded-md border border-[#DDD4FF] px-4 text-[16px] font-medium text-[#4F1DDB] sm:mb-5">
+              <div className="flex flex-col justify-center px-4 py-5 sm:px-6 sm:py-6">
+                <div className="mb-3 inline-flex h-[29px] w-[112px] items-center rounded-md border border-[#DDD4FF] px-3 text-sm font-medium text-[#4F1DDB] sm:mb-4">
                   Next Step
                 </div>
 
-                <h2 className="mb-4 text-2xl font-bold leading-tight text-[#4F1DDB] sm:mb-6 sm:text-[32px]">
+                <h2 className="mb-4 text-xl font-bold leading-tight text-[#4F1DDB] sm:mb-5 sm:text-[26px]">
                   Ready to Begin Your Treatment Journey?
                 </h2>
 
-                <p className="mb-6 text-base leading-relaxed text-[#4F1DDB] sm:mb-8 sm:text-[18px] sm:leading-9">
+                <p className="mb-5 text-sm leading-relaxed text-[#4F1DDB] sm:mb-6 sm:text-sm sm:leading-7">
                   Your lab work is now available. Schedule a clinician review to discuss your
                   results and receive personalized recommendations.
                 </p>
 
-                <Button className="h-[52px] w-full rounded-lg bg-[#4F1DDB] px-7 text-[16px] hover:bg-[#4420C9] sm:w-fit">
+                <Button className="h-[42px] w-full rounded-lg bg-[#4F1DDB] px-6 text-sm hover:bg-[#4420C9] sm:w-fit">
                   Complete Intake Form →
                 </Button>
               </div>
@@ -62,37 +62,37 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-[#DDD4FF] bg-white p-4 sm:p-6">
-            <h3 className="mb-4 text-2xl font-bold text-[#4F1DDB] sm:mb-6 sm:text-[28px]">
+          <div className="rounded-xl border border-[#DDD4FF] bg-white p-4 sm:p-5">
+            <h3 className="mb-4 text-xl font-bold text-[#4F1DDB] sm:mb-5 sm:text-[22px]">
               Message
             </h3>
 
-            <div className="space-y-4">
-              <div className="rounded-xl border-l-4 border-[#4F1DDB] bg-[#F6F2FF] p-4 sm:p-5">
+            <div className="space-y-3">
+              <div className="rounded-xl border-l-4 border-[#4F1DDB] bg-[#F6F2FF] p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <p className="font-semibold text-[#4F1DDB]">Dr. Sarah Miller</p>
-                  <p className="text-sm text-[#4F1DDB]">10:45 AM</p>
+                  <p className="text-sm font-semibold text-[#4F1DDB]">Dr. Sarah Miller</p>
+                  <p className="text-xs text-[#4F1DDB] sm:text-sm">10:45 AM</p>
                 </div>
 
-                <p className="mt-3 text-[16px] text-[#4F1DDB]">
+                <p className="mt-2 text-sm text-[#4F1DDB]">
                   Your lab results are now available. Schedule your clinician review.
                 </p>
               </div>
 
-              <div className="rounded-xl border border-[#DDD4FF] p-4 sm:p-5">
+              <div className="rounded-xl border border-[#DDD4FF] p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <p className="font-semibold text-[#4F1DDB]">Nursing Support</p>
-                  <p className="text-sm text-[#4F1DDB]">10:45 AM</p>
+                  <p className="text-sm font-semibold text-[#4F1DDB]">Nursing Support</p>
+                  <p className="text-xs text-[#4F1DDB] sm:text-sm">10:45 AM</p>
                 </div>
 
-                <p className="mt-3 text-[16px] text-[#4F1DDB]">
+                <p className="mt-2 text-sm text-[#4F1DDB]">
                   Your lab work has been processed successfully.
                 </p>
               </div>
 
               <Button
                 variant="outline"
-                className="mt-5 h-[48px] w-full rounded-lg border-[#4F1DDB] px-6 text-[#4F1DDB] sm:w-auto"
+                className="mt-4 h-[38px] w-full rounded-lg border-[#4F1DDB] px-5 text-sm text-[#4F1DDB] sm:w-auto"
               >
                 View all messages →
               </Button>

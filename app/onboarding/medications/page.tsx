@@ -8,7 +8,7 @@ import OnboardingShell from "../_components/OnboardingShell";
 import MedicationCard from "../_components/MedicationCard";
 import MedicationDetailsDialog from "../_components/MedicationDetailsDialog";
 import OnboardingFooter from "../_components/OnboardingFooter";
-import OnboardingProgress from "../_components/OnboardingProgress";
+import OnboardingFrame from "../_components/OnboardingFrame";
 import { getGoalById, getMedicationById, getMedicationsForGoal } from "../_lib/onboarding-config";
 import { getNextStepPath, getPrevStepPath } from "../_lib/onboarding-navigation";
 import { useOnboarding } from "../_lib/onboarding-store";
@@ -48,9 +48,15 @@ export default function MedicationsPage() {
 
   return (
     <OnboardingShell>
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col overflow-hidden px-2 lg:px-6">
-        <OnboardingProgress />
-
+      <OnboardingFrame
+        footer={
+          <OnboardingFooter
+            onBack={handleBack}
+            onContinue={handleContinue}
+            continueDisabled={!selected}
+          />
+        }
+      >
         <div className="mb-2 shrink-0 text-center sm:mb-3">
           <h1 className="text-xl font-semibold text-[#2E00AB] sm:text-2xl lg:text-[28px]">
             Medications for your goal
@@ -81,13 +87,7 @@ export default function MedicationsPage() {
             </div>
           )}
         </div>
-
-        <OnboardingFooter
-          onBack={handleBack}
-          onContinue={handleContinue}
-          continueDisabled={!selected}
-        />
-      </div>
+      </OnboardingFrame>
 
       <MedicationDetailsDialog
         medication={detailsMedication}

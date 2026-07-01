@@ -10,20 +10,20 @@ export default function DashboardHeader({ fullName }: DashboardHeaderProps) {
   const displayName = fullName ? `, ${fullName}` : ", James";
 
   return (
-    <div className="mb-5 flex flex-col gap-4 rounded-xl bg-gradient-to-r from-[#F7F4FF] to-[#F3EEFF] px-4 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8 sm:py-6">
+    <div className="mb-4 flex flex-col gap-3 rounded-xl bg-gradient-to-r from-[#F7F4FF] to-[#F3EEFF] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6 sm:py-5">
       <div>
-        <h1 className="text-2xl font-semibold leading-tight text-[#2E00AB] sm:text-3xl lg:text-[42px] lg:leading-none">
+        <h1 className="text-xl font-semibold leading-tight text-[#2E00AB] sm:text-2xl lg:text-[34px] lg:leading-none">
           Good morning{displayName}
         </h1>
 
-        <p className="mt-2 text-base leading-snug text-[#2E00AB] sm:mt-3 sm:text-lg lg:text-[20px] lg:leading-none">
+        <p className="mt-2 text-sm leading-snug text-[#2E00AB] sm:mt-2.5 sm:text-base lg:text-base lg:leading-snug">
           Here&apos;s an update on your health journey and upcoming treatment milestones.
         </p>
       </div>
 
-      <div className="flex items-center justify-between gap-4 sm:justify-end sm:gap-5">
+      <div className="flex items-center justify-between gap-3 sm:justify-end sm:gap-4">
         <div className="relative">
-          <Bell className="h-6 w-6 text-[#4F1DDB]" strokeWidth={1.8} />
+          <Bell className="h-5 w-5 text-[#4F1DDB]" strokeWidth={1.8} />
           <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-red-500" />
         </div>
 
@@ -31,12 +31,14 @@ export default function DashboardHeader({ fullName }: DashboardHeaderProps) {
           <img
             src="https://i.pravatar.cc/60"
             alt="Profile"
-            className="h-11 w-11 rounded-lg object-cover sm:h-[52px] sm:w-[52px]"
+            className="h-9 w-9 rounded-lg object-cover sm:h-[42px] sm:w-[42px]"
           />
 
           <div>
-            <p className="font-semibold text-[#4F1DDB]">{fullName || "James Wilson"}</p>
-            <p className="text-sm text-[#7B5CF1]">Patient ID: #BI-2048</p>
+            <p className="text-sm font-semibold text-[#4F1DDB] sm:text-base">
+              {fullName || "James Wilson"}
+            </p>
+            <p className="text-xs text-[#7B5CF1] sm:text-sm">Patient ID: #BI-2048</p>
           </div>
         </div>
       </div>

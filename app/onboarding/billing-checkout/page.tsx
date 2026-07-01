@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 
 import OnboardingShell from "../_components/OnboardingShell";
 import OnboardingFooter from "../_components/OnboardingFooter";
+import OnboardingFrame from "../_components/OnboardingFrame";
 import PageHeader from "./components/PageHeader";
 import InfoCard from "./components/InfoCard";
 import PaymentForm from "./components/PaymentForm";
@@ -39,7 +40,10 @@ export default function BillingCheckoutPage() {
 
   return (
     <OnboardingShell>
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col overflow-hidden px-2 lg:px-6">
+      <OnboardingFrame
+        showProgress={false}
+        footer={<OnboardingFooter onBack={handleBack} showContinue={false} />}
+      >
         <PageHeader />
 
         <div className="grid min-h-0 flex-1 grid-cols-1 items-stretch gap-3 lg:grid-cols-[1.65fr_1fr]">
@@ -78,9 +82,7 @@ export default function BillingCheckoutPage() {
             total={total}
           />
         </div>
-
-        <OnboardingFooter onBack={handleBack} showContinue={false} />
-      </div>
+      </OnboardingFrame>
     </OnboardingShell>
   );
 }

@@ -24,6 +24,15 @@ export type SignupResult =
 
 export type MyRoleResult = { role: "patient" | "provider" | "admin" | null };
 
+function isDuplicateEmailError(message: string) {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("already been registered") ||
+    lower.includes("already exists") ||
+    lower.includes("duplicate")
+  );
+}
+
 async function findAuthUserByEmail(email: string) {
   const normalized = email.toLowerCase();
   for (let page = 1; page <= 5; page++) {
@@ -36,6 +45,36 @@ async function findAuthUserByEmail(email: string) {
   return { user: null, error: null };
 }
 
+async function getExistingUserSignupResult(email: string): Promise<SignupResult> {
+  const { user: found, error: lookupErr } = await findAuthUserByEmail(email);
+
+  if (lookupErr || !found) {
+    return { ok: false, code: "error", message: "Could not verify email. Try again." };
+  }
+
+  const { data: roleRow } = await supabaseAdmin
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", found.id)
+    .maybeSingle();
+
+  const role = (roleRow as { role: MyRoleResult["role"] } | null)?.role;
+  if (role && role !== PORTAL_ROLE) {
+    return {
+      ok: false,
+      code: "wrong_portal",
+      role,
+      message: `An account with this email already exists on the ${role} portal. Please sign in at ${role}.bodyinc.com.`,
+    };
+  }
+
+  return {
+    ok: false,
+    code: "exists",
+    message: "An account with this email already exists. Please sign in instead.",
+  };
+}
+
 async function getAuthenticatedClient() {
   const supabase = await createClient();
   const {
@@ -44,7 +83,7 @@ async function getAuthenticatedClient() {
   } = await supabase.auth.getUser();
 
   if (error || !user) {
-    throw new Error("Unauthorized");
+    return null;
   }
 
   return { supabase, userId: user.id };
@@ -52,35 +91,6 @@ async function getAuthenticatedClient() {
 
 export async function signUpPatient(input: z.infer<typeof signupSchema>): Promise<SignupResult> {
   const data = signupSchema.parse(input);
-
-  const { user: found, error: lookupErr } = await findAuthUserByEmail(data.email);
-
-  if (lookupErr) {
-    return { ok: false, code: "error", message: "Could not verify email. Try again." };
-  }
-
-  if (found) {
-    const { data: roleRow } = await supabaseAdmin
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", found.id)
-      .maybeSingle();
-
-    const role = (roleRow as { role: MyRoleResult["role"] } | null)?.role;
-    if (role && role !== PORTAL_ROLE) {
-      return {
-        ok: false,
-        code: "wrong_portal",
-        role,
-        message: `An account with this email already exists on the ${role} portal. Please sign in at ${role}.bodyinc.com.`,
-      };
-    }
-    return {
-      ok: false,
-      code: "exists",
-      message: "An account with this email already exists. Please sign in instead.",
-    };
-  }
 
   const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
     email: data.email,
@@ -93,12 +103,20 @@ export async function signUpPatient(input: z.infer<typeof signupSchema>): Promis
     },
   });
 
-  if (createErr || !created.user) {
+  if (createErr) {
+    if (isDuplicateEmailError(createErr.message)) {
+      return getExistingUserSignupResult(data.email);
+    }
+
     return {
       ok: false,
       code: "error",
-      message: createErr?.message ?? "Could not create account.",
+      message: createErr.message ?? "Could not create account.",
     };
+  }
+
+  if (!created.user) {
+    return { ok: false, code: "error", message: "Could not create account." };
   }
 
   const { error: roleErr } = await supabaseAdmin
@@ -114,19 +132,22 @@ export async function signUpPatient(input: z.infer<typeof signupSchema>): Promis
 }
 
 export async function getMyRole(): Promise<MyRoleResult> {
-  const { supabase } = await getAuthenticatedClient();
-  const { data, error } = await supabase.rpc("get_my_role");
+  const auth = await getAuthenticatedClient();
+  if (!auth) return { role: null };
+
+  const { data, error } = await auth.supabase.rpc("get_my_role");
   if (error) return { role: null };
   return { role: (data as MyRoleResult["role"]) ?? null };
 }
 
 export async function ensurePatientRole(): Promise<MyRoleResult> {
-  const { supabase, userId } = await getAuthenticatedClient();
+  const auth = await getAuthenticatedClient();
+  if (!auth) return { role: null };
 
-  const { data: existing } = await supabase
+  const { data: existing } = await auth.supabase
     .from("user_roles")
     .select("role")
-    .eq("user_id", userId)
+    .eq("user_id", auth.userId)
     .maybeSingle();
 
   const role = (existing as { role: MyRoleResult["role"] } | null)?.role;
@@ -134,6 +155,6 @@ export async function ensurePatientRole(): Promise<MyRoleResult> {
     return { role };
   }
 
-  await supabaseAdmin.from("user_roles").insert({ user_id: userId, role: PORTAL_ROLE });
+  await supabaseAdmin.from("user_roles").insert({ user_id: auth.userId, role: PORTAL_ROLE });
   return { role: PORTAL_ROLE };
 }

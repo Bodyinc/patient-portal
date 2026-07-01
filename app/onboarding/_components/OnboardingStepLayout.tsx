@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { Card } from "@/components/ui/card";
 
 import OnboardingFooter from "./OnboardingFooter";
-import OnboardingProgress from "./OnboardingProgress";
+import OnboardingFrame from "./OnboardingFrame";
 
 type OnboardingStepLayoutProps = {
   title: string;
@@ -44,22 +44,26 @@ export default function OnboardingStepLayout({
 }: OnboardingStepLayoutProps) {
   const isCentered = layout === "centered";
 
-  const middleZoneClass = isCentered
-    ? "flex min-h-0 flex-1 flex-col justify-center"
-    : "flex min-h-0 flex-1 flex-col justify-center";
-
   const cardClass = isCentered
     ? "shrink-0 overflow-hidden rounded-2xl border-[#2E00AB]/20 p-4 shadow-none sm:p-5"
     : "flex min-h-0 max-h-full shrink flex-col overflow-hidden rounded-2xl border-[#2E00AB]/20 p-3 shadow-none sm:p-4";
 
   const contentClass = isCentered ? "mt-3 sm:mt-4" : "mt-3 min-h-0 sm:mt-4";
 
-  return (
-    <div className={`mx-auto flex min-h-0 w-full flex-1 flex-col ${maxWidthClass[maxWidth]}`}>
-      {showProgress ? <OnboardingProgress /> : null}
+  const footer = onContinue ? (
+    <OnboardingFooter
+      onBack={onBack}
+      onContinue={onContinue}
+      continueLabel={continueLabel}
+      continueDisabled={continueDisabled}
+      showBack={showBack}
+    />
+  ) : undefined;
 
-      <div className={middleZoneClass}>
-        <Card className={cardClass}>
+  return (
+    <OnboardingFrame showProgress={showProgress} footer={footer}>
+      <div className="flex min-h-0 flex-1 flex-col justify-center">
+        <Card className={`mx-auto w-full ${maxWidthClass[maxWidth]} ${cardClass}`}>
           <div className="shrink-0">
             <h1 className="text-lg font-semibold text-[#2E00AB] sm:text-xl lg:text-2xl">{title}</h1>
             {description ? (
@@ -70,16 +74,6 @@ export default function OnboardingStepLayout({
           <div className={contentClass}>{children}</div>
         </Card>
       </div>
-
-      {onContinue ? (
-        <OnboardingFooter
-          onBack={onBack}
-          onContinue={onContinue}
-          continueLabel={continueLabel}
-          continueDisabled={continueDisabled}
-          showBack={showBack}
-        />
-      ) : null}
-    </div>
+    </OnboardingFrame>
   );
 }
