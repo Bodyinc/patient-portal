@@ -46,9 +46,11 @@ export default function OnboardingStepLayout({
 
   const cardClass = isCentered
     ? "shrink-0 overflow-hidden rounded-2xl border-[#2E00AB]/20 p-4 shadow-none sm:p-5"
-    : "flex min-h-0 max-h-full shrink flex-col overflow-hidden rounded-2xl border-[#2E00AB]/20 p-3 shadow-none sm:p-4";
+    : "flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border-[#2E00AB]/20 p-3 shadow-none sm:p-4";
 
-  const contentClass = isCentered ? "mt-3 sm:mt-4" : "mt-3 min-h-0 sm:mt-4";
+  const contentClass = isCentered
+    ? "mt-3 sm:mt-4"
+    : "mt-3 min-h-0 flex-1 overflow-y-auto pr-1 sm:mt-4";
 
   const footer = onContinue ? (
     <OnboardingFooter
@@ -62,7 +64,9 @@ export default function OnboardingStepLayout({
 
   return (
     <OnboardingFrame showProgress={showProgress} footer={footer}>
-      <div className="flex min-h-0 flex-1 flex-col justify-center">
+      <div
+        className={`flex min-h-0 flex-1 flex-col ${isCentered ? "justify-center" : "overflow-hidden"}`}
+      >
         <Card className={`mx-auto w-full ${maxWidthClass[maxWidth]} ${cardClass}`}>
           <div className="shrink-0">
             <h1 className="text-lg font-semibold text-[#2E00AB] sm:text-xl lg:text-2xl">{title}</h1>

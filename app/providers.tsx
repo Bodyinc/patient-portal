@@ -7,7 +7,16 @@ import { Toaster } from "@/components/ui/sonner";
 import { createClient } from "@/lib/supabase/client";
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  const [queryClient] = useState(() => new QueryClient());
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            refetchOnWindowFocus: false,
+          },
+        },
+      }),
+  );
   const router = useRouter();
 
   useEffect(() => {

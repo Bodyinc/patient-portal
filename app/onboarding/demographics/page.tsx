@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { saveIntakeDemographics } from "@/lib/actions/intake";
 
 import OnboardingShell from "../_components/OnboardingShell";
 import OnboardingStepLayout from "../_components/OnboardingStepLayout";
@@ -23,20 +24,30 @@ import { useOnboarding } from "../_lib/onboarding-store";
 
 const demographicsSchema = z.object({
   state: z.string().min(1, "Select your state"),
-  sex: z.string().min(1, "Select your sex"),
+  sex: z.enum(["male", "female", "other"]),
   dob: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date of birth"),
 });
 
 export default function DemographicsPage() {
   const router = useRouter();
-  const { state, updateState } = useOnboarding();
+  const { state, updateState, hydrated } = useOnboarding();
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     state: state.state ?? "",
     sex: state.sex ?? "",
     dob: state.dob ?? "",
   });
 
-  function handleContinue() {
+  useEffect(() => {
+    if (!hydrated) return;
+    setForm({
+      state: state.state ?? "",
+      sex: state.sex ?? "",
+      dob: state.dob ?? "",
+    });
+  }, [hydrated, state.state, state.sex, state.dob]);
+
+  async function handleContinue() {
     const parsed = demographicsSchema.safeParse(form);
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]?.message ?? "Invalid input");
@@ -44,6 +55,19 @@ export default function DemographicsPage() {
     }
     if (new Date(parsed.data.dob) >= new Date()) {
       toast.error("Date of birth must be in the past");
+      return;
+    }
+
+    setSaving(true);
+    const result = await saveIntakeDemographics({
+      stateCode: parsed.data.state,
+      sex: parsed.data.sex,
+      dob: parsed.data.dob,
+    });
+    setSaving(false);
+
+    if (!result.ok) {
+      toast.error(result.message);
       return;
     }
 
@@ -65,6 +89,7 @@ export default function DemographicsPage() {
         description="We need a few details to personalize your care and confirm eligibility."
         onBack={handleBack}
         onContinue={handleContinue}
+        continueDisabled={saving}
         maxWidth="2xl"
       >
         <div className="space-y-5">

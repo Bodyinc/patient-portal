@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Menu } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -14,11 +14,13 @@ type DashboardShellProps = {
 };
 
 export default function DashboardShell({ children }: DashboardShellProps) {
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
   return (
     <div className="flex min-h-screen flex-col bg-white lg:flex-row">
       <div className="flex items-center justify-between border-b border-[#DDD4FF] bg-[#F3EFFF] px-4 py-2.5 lg:hidden">
         <Image src="/logo.svg" alt="BodyInc" width={96} height={30} priority />
-        <Sheet>
+        <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon" className="text-[#2E00AB]">
               <Menu className="h-5 w-5" />
@@ -26,7 +28,10 @@ export default function DashboardShell({ children }: DashboardShellProps) {
             </Button>
           </SheetTrigger>
           <SheetContent side="left" className="w-[224px] bg-[#F3EFFF] p-0">
-            <DashboardSidebar className="h-full rounded-none" />
+            <DashboardSidebar
+              className="h-full rounded-none"
+              onNavigate={() => setMobileNavOpen(false)}
+            />
           </SheetContent>
         </Sheet>
       </div>

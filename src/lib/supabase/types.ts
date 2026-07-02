@@ -1,55 +1,542 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.5";
   };
   public: {
     Tables: {
-      profiles: {
+      intake_session_categories: {
         Row: {
+          session_id: string;
+          category_id: string;
           created_at: string;
-          dob: string | null;
-          full_name: string;
+        };
+        Insert: {
+          session_id: string;
+          category_id: string;
+          created_at?: string;
+        };
+        Update: {
+          session_id?: string;
+          category_id?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      intake_session_eligibility_results: {
+        Row: {
           id: string;
+          session_id: string;
+          medicine_id: string;
+          result: Database["public"]["Enums"]["eligibility_result"];
+          reason: string | null;
+          evaluated_at: string;
+        };
+        Insert: {
+          id?: string;
+          session_id: string;
+          medicine_id: string;
+          result: Database["public"]["Enums"]["eligibility_result"];
+          reason?: string | null;
+          evaluated_at?: string;
+        };
+        Update: {
+          id?: string;
+          session_id?: string;
+          medicine_id?: string;
+          result?: Database["public"]["Enums"]["eligibility_result"];
+          reason?: string | null;
+          evaluated_at?: string;
+        };
+        Relationships: [];
+      };
+      intake_session_medicines: {
+        Row: {
+          session_id: string;
+          category_id: string;
+          medicine_id: string;
+          created_at: string;
+        };
+        Insert: {
+          session_id: string;
+          category_id: string;
+          medicine_id: string;
+          created_at?: string;
+        };
+        Update: {
+          session_id?: string;
+          category_id?: string;
+          medicine_id?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      intake_session_questionnaire_responses: {
+        Row: {
+          id: string;
+          session_id: string;
+          medicine_id: string;
+          question_id: string;
+          answer_text: string | null;
+          answer_number: number | null;
+          answer_boolean: boolean | null;
+          answer_option_ids: string[];
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          session_id: string;
+          medicine_id: string;
+          question_id: string;
+          answer_text?: string | null;
+          answer_number?: number | null;
+          answer_boolean?: boolean | null;
+          answer_option_ids?: string[];
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          session_id?: string;
+          medicine_id?: string;
+          question_id?: string;
+          answer_text?: string | null;
+          answer_number?: number | null;
+          answer_boolean?: boolean | null;
+          answer_option_ids?: string[];
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      intake_sessions: {
+        Row: {
+          id: string;
+          session_token: string;
+          state_code: string | null;
+          sex: Database["public"]["Enums"]["sex_type"] | null;
+          dob: string | null;
+          height_cm: number | null;
+          weight_kg: number | null;
+          full_name: string | null;
+          email: string | null;
           phone: string | null;
+          selected_plan_id: string | null;
+          status: Database["public"]["Enums"]["intake_session_status"];
+          claimed_by_user_id: string | null;
+          created_at: string;
+          updated_at: string;
+          expires_at: string;
+        };
+        Insert: {
+          id?: string;
+          session_token: string;
+          state_code?: string | null;
+          sex?: Database["public"]["Enums"]["sex_type"] | null;
+          dob?: string | null;
+          height_cm?: number | null;
+          weight_kg?: number | null;
+          full_name?: string | null;
+          email?: string | null;
+          phone?: string | null;
+          selected_plan_id?: string | null;
+          status?: Database["public"]["Enums"]["intake_session_status"];
+          claimed_by_user_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          expires_at?: string;
+        };
+        Update: {
+          id?: string;
+          session_token?: string;
+          state_code?: string | null;
+          sex?: Database["public"]["Enums"]["sex_type"] | null;
+          dob?: string | null;
+          height_cm?: number | null;
+          weight_kg?: number | null;
+          full_name?: string | null;
+          email?: string | null;
+          phone?: string | null;
+          selected_plan_id?: string | null;
+          status?: Database["public"]["Enums"]["intake_session_status"];
+          claimed_by_user_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          expires_at?: string;
+        };
+        Relationships: [];
+      };
+      medication_categories: {
+        Row: {
+          id: string;
+          slug: string;
+          name: string;
+          tagline: string | null;
+          description: string | null;
+          icon: string | null;
+          eligibility_rules: Json;
+          sort_order: number;
+          is_active: boolean;
+          created_at: string;
           updated_at: string;
         };
         Insert: {
+          id?: string;
+          slug: string;
+          name: string;
+          tagline?: string | null;
+          description?: string | null;
+          icon?: string | null;
+          eligibility_rules?: Json;
+          sort_order?: number;
+          is_active?: boolean;
           created_at?: string;
-          dob?: string | null;
-          full_name: string;
-          id: string;
-          phone?: string | null;
           updated_at?: string;
         };
         Update: {
-          created_at?: string;
-          dob?: string | null;
-          full_name?: string;
           id?: string;
+          slug?: string;
+          name?: string;
+          tagline?: string | null;
+          description?: string | null;
+          icon?: string | null;
+          eligibility_rules?: Json;
+          sort_order?: number;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      medication_category_medicines: {
+        Row: {
+          category_id: string;
+          medicine_id: string;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          category_id: string;
+          medicine_id: string;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          category_id?: string;
+          medicine_id?: string;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      medication_relationships: {
+        Row: {
+          id: string;
+          medicine_a_id: string;
+          medicine_b_id: string;
+          relationship: Database["public"]["Enums"]["medication_relationship"];
+          reason: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          medicine_a_id: string;
+          medicine_b_id: string;
+          relationship: Database["public"]["Enums"]["medication_relationship"];
+          reason?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          medicine_a_id?: string;
+          medicine_b_id?: string;
+          relationship?: Database["public"]["Enums"]["medication_relationship"];
+          reason?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      medicines: {
+        Row: {
+          id: string;
+          name: string;
+          short_description: string;
+          long_description: string | null;
+          image_url: string | null;
+          price_monthly: number;
+          status: Database["public"]["Enums"]["medicine_status"];
+          important_info: Json;
+          notice_text: string | null;
+          sort_order: number;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+          requires_questionnaire: boolean;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          short_description: string;
+          long_description?: string | null;
+          image_url?: string | null;
+          price_monthly?: number;
+          status?: Database["public"]["Enums"]["medicine_status"];
+          important_info?: Json;
+          notice_text?: string | null;
+          sort_order?: number;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+          requires_questionnaire?: boolean;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          short_description?: string;
+          long_description?: string | null;
+          image_url?: string | null;
+          price_monthly?: number;
+          status?: Database["public"]["Enums"]["medicine_status"];
+          important_info?: Json;
+          notice_text?: string | null;
+          sort_order?: number;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+          requires_questionnaire?: boolean;
+        };
+        Relationships: [];
+      };
+      packages: {
+        Row: {
+          id: string;
+          medicine_id: string;
+          name: string;
+          duration_months: number;
+          original_price: number;
+          price: number;
+          is_most_popular: boolean;
+          features: Json;
+          clinical_note: string | null;
+          sort_order: number;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          medicine_id: string;
+          name: string;
+          duration_months: number;
+          original_price?: number;
+          price?: number;
+          is_most_popular?: boolean;
+          features?: Json;
+          clinical_note?: string | null;
+          sort_order?: number;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          medicine_id?: string;
+          name?: string;
+          duration_months?: number;
+          original_price?: number;
+          price?: number;
+          is_most_popular?: boolean;
+          features?: Json;
+          clinical_note?: string | null;
+          sort_order?: number;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      profiles: {
+        Row: {
+          id: string;
+          full_name: string;
+          phone: string | null;
+          dob: string | null;
+          email: string;
+          avatar_url: string | null;
+          street_address: string | null;
+          city: string | null;
+          state_code: string | null;
+          postal_code: string | null;
+          country: string | null;
+          sex: Database["public"]["Enums"]["sex_type"] | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          full_name: string;
           phone?: string | null;
+          dob?: string | null;
+          email: string;
+          avatar_url?: string | null;
+          street_address?: string | null;
+          city?: string | null;
+          state_code?: string | null;
+          postal_code?: string | null;
+          country?: string | null;
+          sex?: Database["public"]["Enums"]["sex_type"] | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          full_name?: string;
+          phone?: string | null;
+          dob?: string | null;
+          email?: string;
+          avatar_url?: string | null;
+          street_address?: string | null;
+          city?: string | null;
+          state_code?: string | null;
+          postal_code?: string | null;
+          country?: string | null;
+          sex?: Database["public"]["Enums"]["sex_type"] | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      questionnaire_medicines: {
+        Row: {
+          questionnaire_id: string;
+          medicine_id: string;
+          created_at: string;
+        };
+        Insert: {
+          questionnaire_id: string;
+          medicine_id: string;
+          created_at?: string;
+        };
+        Update: {
+          questionnaire_id?: string;
+          medicine_id?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      questionnaire_question_options: {
+        Row: {
+          id: string;
+          question_id: string;
+          label: string;
+          value: string | null;
+          sort_order: number;
+          is_disqualifying: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          question_id: string;
+          label: string;
+          value?: string | null;
+          sort_order?: number;
+          is_disqualifying?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          question_id?: string;
+          label?: string;
+          value?: string | null;
+          sort_order?: number;
+          is_disqualifying?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      questionnaire_questions: {
+        Row: {
+          id: string;
+          questionnaire_id: string;
+          prompt: string;
+          description: string | null;
+          question_type: Database["public"]["Enums"]["q_question_type"];
+          is_required: boolean;
+          sort_order: number;
+          disqualify_rules: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          questionnaire_id: string;
+          prompt: string;
+          description?: string | null;
+          question_type: Database["public"]["Enums"]["q_question_type"];
+          is_required?: boolean;
+          sort_order?: number;
+          disqualify_rules?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          questionnaire_id?: string;
+          prompt?: string;
+          description?: string | null;
+          question_type?: Database["public"]["Enums"]["q_question_type"];
+          is_required?: boolean;
+          sort_order?: number;
+          disqualify_rules?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      questionnaires: {
+        Row: {
+          id: string;
+          name: string;
+          description: string | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          description?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          description?: string | null;
+          is_active?: boolean;
+          created_at?: string;
           updated_at?: string;
         };
         Relationships: [];
       };
       user_roles: {
         Row: {
-          created_at: string;
-          role: Database["public"]["Enums"]["app_role"];
           user_id: string;
+          role: Database["public"]["Enums"]["app_role"];
+          created_at: string;
         };
         Insert: {
-          created_at?: string;
-          role: Database["public"]["Enums"]["app_role"];
           user_id: string;
+          role: Database["public"]["Enums"]["app_role"];
+          created_at?: string;
         };
         Update: {
-          created_at?: string;
-          role?: Database["public"]["Enums"]["app_role"];
           user_id?: string;
+          role?: Database["public"]["Enums"]["app_role"];
+          created_at?: string;
         };
         Relationships: [];
       };
@@ -73,6 +560,20 @@ export type Database = {
     };
     Enums: {
       app_role: "admin" | "provider" | "patient";
+      eligibility_result: "eligible" | "ineligible" | "needs_review";
+      intake_session_status: "in_progress" | "completed" | "abandoned" | "expired";
+      medication_relationship: "contraindicated" | "caution" | "alternative";
+      medicine_status: "draft" | "active" | "published" | "archived";
+      q_question_type:
+        | "single_select"
+        | "single_choice"
+        | "multi_select"
+        | "multi_choice"
+        | "text"
+        | "number"
+        | "boolean"
+        | "yes_no";
+      sex_type: "male" | "female" | "other";
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -81,7 +582,6 @@ export type Database = {
 };
 
 type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">;
-
 type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">];
 
 export type Tables<
@@ -136,31 +636,6 @@ export type TablesInsert<
       : never
     : never;
 
-export type TablesUpdate<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals;
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
-}
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U;
-    }
-    ? U
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U;
-      }
-      ? U
-      : never
-    : never;
-
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
@@ -178,27 +653,25 @@ export type Enums<
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never;
 
-export type CompositeTypes<
-  PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals;
-  }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
-> = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
-}
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never;
-
 export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "provider", "patient"],
+      eligibility_result: ["eligible", "ineligible", "needs_review"],
+      intake_session_status: ["in_progress", "completed", "abandoned", "expired"],
+      medication_relationship: ["contraindicated", "caution", "alternative"],
+      medicine_status: ["draft", "active", "published", "archived"],
+      q_question_type: [
+        "single_select",
+        "single_choice",
+        "multi_select",
+        "multi_choice",
+        "text",
+        "number",
+        "boolean",
+        "yes_no",
+      ],
+      sex_type: ["male", "female", "other"],
     },
   },
 } as const;

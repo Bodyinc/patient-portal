@@ -1,8 +1,6 @@
-import {
-  getQuestionnaireForMedication,
-  medicationRequiresQuestionnaire,
-} from "./onboarding-config";
 import type { OnboardingState } from "./onboarding-store";
+import type { QuestionDto } from "@/lib/intake/types";
+import { isQuestionAnswered } from "@/lib/intake/questionnaire";
 
 export const ONBOARDING_STEPS = [
   { id: "goal", path: "/onboarding/goal" },
@@ -40,16 +38,32 @@ export function getStepByPath(pathname: string) {
 }
 
 function includesQuestionnaire(state: OnboardingState) {
-  return medicationRequiresQuestionnaire(state.medicationId);
+  return state.requiresQuestionnaire;
+}
+
+export function areRequiredQuestionsAnswered(
+  questions: QuestionDto[],
+  answers: OnboardingState["questionnaireAnswers"],
+) {
+  return questions
+    .filter((q) => q.isRequired)
+    .every((q) => isQuestionAnswered(q.questionType, answers[q.id]));
 }
 
 function isQuestionnaireComplete(state: OnboardingState) {
-  const questionnaire = getQuestionnaireForMedication(state.medicationId);
-  if (!questionnaire) return true;
-  return questionnaire.questions.every((q) => {
-    const answers = state.questionnaireAnswers[q.id];
-    return Boolean(answers?.length);
-  });
+  if (!state.requiresQuestionnaire) return true;
+  if (state.eligibilityResult === "ineligible") return false;
+  return state.questionnaireComplete;
+}
+
+function isBmiComplete(state: OnboardingState) {
+  if (state.bmi !== null) return true;
+  return (
+    state.heightFeet !== null &&
+    state.heightInches !== null &&
+    state.weightLbs !== null &&
+    state.bmi !== null
+  );
 }
 
 export function getNextStepPath(currentPath: string, state: OnboardingState): string | null {
@@ -81,9 +95,7 @@ export function getPrevStepPath(currentPath: string, state: OnboardingState): st
 export function getEarliestIncompleteStep(state: OnboardingState): string {
   if (!state.goalId) return "/onboarding/goal";
   if (!state.state || !state.sex || !state.dob) return "/onboarding/demographics";
-  if (state.bmi === null || state.heightFeet === null || state.weightLbs === null) {
-    return "/onboarding/bmi";
-  }
+  if (!isBmiComplete(state)) return "/onboarding/bmi";
   if (!state.medicationId) return "/onboarding/medications";
   if (!state.fullName || !state.email || !state.phone) return "/onboarding/personal-info";
 
@@ -91,13 +103,13 @@ export function getEarliestIncompleteStep(state: OnboardingState): string {
     return "/onboarding/questionnaire";
   }
 
-  if (!state.planMonths) return "/onboarding/select-plan";
-  return "/onboarding/billing-checkout";
+  if (!state.selectedPackageId) return "/onboarding/select-plan";
+  if (!state.checkoutConfirmed) return "/onboarding/billing-checkout";
+  return "/onboarding/order-confirmation";
 }
 
 export function canAccessStep(pathname: string, state: OnboardingState): boolean {
   if (isRedirectOnlyPath(pathname)) return true;
-  if (pathname.startsWith("/onboarding/order-confirmation")) return true;
 
   const earliest = getEarliestIncompleteStep(state);
   const requestedIndex = getStepIndex(pathname);

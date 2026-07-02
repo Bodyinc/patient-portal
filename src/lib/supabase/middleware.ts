@@ -48,11 +48,15 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
+  const { pathname } = request.nextUrl;
+
+  if (pathname.startsWith("/onboarding")) {
+    return supabaseResponse;
+  }
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
-  const { pathname } = request.nextUrl;
 
   if (isProtectedPath(pathname) && !user) {
     return redirectWithCookies(request, "/auth", supabaseResponse);

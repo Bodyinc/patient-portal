@@ -1,11 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { saveIntakeBmi } from "@/lib/actions/intake";
 
 import OnboardingShell from "../_components/OnboardingShell";
 import OnboardingStepLayout from "../_components/OnboardingStepLayout";
@@ -15,7 +16,8 @@ import { useOnboarding } from "../_lib/onboarding-store";
 
 export default function BmiPage() {
   const router = useRouter();
-  const { state, updateState } = useOnboarding();
+  const { state, updateState, hydrated } = useOnboarding();
+  const [saving, setSaving] = useState(false);
   const [heightFeet, setHeightFeet] = useState(
     state.heightFeet !== null ? String(state.heightFeet) : "",
   );
@@ -25,6 +27,13 @@ export default function BmiPage() {
   const [weightLbs, setWeightLbs] = useState(
     state.weightLbs !== null ? String(state.weightLbs) : "",
   );
+
+  useEffect(() => {
+    if (!hydrated) return;
+    setHeightFeet(state.heightFeet !== null ? String(state.heightFeet) : "");
+    setHeightInches(state.heightInches !== null ? String(state.heightInches) : "");
+    setWeightLbs(state.weightLbs !== null ? String(state.weightLbs) : "");
+  }, [hydrated, state.heightFeet, state.heightInches, state.weightLbs]);
 
   const bmi = useMemo(() => {
     const feet = Number(heightFeet);
@@ -36,7 +45,7 @@ export default function BmiPage() {
 
   const bmiCategory = getBmiCategory(bmi);
 
-  function handleContinue() {
+  async function handleContinue() {
     const feet = Number(heightFeet);
     const inches = Number(heightInches);
     const weight = Number(weightLbs);
@@ -60,11 +69,24 @@ export default function BmiPage() {
       return;
     }
 
+    setSaving(true);
+    const result = await saveIntakeBmi({
+      heightFeet: feet,
+      heightInches: inches,
+      weightLbs: weight,
+    });
+    setSaving(false);
+
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
+
     const patch = {
       heightFeet: feet,
       heightInches: inches,
       weightLbs: weight,
-      bmi: computedBmi,
+      bmi: result.data.bmi,
     };
     updateState(patch);
     const next = getNextStepPath("/onboarding/bmi", { ...state, ...patch });
@@ -83,6 +105,7 @@ export default function BmiPage() {
         description="We'll use your height and weight to calculate your BMI for clinical review."
         onBack={handleBack}
         onContinue={handleContinue}
+        continueDisabled={saving}
         maxWidth="2xl"
       >
         <div className="space-y-5">

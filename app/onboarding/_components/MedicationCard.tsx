@@ -2,10 +2,11 @@
 
 import Image from "next/image";
 
-import type { Medication } from "../_lib/onboarding-config";
+import MedicineImage from "./MedicineImage";
+import type { MedicineDto } from "@/lib/intake/types";
 
 type MedicationCardProps = {
-  medication: Medication;
+  medication: MedicineDto;
   selected?: boolean;
   onSelect?: (id: string) => void;
   onViewDetails?: (id: string) => void;
@@ -43,9 +44,9 @@ export default function MedicationCard({
           className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-70 select-none"
         />
 
-        <Image
-          src={medication.imageSrc ?? "/syrup.svg"}
-          alt="Medication"
+        <MedicineImage
+          src={medication.imageSrc}
+          alt={medication.name}
           width={200}
           height={200}
           className="relative z-10 h-auto max-h-[70%] w-auto object-contain"

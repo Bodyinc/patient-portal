@@ -1,7 +1,4 @@
 "use client";
-
-import { useRouter } from "next/navigation";
-
 type OrderSummaryProps = {
   medicationName: string;
   planLabel: string;
@@ -9,7 +6,17 @@ type OrderSummaryProps = {
   subtotal: number;
   processingFee: number;
   discount: number;
+  discountLabel: string | null;
   total: number;
+  promoCode: string;
+  promoMessage: string | null;
+  promoError: string | null;
+  applyingPromo: boolean;
+  consentAccepted: boolean;
+  confirming: boolean;
+  onPromoCodeChange: (value: string) => void;
+  onApplyPromo: () => void;
+  onContinue: () => void;
 };
 
 function formatMoney(amount: number) {
@@ -23,36 +30,49 @@ export default function OrderSummary({
   subtotal,
   processingFee,
   discount,
+  discountLabel,
   total,
+  promoCode,
+  promoMessage,
+  promoError,
+  applyingPromo,
+  consentAccepted,
+  confirming,
+  onPromoCodeChange,
+  onApplyPromo,
+  onContinue,
 }: OrderSummaryProps) {
-  const router = useRouter();
-
   return (
-    <div className="flex flex-col self-start rounded-[20px] border border-[#2E00AB]/20 bg-white p-5">
-      <h2 className="shrink-0 border-b border-[#2E00AB]/10 pb-3 text-xl font-semibold text-[#2E00AB]">
-        Order Summary
-      </h2>
+    <div className="flex h-full min-h-0 flex-1 flex-col rounded-2xl border border-[#2E00AB]/20 bg-white p-4">
+      {/* Header */}
+      <div className="shrink-0 border-b border-[#2E00AB]/10 pb-3">
+        <h2 className="text-lg font-semibold text-[#2E00AB]">Order Summary</h2>
+      </div>
 
-      <div className="mt-3 flex flex-col gap-3">
-        <div className="flex justify-between gap-4">
-          <div>
-            <p className="text-base font-medium text-[#2E00AB]">{medicationName}</p>
-            <p className="mt-0.5 text-sm text-[#2E00AB]/70">{planLabel}</p>
+      {/* Scrollable Content - overflow removed */}
+      <div className="flex min-h-0 flex-1 flex-col py-3">
+        {/* Medication */}
+        <div className="flex justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-[#2E00AB]">{medicationName}</p>
+            <p className="truncate text-xs text-[#2E00AB]/70">{planLabel}</p>
           </div>
-          <p className="shrink-0 text-base font-semibold text-[#2E00AB]">
+          <p className="shrink-0 text-sm font-semibold text-[#2E00AB]">
             {formatMoney(medicationTotal)}
           </p>
         </div>
 
-        <div className="flex justify-between gap-4 border-b border-[#2E00AB]/10 pb-3">
-          <div>
-            <p className="text-base font-medium text-[#2E00AB]">Initial Provider Consultation</p>
-            <p className="mt-0.5 text-sm text-[#2E00AB]/70">Required Clinical Assessment</p>
+        {/* Consultation */}
+        <div className="mt-4 flex justify-between gap-3 border-b border-[#2E00AB]/10 pb-4">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-[#2E00AB]">Initial Provider Consultation</p>
+            <p className="text-xs text-[#2E00AB]/70">Required Clinical Assessment</p>
           </div>
-          <p className="shrink-0 text-base font-semibold text-[#2E00AB]">$35.00</p>
+          <p className="shrink-0 text-sm font-semibold text-[#2E00AB]">$35.00</p>
         </div>
 
-        <div className="space-y-2 text-sm text-[#2E00AB]">
+        {/* Totals */}
+        <div className="mt-4 space-y-2 text-sm text-[#2E00AB]">
           <div className="flex justify-between">
             <span>Subtotal</span>
             <span>{formatMoney(subtotal)}</span>
@@ -61,49 +81,57 @@ export default function OrderSummary({
             <span>Processing Fee</span>
             <span>{formatMoney(processingFee)}</span>
           </div>
-          {discount > 0 ? (
-            <div className="flex justify-between">
-              <span>Discount (WELCOME20)</span>
+          {discount > 0 && (
+            <div className="flex justify-between text-emerald-700">
+              <span>Discount ({discountLabel ?? "Promo"})</span>
               <span>-{formatMoney(discount)}</span>
             </div>
-          ) : null}
+          )}
           <div className="flex justify-between">
             <span>Tax</span>
             <span>$0.00</span>
           </div>
         </div>
 
-        <hr className="border-[#2E00AB]/10" />
-
-        <div className="flex items-center justify-between">
-          <p className="text-base font-medium text-[#2E00AB]">Total Due Today</p>
-          <p className="text-3xl font-bold leading-none text-[#2E00AB]">{formatMoney(total)}</p>
+        {/* Total */}
+        <div className="mt-5 flex items-center justify-between border-t border-[#2E00AB]/10 pt-4">
+          <p className="text-base font-semibold text-[#2E00AB]">Total Due Today</p>
+          <p className="text-2xl font-bold text-[#2E00AB]">{formatMoney(total)}</p>
         </div>
 
-        <div className="flex gap-2">
-          <input
-            placeholder="Enter promo code"
-            className="flex-1 rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-[#2E00AB]"
-          />
+        {/* Promo */}
+        <div className="mt-5">
+          <div className="flex gap-2">
+            <input
+              value={promoCode}
+              onChange={(e) => onPromoCodeChange(e.target.value)}
+              placeholder="Promo code"
+              className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-[#2E00AB]"
+            />
+            <button
+              type="button"
+              onClick={onApplyPromo}
+              disabled={applyingPromo || !promoCode.trim()}
+              className="rounded-md border border-[#2E00AB] px-4 py-2 text-sm font-medium text-[#2E00AB] transition hover:bg-[#2E00AB]/5 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {applyingPromo ? "Applying..." : "Apply"}
+            </button>
+          </div>
+          {promoError && <p className="mt-2 text-xs text-red-600">{promoError}</p>}
+          {promoMessage && <p className="mt-2 text-xs text-emerald-700">{promoMessage}</p>}
+        </div>
+
+        {/* Push Footer to Bottom */}
+        <div className="mt-auto pt-6">
           <button
             type="button"
-            className="shrink-0 rounded-md border border-[#2E00AB] px-4 py-2 text-sm text-[#2E00AB]"
+            onClick={onContinue}
+            disabled={!consentAccepted || confirming}
+            className="w-full rounded-md bg-[#2E00AB] py-3 text-base font-semibold text-white transition hover:bg-[#24008A] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Apply Code →
+            {confirming ? "Processing payment..." : "Continue to Payment"}
           </button>
         </div>
-
-        <button
-          type="button"
-          onClick={() => router.push("/onboarding/order-confirmation")}
-          className="w-full rounded-md bg-[#2E00AB] py-3 text-base font-semibold text-white"
-        >
-          Continue to Payment
-        </button>
-
-        <p className="text-center text-xs text-[#2E00AB]/70">
-          Need assistance? <span className="font-semibold">Chat with Support</span>
-        </p>
       </div>
     </div>
   );

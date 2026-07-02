@@ -3,7 +3,16 @@ export const PORTAL_ROLE = "patient" as const;
 export type AppRole = "patient" | "provider" | "admin";
 
 /** Routes that require an authenticated session */
-export const PROTECTED_PATHS = ["/dashboard"];
+export const PROTECTED_PATHS = [
+  "/dashboard",
+  "/my-meds",
+  "/consultations",
+  "/document-center",
+  "/billing",
+  "/shop",
+  "/profile",
+  "/settings",
+];
 
 /**
  * Guest routes that redirect to /dashboard when already authenticated.

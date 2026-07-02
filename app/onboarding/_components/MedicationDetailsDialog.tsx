@@ -5,10 +5,11 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 
-import type { Medication } from "../_lib/onboarding-config";
+import MedicineImage from "./MedicineImage";
+import type { MedicineDto } from "@/lib/intake/types";
 
 type MedicationDetailsDialogProps = {
-  medication: Medication | null;
+  medication: MedicineDto | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelect: (id: string) => void;
@@ -40,8 +41,8 @@ export default function MedicationDetailsDialog({
                 fill
                 className="pointer-events-none object-cover opacity-70"
               />
-              <Image
-                src={medication.imageSrc ?? "/syrup.svg"}
+              <MedicineImage
+                src={medication.imageSrc}
                 alt={medication.name}
                 width={160}
                 height={200}

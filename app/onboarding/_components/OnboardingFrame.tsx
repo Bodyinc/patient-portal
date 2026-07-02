@@ -16,8 +16,8 @@ export default function OnboardingFrame({
   return (
     <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col overflow-hidden px-2 lg:px-6">
       {showProgress ? <OnboardingProgress /> : null}
-      {children}
-      {footer}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
+      {footer ? <div className="mt-2 shrink-0 sm:mt-3">{footer}</div> : null}
     </div>
   );
 }

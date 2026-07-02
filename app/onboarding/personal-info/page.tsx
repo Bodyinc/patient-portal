@@ -1,15 +1,18 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { saveIntakeContact } from "@/lib/actions/intake";
 
 import OnboardingShell from "../_components/OnboardingShell";
 import OnboardingStepLayout from "../_components/OnboardingStepLayout";
+import { prefetchQuestionnaireAndPackages } from "../_lib/intake-query";
 import { getNextStepPath, getPrevStepPath } from "../_lib/onboarding-navigation";
 import { useOnboarding } from "../_lib/onboarding-store";
 
@@ -21,21 +24,44 @@ const personalInfoSchema = z.object({
 
 export default function PersonalInfoPage() {
   const router = useRouter();
-  const { state, updateState } = useOnboarding();
+  const queryClient = useQueryClient();
+  const { state, updateState, hydrated } = useOnboarding();
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     fullName: state.fullName,
     email: state.email,
     phone: state.phone,
   });
 
-  function handleContinue() {
+  useEffect(() => {
+    if (!hydrated) return;
+    setForm({
+      fullName: state.fullName,
+      email: state.email,
+      phone: state.phone,
+    });
+  }, [hydrated, state.fullName, state.email, state.phone]);
+
+  async function handleContinue() {
     const parsed = personalInfoSchema.safeParse(form);
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]?.message ?? "Invalid input");
       return;
     }
 
+    setSaving(true);
+    const result = await saveIntakeContact(parsed.data);
+    setSaving(false);
+
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
+
     updateState(parsed.data);
+    if (state.medicationId) {
+      await prefetchQuestionnaireAndPackages(queryClient, state.medicationId);
+    }
     const next = getNextStepPath("/onboarding/personal-info", { ...state, ...parsed.data });
     if (next) router.push(next);
   }
@@ -52,6 +78,7 @@ export default function PersonalInfoPage() {
         description="We'll use this to set up your account and contact you about your treatment."
         onBack={handleBack}
         onContinue={handleContinue}
+        continueDisabled={saving}
         maxWidth="2xl"
       >
         <div className="space-y-4">

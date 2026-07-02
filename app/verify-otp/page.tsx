@@ -7,7 +7,7 @@ import { toast } from "sonner";
 
 import AuthPageShell, { AuthHeading, authButtonClassName } from "@/components/AuthPageShell";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { OTP_LENGTH } from "@/lib/auth/constants";
 import { onLoginSuccess } from "@/lib/auth/on-login-success";
 import { createClient } from "@/lib/supabase/client";
@@ -16,6 +16,7 @@ function VerifyOTPContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const email = searchParams.get("email") ?? "";
+  const redirectTo = searchParams.get("redirect");
   const supabase = createClient();
   const [otp, setOtp] = useState("");
   const [busy, setBusy] = useState(false);
@@ -34,6 +35,13 @@ function VerifyOTPContent() {
       });
       if (error) {
         toast.error(error.message);
+        return;
+      }
+
+      if (redirectTo && redirectTo.startsWith("/")) {
+        toast.success("You're signed in. Continuing your order…");
+        router.refresh();
+        router.push(redirectTo);
         return;
       }
 
@@ -71,22 +79,24 @@ function VerifyOTPContent() {
           Change email
         </Link>
 
-        <div className="mx-auto mt-8 flex max-w-full justify-center gap-1.5 overflow-x-auto sm:mt-10 sm:gap-3">
-          {Array.from({ length: OTP_LENGTH }, (_, index) => (
-            <Input
-              key={index}
-              maxLength={1}
-              inputMode="numeric"
-              value={otp[index] || ""}
-              onChange={(e) => {
-                const value = e.target.value.slice(-1);
-                const otpArray = otp.split("");
-                otpArray[index] = value;
-                setOtp(otpArray.join(""));
-              }}
-              className="h-10 w-9 shrink-0 rounded-[8px] border border-[#2E00AB]/40 bg-white p-0 text-center text-lg font-semibold text-[#2E00AB] shadow-none focus:border-[#2E00AB] sm:h-[50px] sm:w-[50px] sm:text-[24px]"
-            />
-          ))}
+        <div className="mx-auto mt-8 flex max-w-full justify-center overflow-x-auto sm:mt-10">
+          <InputOTP
+            maxLength={OTP_LENGTH}
+            value={otp}
+            onChange={setOtp}
+            inputMode="numeric"
+            containerClassName="justify-center gap-1.5 sm:gap-3"
+          >
+            <InputOTPGroup>
+              {Array.from({ length: OTP_LENGTH }, (_, index) => (
+                <InputOTPSlot
+                  key={index}
+                  index={index}
+                  className="h-10 w-9 rounded-[8px] border border-[#2E00AB]/40 bg-white text-lg font-semibold text-[#2E00AB] shadow-none first:rounded-[8px] first:border-l last:rounded-[8px] sm:h-[50px] sm:w-[50px] sm:text-[24px]"
+                />
+              ))}
+            </InputOTPGroup>
+          </InputOTP>
         </div>
 
         <Button onClick={verify} disabled={busy} className={`mt-6 ${authButtonClassName}`}>

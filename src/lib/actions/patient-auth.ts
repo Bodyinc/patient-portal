@@ -2,6 +2,8 @@
 
 import { z } from "zod";
 import { PORTAL_ROLE } from "@/lib/auth/constants";
+import { claimIntakeSession } from "@/lib/actions/intake";
+import { requireIntakeSession } from "@/lib/intake/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -23,6 +25,10 @@ export type SignupResult =
   | { ok: false; code: "error"; message: string };
 
 export type MyRoleResult = { role: "patient" | "provider" | "admin" | null };
+
+export type PostCheckoutAccountResult =
+  | { ok: true; email: string; created: boolean }
+  | { ok: false; code: "session_error" | "incomplete" | "wrong_portal" | "error"; message: string };
 
 function isDuplicateEmailError(message: string) {
   const lower = message.toLowerCase();
@@ -128,6 +134,8 @@ export async function signUpPatient(input: z.infer<typeof signupSchema>): Promis
     return { ok: false, code: "error", message: "Could not assign role. Try again." };
   }
 
+  await claimIntakeSession(created.user.id);
+
   return { ok: true };
 }
 
@@ -157,4 +165,113 @@ export async function ensurePatientRole(): Promise<MyRoleResult> {
 
   await supabaseAdmin.from("user_roles").insert({ user_id: auth.userId, role: PORTAL_ROLE });
   return { role: PORTAL_ROLE };
+}
+
+async function ensurePatientRoleForUser(userId: string) {
+  const { data: existing } = await supabaseAdmin
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  const role = (existing as { role: MyRoleResult["role"] } | null)?.role;
+  if (role && role !== PORTAL_ROLE) {
+    return { ok: false as const, role };
+  }
+
+  if (!role) {
+    const { error } = await supabaseAdmin
+      .from("user_roles")
+      .insert({ user_id: userId, role: PORTAL_ROLE });
+    if (error) {
+      return { ok: false as const, role: null };
+    }
+  }
+
+  return { ok: true as const, role: PORTAL_ROLE };
+}
+
+export async function preparePostCheckoutAccount(): Promise<PostCheckoutAccountResult> {
+  const sessionResult = await requireIntakeSession();
+  if ("error" in sessionResult) {
+    return { ok: false, code: "session_error", message: sessionResult.error };
+  }
+
+  const session = sessionResult.session;
+  const email = session.email?.trim().toLowerCase();
+  const fullName = session.full_name?.trim();
+  const dob = session.dob;
+
+  if (!email || !fullName || !dob) {
+    return {
+      ok: false,
+      code: "incomplete",
+      message: "Complete your personal information before checkout.",
+    };
+  }
+
+  const { user: existing, error: lookupErr } = await findAuthUserByEmail(email);
+  if (lookupErr) {
+    return { ok: false, code: "error", message: "Could not verify account. Try again." };
+  }
+
+  if (existing) {
+    const roleResult = await ensurePatientRoleForUser(existing.id);
+    if (!roleResult.ok) {
+      return {
+        ok: false,
+        code: "wrong_portal",
+        message: `An account with this email already exists on the ${roleResult.role} portal.`,
+      };
+    }
+
+    await claimIntakeSession(existing.id);
+    return { ok: true, email, created: false };
+  }
+
+  const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+    email,
+    email_confirm: true,
+    user_metadata: {
+      full_name: fullName,
+      phone: session.phone ?? null,
+      dob,
+    },
+  });
+
+  if (createErr) {
+    if (isDuplicateEmailError(createErr.message)) {
+      const { user: found } = await findAuthUserByEmail(email);
+      if (found) {
+        const roleResult = await ensurePatientRoleForUser(found.id);
+        if (!roleResult.ok) {
+          return {
+            ok: false,
+            code: "wrong_portal",
+            message: `An account with this email already exists on the ${roleResult.role} portal.`,
+          };
+        }
+        await claimIntakeSession(found.id);
+        return { ok: true, email, created: false };
+      }
+    }
+    return {
+      ok: false,
+      code: "error",
+      message: createErr.message ?? "Could not create account.",
+    };
+  }
+
+  if (!created.user) {
+    return { ok: false, code: "error", message: "Could not create account." };
+  }
+
+  const roleResult = await ensurePatientRoleForUser(created.user.id);
+  if (!roleResult.ok) {
+    await supabaseAdmin.auth.admin.deleteUser(created.user.id);
+    return { ok: false, code: "error", message: "Could not assign patient role." };
+  }
+
+  await claimIntakeSession(created.user.id);
+  return { ok: true, email, created: true };
 }
