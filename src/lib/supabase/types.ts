@@ -357,6 +357,123 @@ export type Database = {
         };
         Relationships: [];
       };
+      shop_checkout_events: {
+        Row: {
+          id: string;
+          order_id: string;
+          event_type: string;
+          payload: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          order_id: string;
+          event_type: string;
+          payload?: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          order_id?: string;
+          event_type?: string;
+          payload?: Json;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      shop_checkout_order_items: {
+        Row: {
+          id: string;
+          order_id: string;
+          medicine_id: string;
+          package_id: string | null;
+          name: string;
+          description: string;
+          image_url: string | null;
+          quantity: number;
+          unit_price: number;
+          line_total: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          order_id: string;
+          medicine_id: string;
+          package_id?: string | null;
+          name: string;
+          description: string;
+          image_url?: string | null;
+          quantity?: number;
+          unit_price: number;
+          line_total: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          order_id?: string;
+          medicine_id?: string;
+          package_id?: string | null;
+          name?: string;
+          description?: string;
+          image_url?: string | null;
+          quantity?: number;
+          unit_price?: number;
+          line_total?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      shop_checkout_orders: {
+        Row: {
+          id: string;
+          user_id: string;
+          medicine_id: string;
+          selected_package_id: string | null;
+          selected_plan_code: string;
+          payment_method_code: string;
+          promo_code: string | null;
+          promo_savings: number;
+          subtotal: number;
+          shipping: number;
+          total: number;
+          status: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          medicine_id: string;
+          selected_package_id?: string | null;
+          selected_plan_code: string;
+          payment_method_code: string;
+          promo_code?: string | null;
+          promo_savings?: number;
+          subtotal: number;
+          shipping?: number;
+          total: number;
+          status?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          medicine_id?: string;
+          selected_package_id?: string | null;
+          selected_plan_code?: string;
+          payment_method_code?: string;
+          promo_code?: string | null;
+          promo_savings?: number;
+          subtotal?: number;
+          shipping?: number;
+          total?: number;
+          status?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       profiles: {
         Row: {
           id: string;

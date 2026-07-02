@@ -1,4 +1,7 @@
 import type {
+  ShopCheckoutBootstrapPayload,
+  ShopCheckoutOrderCreateInput,
+  ShopCheckoutOrderPayload,
   ShopCatalogPayload,
   ShopCatalogQuery,
   ShopCategoriesPayload,
@@ -84,6 +87,41 @@ export async function postShopReferralShare(
     path: "/api/shop/referrals/share",
     method: "POST",
     body: input,
+    baseUrl: options?.baseUrl,
+  });
+  return payload.data;
+}
+
+export async function getShopCheckoutBootstrap(
+  input: { medicineId: string },
+  options?: { baseUrl?: string },
+) {
+  const payload = await requestShopService<ShopCheckoutBootstrapPayload>({
+    path: `/api/shop/checkout/bootstrap${toQueryString({ medicineId: input.medicineId })}`,
+    baseUrl: options?.baseUrl,
+  });
+  return payload.data;
+}
+
+export async function createShopCheckoutOrder(
+  input: ShopCheckoutOrderCreateInput,
+  options?: { baseUrl?: string },
+) {
+  const payload = await requestShopService<ShopCheckoutOrderPayload>({
+    path: "/api/shop/checkout/orders",
+    method: "POST",
+    body: input,
+    baseUrl: options?.baseUrl,
+  });
+  return payload.data;
+}
+
+export async function getShopCheckoutOrder(
+  input: { orderId: string },
+  options?: { baseUrl?: string },
+) {
+  const payload = await requestShopService<ShopCheckoutOrderPayload>({
+    path: `/api/shop/checkout/orders/${encodeURIComponent(input.orderId)}`,
     baseUrl: options?.baseUrl,
   });
   return payload.data;

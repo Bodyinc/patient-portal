@@ -1,6 +1,11 @@
 import { resolveMedicineImageSrc } from "@/lib/intake/medicine-image";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { ShopCategoryDto, ShopMedicinesListDto, ShopSortOption } from "./types";
+import type {
+  ShopCheckoutBootstrapDto,
+  ShopCheckoutOrderCreateInput,
+  ShopCheckoutOrderDto,
+} from "./service-types";
 
 export async function fetchShopCategoriesData(): Promise<ShopCategoryDto[]> {
   const { data, error } = await supabaseAdmin
@@ -142,5 +147,213 @@ export async function fetchShopCatalogData(options: {
     sortBy,
     currentCategorySlug: categorySlug,
     searchQuery,
+  };
+}
+
+function formatMoneyLabel(amount: number, durationMonths: number) {
+  if (durationMonths === 1) return `$${amount}/month`;
+  if (durationMonths === 3) return `$${amount}/quarter`;
+  return `$${amount}/${durationMonths} months`;
+}
+
+export async function fetchShopCheckoutBootstrapData(options: {
+  medicineId: string;
+}): Promise<ShopCheckoutBootstrapDto> {
+  const { medicineId } = options;
+
+  const { data: medicine, error: medicineError } = await supabaseAdmin
+    .from("medicines")
+    .select("id, name, short_description, image_url, price_monthly")
+    .eq("id", medicineId)
+    .eq("is_active", true)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (medicineError || !medicine) throw new Error("Medicine not found.");
+
+  const [{ data: categoryLinks }, { data: packages, error: packagesError }] = await Promise.all([
+    supabaseAdmin
+      .from("medication_category_medicines")
+      .select("category_id")
+      .eq("medicine_id", medicine.id)
+      .limit(1),
+    supabaseAdmin
+      .from("packages")
+      .select("id, name, duration_months, price, is_most_popular, is_active")
+      .eq("medicine_id", medicine.id)
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true }),
+  ]);
+
+  if (packagesError) throw new Error(packagesError.message);
+
+  let categoryName = "Wellness";
+  const categoryId = categoryLinks?.[0]?.category_id;
+  if (categoryId) {
+    const { data: category } = await supabaseAdmin
+      .from("medication_categories")
+      .select("name")
+      .eq("id", categoryId)
+      .maybeSingle();
+    if (category?.name) categoryName = category.name;
+  }
+
+  const plans = (packages ?? []).map((pkg) => ({
+    id: pkg.id,
+    code: pkg.duration_months === 1 ? ("monthly" as const) : ("quarterly" as const),
+    title: pkg.duration_months === 1 ? "Monthly Plan" : `${pkg.duration_months}-Month Plan`,
+    subtitle:
+      pkg.duration_months === 1
+        ? "Billed every 30 days. Cancel anytime."
+        : `Billed every ${pkg.duration_months * 30} days with free shipping.`,
+    priceLabel: formatMoneyLabel(Number(pkg.price), pkg.duration_months),
+    amount: Number(pkg.price),
+    badge: pkg.is_most_popular ? "Most Popular" : undefined,
+  }));
+  const fallbackPlans =
+    plans.length > 0
+      ? plans
+      : [
+          {
+            id: `${medicine.id}-monthly`,
+            code: "monthly" as const,
+            title: "Monthly Plan",
+            subtitle: "Billed every 30 days. Cancel anytime.",
+            priceLabel: formatMoneyLabel(Number(medicine.price_monthly), 1),
+            amount: Number(medicine.price_monthly),
+          },
+          {
+            id: `${medicine.id}-quarterly`,
+            code: "quarterly" as const,
+            title: "3-Month Plan",
+            subtitle: "Billed every 90 days with free shipping.",
+            priceLabel: formatMoneyLabel(Number(medicine.price_monthly) * 3, 3),
+            amount: Number(medicine.price_monthly) * 3,
+            badge: "Most Popular",
+          },
+        ];
+
+  return {
+    product: {
+      id: medicine.id,
+      name: medicine.name,
+      category: categoryName,
+      description: medicine.short_description,
+      imageSrc: resolveMedicineImageSrc(medicine.image_url),
+      baseMonthlyPrice: Number(medicine.price_monthly),
+    },
+    plans: fallbackPlans,
+    paymentMethods: [
+      { id: "card", title: "Visa •••• 4242", subtitle: "Expires 12/26" },
+      { id: "alt", title: "Alternative Payment", subtitle: "Apple Pay / PayPal" },
+      { id: "new", title: "Add Payment Method", subtitle: "" },
+    ],
+    referralHint: "Invite a friend and you'll both receive a $50 account credit.",
+    defaultSelectedPlan: "quarterly",
+  };
+}
+
+export async function createShopCheckoutOrderData(options: {
+  userId: string;
+  input: ShopCheckoutOrderCreateInput;
+}): Promise<ShopCheckoutOrderDto> {
+  const { userId, input } = options;
+
+  const { data: medicine } = await supabaseAdmin
+    .from("medicines")
+    .select("id, name, short_description, image_url")
+    .eq("id", input.medicineId)
+    .maybeSingle();
+
+  if (!medicine) throw new Error("Medicine not found.");
+
+  const { data: order, error: orderError } = await supabaseAdmin
+    .from("shop_checkout_orders")
+    .insert({
+      user_id: userId,
+      medicine_id: input.medicineId,
+      selected_package_id: input.packageId,
+      selected_plan_code: input.selectedPlanCode,
+      payment_method_code: input.paymentMethodCode,
+      promo_code: input.promoCode,
+      promo_savings: input.promoSavings,
+      subtotal: input.subtotal,
+      shipping: input.shipping,
+      total: input.total,
+      status: "pending_payment",
+    })
+    .select("*")
+    .single();
+
+  if (orderError || !order) throw new Error(orderError?.message ?? "Unable to create order.");
+
+  const { error: itemError } = await supabaseAdmin.from("shop_checkout_order_items").insert({
+    order_id: order.id,
+    medicine_id: input.medicineId,
+    package_id: input.packageId,
+    name: medicine.name,
+    description: medicine.short_description,
+    image_url: medicine.image_url,
+    quantity: 1,
+    unit_price: input.subtotal,
+    line_total: input.total,
+  });
+
+  if (itemError) throw new Error(itemError.message);
+
+  await supabaseAdmin.from("shop_checkout_events").insert({
+    order_id: order.id,
+    event_type: "order_created",
+    payload: {
+      selectedPlanCode: input.selectedPlanCode,
+      paymentMethodCode: input.paymentMethodCode,
+    },
+  });
+
+  return {
+    id: order.id,
+    status: order.status,
+    createdAt: order.created_at,
+    productName: medicine.name,
+    selectedPlanLabel: input.selectedPlanCode === "monthly" ? "Monthly Plan" : "3-Month Plan",
+    subtotal: Number(order.subtotal),
+    promoSavings: Number(order.promo_savings),
+    shipping: Number(order.shipping),
+    total: Number(order.total),
+  };
+}
+
+export async function getShopCheckoutOrderByIdData(options: {
+  userId: string;
+  orderId: string;
+}): Promise<ShopCheckoutOrderDto> {
+  const { userId, orderId } = options;
+  const { data: order, error } = await supabaseAdmin
+    .from("shop_checkout_orders")
+    .select(
+      "id, status, created_at, selected_plan_code, subtotal, promo_savings, shipping, total, medicine_id",
+    )
+    .eq("id", orderId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error || !order) throw new Error("Order not found.");
+
+  const { data: medicine } = await supabaseAdmin
+    .from("medicines")
+    .select("name")
+    .eq("id", order.medicine_id)
+    .maybeSingle();
+
+  return {
+    id: order.id,
+    status: order.status,
+    createdAt: order.created_at,
+    productName: medicine?.name ?? "Product",
+    selectedPlanLabel: order.selected_plan_code === "monthly" ? "Monthly Plan" : "3-Month Plan",
+    subtotal: Number(order.subtotal),
+    promoSavings: Number(order.promo_savings),
+    shipping: Number(order.shipping),
+    total: Number(order.total),
   };
 }

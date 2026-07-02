@@ -25,8 +25,67 @@ export type ShopCatalogQuery = {
   q?: string;
 };
 
+export type ShopCheckoutPlanDto = {
+  id: string;
+  code: "monthly" | "quarterly";
+  title: string;
+  subtitle: string;
+  priceLabel: string;
+  amount: number;
+  badge?: string;
+};
+
+export type ShopCheckoutPaymentMethodDto = {
+  id: "card" | "alt" | "new";
+  title: string;
+  subtitle: string;
+};
+
+export type ShopCheckoutProductDto = {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  imageSrc: string;
+  baseMonthlyPrice: number;
+};
+
+export type ShopCheckoutBootstrapDto = {
+  product: ShopCheckoutProductDto;
+  plans: ShopCheckoutPlanDto[];
+  paymentMethods: ShopCheckoutPaymentMethodDto[];
+  referralHint: string;
+  defaultSelectedPlan: "monthly" | "quarterly";
+};
+
+export type ShopCheckoutOrderCreateInput = {
+  medicineId: string;
+  packageId: string | null;
+  selectedPlanCode: "monthly" | "quarterly";
+  paymentMethodCode: "card" | "alt" | "new";
+  promoCode: string | null;
+  promoSavings: number;
+  subtotal: number;
+  shipping: number;
+  total: number;
+};
+
+export type ShopCheckoutOrderDto = {
+  id: string;
+  status: string;
+  createdAt: string;
+  productName: string;
+  selectedPlanLabel: string;
+  subtotal: number;
+  promoSavings: number;
+  shipping: number;
+  total: number;
+};
+
 export type ShopCategoriesPayload = ShopCategoryDto[];
 export type ShopCatalogPayload = ShopMedicinesListDto;
+export type ShopCheckoutBootstrapPayload = ShopCheckoutBootstrapDto;
+export type ShopCheckoutOrderPayload = ShopCheckoutOrderDto;
 
 export type ShopReferralSharePayload = {
   referralCode: string;
