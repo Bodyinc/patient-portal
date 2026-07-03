@@ -18,6 +18,7 @@ import {
   resolveIntakeSession,
   type IntakeSessionRow,
 } from "@/lib/intake/session";
+import { linkOnboardingStripeToUser } from "@/lib/stripe/customers";
 import type {
   CategoryDto,
   EligibilityResultDto,
@@ -897,4 +898,12 @@ export async function claimIntakeSession(userId: string): Promise<void> {
       sex: session.sex,
     })
     .eq("id", userId);
+
+  if (session.stripe_customer_id) {
+    await linkOnboardingStripeToUser({
+      sessionId: session.id,
+      stripeCustomerId: session.stripe_customer_id,
+      userId,
+    });
+  }
 }

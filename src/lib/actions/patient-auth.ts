@@ -191,6 +191,13 @@ async function ensurePatientRoleForUser(userId: string) {
   return { ok: true as const, role: PORTAL_ROLE };
 }
 
+export async function claimCheckoutForCurrentUser(): Promise<{ ok: boolean }> {
+  const auth = await getAuthenticatedClient();
+  if (!auth) return { ok: false };
+  await claimIntakeSession(auth.userId);
+  return { ok: true };
+}
+
 export async function preparePostCheckoutAccount(): Promise<PostCheckoutAccountResult> {
   const sessionResult = await requireIntakeSession();
   if ("error" in sessionResult) {

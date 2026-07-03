@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   getActiveCategories,
@@ -76,6 +76,7 @@ export function useIntakeSummary() {
       return result.data;
     },
     staleTime: SUMMARY_STALE_MS,
+    placeholderData: keepPreviousData,
   });
 }
 
