@@ -126,6 +126,8 @@ export type Database = {
           created_at: string;
           updated_at: string;
           expires_at: string;
+          stripe_customer_id: string | null;
+          stripe_subscription_id: string | null;
         };
         Insert: {
           id?: string;
@@ -144,6 +146,8 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           expires_at?: string;
+          stripe_customer_id?: string | null;
+          stripe_subscription_id?: string | null;
         };
         Update: {
           id?: string;
@@ -162,6 +166,8 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           expires_at?: string;
+          stripe_customer_id?: string | null;
+          stripe_subscription_id?: string | null;
         };
         Relationships: [];
       };
@@ -274,6 +280,7 @@ export type Database = {
           created_at: string;
           updated_at: string;
           requires_questionnaire: boolean;
+          stripe_product_id: string | null;
         };
         Insert: {
           id?: string;
@@ -290,6 +297,7 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           requires_questionnaire?: boolean;
+          stripe_product_id?: string | null;
         };
         Update: {
           id?: string;
@@ -306,6 +314,7 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           requires_questionnaire?: boolean;
+          stripe_product_id?: string | null;
         };
         Relationships: [];
       };
@@ -324,6 +333,7 @@ export type Database = {
           is_active: boolean;
           created_at: string;
           updated_at: string;
+          stripe_price_id: string | null;
         };
         Insert: {
           id?: string;
@@ -339,6 +349,7 @@ export type Database = {
           is_active?: boolean;
           created_at?: string;
           updated_at?: string;
+          stripe_price_id?: string | null;
         };
         Update: {
           id?: string;
@@ -352,6 +363,181 @@ export type Database = {
           clinical_note?: string | null;
           sort_order?: number;
           is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+          stripe_price_id?: string | null;
+        };
+        Relationships: [];
+      };
+      payments: {
+        Row: {
+          id: string;
+          session_id: string | null;
+          user_id: string | null;
+          plan_id: string | null;
+          stripe_payment_intent_id: string | null;
+          stripe_customer_id: string | null;
+          amount_cents: number;
+          currency: string;
+          status: string;
+          raw_event: Json | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          session_id?: string | null;
+          user_id?: string | null;
+          plan_id?: string | null;
+          stripe_payment_intent_id?: string | null;
+          stripe_customer_id?: string | null;
+          amount_cents: number;
+          currency?: string;
+          status?: string;
+          raw_event?: Json | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          session_id?: string | null;
+          user_id?: string | null;
+          plan_id?: string | null;
+          stripe_payment_intent_id?: string | null;
+          stripe_customer_id?: string | null;
+          amount_cents?: number;
+          currency?: string;
+          status?: string;
+          raw_event?: Json | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      stripe_events: {
+        Row: {
+          id: string;
+          stripe_event_id: string;
+          type: string;
+          payload: Json;
+          received_at: string;
+        };
+        Insert: {
+          id?: string;
+          stripe_event_id: string;
+          type: string;
+          payload: Json;
+          received_at?: string;
+        };
+        Update: {
+          id?: string;
+          stripe_event_id?: string;
+          type?: string;
+          payload?: Json;
+          received_at?: string;
+        };
+        Relationships: [];
+      };
+      subscriptions: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          session_id: string | null;
+          stripe_subscription_id: string;
+          stripe_customer_id: string | null;
+          stripe_price_id: string | null;
+          package_id: string | null;
+          medicine_id: string | null;
+          status: string;
+          current_period_end: string | null;
+          cancel_at_period_end: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          session_id?: string | null;
+          stripe_subscription_id: string;
+          stripe_customer_id?: string | null;
+          stripe_price_id?: string | null;
+          package_id?: string | null;
+          medicine_id?: string | null;
+          status?: string;
+          current_period_end?: string | null;
+          cancel_at_period_end?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string | null;
+          session_id?: string | null;
+          stripe_subscription_id?: string;
+          stripe_customer_id?: string | null;
+          stripe_price_id?: string | null;
+          package_id?: string | null;
+          medicine_id?: string | null;
+          status?: string;
+          current_period_end?: string | null;
+          cancel_at_period_end?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      promo_codes: {
+        Row: {
+          id: string;
+          code: string;
+          stripe_coupon_id: string | null;
+          stripe_promotion_code_id: string | null;
+          discount_type: string;
+          percent_off: number | null;
+          amount_off_cents: number | null;
+          currency: string;
+          duration: string;
+          duration_in_months: number | null;
+          max_redemptions: number | null;
+          redeem_by: string | null;
+          is_active: boolean;
+          times_redeemed: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          code: string;
+          stripe_coupon_id?: string | null;
+          stripe_promotion_code_id?: string | null;
+          discount_type: string;
+          percent_off?: number | null;
+          amount_off_cents?: number | null;
+          currency?: string;
+          duration?: string;
+          duration_in_months?: number | null;
+          max_redemptions?: number | null;
+          redeem_by?: string | null;
+          is_active?: boolean;
+          times_redeemed?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          code?: string;
+          stripe_coupon_id?: string | null;
+          stripe_promotion_code_id?: string | null;
+          discount_type?: string;
+          percent_off?: number | null;
+          amount_off_cents?: number | null;
+          currency?: string;
+          duration?: string;
+          duration_in_months?: number | null;
+          max_redemptions?: number | null;
+          redeem_by?: string | null;
+          is_active?: boolean;
+          times_redeemed?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -439,6 +625,9 @@ export type Database = {
           status: string;
           created_at: string;
           updated_at: string;
+          stripe_subscription_id: string | null;
+          stripe_invoice_id: string | null;
+          stripe_payment_intent_id: string | null;
         };
         Insert: {
           id?: string;
@@ -455,6 +644,9 @@ export type Database = {
           status?: string;
           created_at?: string;
           updated_at?: string;
+          stripe_subscription_id?: string | null;
+          stripe_invoice_id?: string | null;
+          stripe_payment_intent_id?: string | null;
         };
         Update: {
           id?: string;
@@ -471,6 +663,9 @@ export type Database = {
           status?: string;
           created_at?: string;
           updated_at?: string;
+          stripe_subscription_id?: string | null;
+          stripe_invoice_id?: string | null;
+          stripe_payment_intent_id?: string | null;
         };
         Relationships: [];
       };
@@ -490,6 +685,7 @@ export type Database = {
           sex: Database["public"]["Enums"]["sex_type"] | null;
           created_at: string;
           updated_at: string;
+          stripe_customer_id: string | null;
         };
         Insert: {
           id: string;
@@ -506,6 +702,7 @@ export type Database = {
           sex?: Database["public"]["Enums"]["sex_type"] | null;
           created_at?: string;
           updated_at?: string;
+          stripe_customer_id?: string | null;
         };
         Update: {
           id?: string;
@@ -522,6 +719,7 @@ export type Database = {
           sex?: Database["public"]["Enums"]["sex_type"] | null;
           created_at?: string;
           updated_at?: string;
+          stripe_customer_id?: string | null;
         };
         Relationships: [];
       };
@@ -678,7 +876,12 @@ export type Database = {
     Enums: {
       app_role: "admin" | "provider" | "patient";
       eligibility_result: "eligible" | "ineligible" | "needs_review";
-      intake_session_status: "in_progress" | "completed" | "abandoned" | "expired";
+      intake_session_status:
+        | "in_progress"
+        | "payment_pending"
+        | "completed"
+        | "abandoned"
+        | "expired";
       medication_relationship: "contraindicated" | "caution" | "alternative";
       medicine_status: "draft" | "active" | "published" | "archived";
       q_question_type:
@@ -775,7 +978,7 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "provider", "patient"],
       eligibility_result: ["eligible", "ineligible", "needs_review"],
-      intake_session_status: ["in_progress", "completed", "abandoned", "expired"],
+      intake_session_status: ["in_progress", "payment_pending", "completed", "abandoned", "expired"],
       medication_relationship: ["contraindicated", "caution", "alternative"],
       medicine_status: ["draft", "active", "published", "archived"],
       q_question_type: [

@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Programming/BeezTech/BodyInc/bodyinc-access-hub/supabase/migrations/**)",
+      "Bash(grep -nE \"^      [a-z_]+: \\\\{$\" src/lib/supabase/types.ts)",
+      "Read(//c/Programming/BeezTech/BodyInc/bodyinc-access-hub/**)",
+      "Bash(grep -nA1 \"export async function createMedicine\\\\|export async function updateMedicine\" src/lib/medicines.store.ts)",
+      "Bash(grep -nE \"^        \\(medicines|packages\\): \\\\{$|^      \\(medicines|packages\\): \\\\{$\" src/integrations/supabase/types.ts)",
+      "Bash(awk '/^      packages: \\\\{/{f=1} f&&/is_active:/{print NR\": \"$0} f&&/Relationships/{print NR\": \"$0; c++} c>=1{exit}' src/integrations/supabase/types.ts)",
+      "Read(//c/Programming/BeezTech/BodyInc/bodyinc-access-hub/src/integrations/supabase/**)",
+      "Bash(node \"C:/Users/ritik/AppData/Local/Temp/claude/c--Programming-BeezTech-BodyInc-patient-portal/8ead50a7-b69b-4b6e-923e-202aa8e17170/scratchpad/stripe-diag.cjs\" \"c:/Programming/BeezTech/BodyInc/patient-portal\")"
+    ],
+    "additionalDirectories": [
+      "c:\\Programming\\BeezTech\\BodyInc\\bodyinc-access-hub\\supabase\\migrations",
+      "c:\\Programming\\BeezTech\\BodyInc\\bodyinc-access-hub\\src\\routes\\_authenticated",
+      "c:\\Programming\\BeezTech\\BodyInc\\bodyinc-access-hub\\src\\integrations\\supabase"
+    ]
+  }
+}

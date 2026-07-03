@@ -1,0 +1,79 @@
+import Link from "next/link";
+import { CheckCircle2 } from "lucide-react";
+
+import { requirePatientSession } from "@/lib/auth/require-patient";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import { calculateCheckoutPricing } from "../../onboarding/_lib/intake-pricing";
+
+export default async function OrderConfirmationPage() {
+  const { user } = await requirePatientSession();
+
+  const { data: sub } = await supabaseAdmin
+    .from("subscriptions")
+    .select(
+      "package_id, medicine_id, created_at, packages(name, price, duration_months), medicines(name)",
+    )
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const pkg = (
+    sub as { packages?: { name: string; price: number; duration_months: number } } | null
+  )?.packages;
+  const med = (sub as { medicines?: { name: string } } | null)?.medicines;
+  const pricing = pkg ? calculateCheckoutPricing(Number(pkg.price), pkg.duration_months) : null;
+
+  return (
+    <main className="min-w-0 flex-1 bg-[#FAF8FF] p-4">
+      <div className="mx-auto flex max-w-2xl flex-col items-center gap-6 py-6">
+        <div className="flex flex-col items-center gap-3 text-center">
+          <CheckCircle2 className="h-14 w-14 text-emerald-600" />
+          <h1 className="text-3xl font-semibold text-[#2E00AB]">Payment Successful</h1>
+          <p className="text-sm text-[#2E00AB]/75">
+            Your treatment plan is confirmed. A receipt has been sent to your email.
+          </p>
+        </div>
+
+        <div className="w-full overflow-hidden rounded-2xl border border-[#2E00AB]/20 bg-white">
+          <div className="bg-[#EDE7FA] px-5 py-3">
+            <h2 className="text-lg font-semibold text-[#2E00AB]">Order Summary</h2>
+          </div>
+          <div className="space-y-4 p-5 text-sm">
+            <div className="flex justify-between">
+              <span className="text-[#2E00AB]/80">Medication</span>
+              <span className="font-medium text-[#2E00AB]">
+                {med?.name ?? "Selected Medication"}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-[#2E00AB]/80">Plan</span>
+              <span className="font-medium text-[#2E00AB]">{pkg?.name ?? "Treatment Plan"}</span>
+            </div>
+            <div className="flex items-center justify-between border-t border-[#2E00AB]/10 pt-4">
+              <span className="text-base font-medium text-[#2E00AB]">Total Paid</span>
+              <span className="text-3xl font-semibold text-[#2E00AB]">
+                {pricing ? `$${pricing.total.toFixed(2)}` : "—"}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-center">
+          <Link
+            href="/dashboard"
+            className="rounded-md bg-[#2E00AB] px-6 py-2.5 text-center text-sm font-medium text-white hover:bg-[#24008A]"
+          >
+            Go to Dashboard
+          </Link>
+          <Link
+            href="/my-meds"
+            className="rounded-md border border-[#2E00AB]/40 px-6 py-2.5 text-center text-sm font-medium text-[#2E00AB]"
+          >
+            View Treatment Details
+          </Link>
+        </div>
+      </div>
+    </main>
+  );
+}

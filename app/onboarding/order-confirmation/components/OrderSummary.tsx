@@ -11,6 +11,7 @@ export default function OrderSummary() {
 
   const medicationName = summary?.medicineName ?? "Selected Medication";
   const planLabel = summary?.packageName ?? "Treatment Plan";
+  const loaded = summary?.packagePrice != null;
   const pricing = calculateCheckoutPricing(summary?.packagePrice, summary?.packageDurationMonths);
 
   return (
@@ -36,7 +37,9 @@ export default function OrderSummary() {
 
         <div className="flex items-center justify-between">
           <span className="text-base font-medium text-[#2E00AB]">Total Paid</span>
-          <span className="text-3xl font-semibold text-[#2E00AB]">${pricing.total.toFixed(2)}</span>
+          <span className="text-3xl font-semibold text-[#2E00AB]">
+            {loaded ? `$${pricing.total.toFixed(2)}` : "…"}
+          </span>
         </div>
       </div>
     </Card>

@@ -4,8 +4,11 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { confirmCheckoutStub } from "@/lib/actions/intake";
-import { preparePostCheckoutAccount } from "@/lib/actions/patient-auth";
+import { createOnboardingSubscription } from "@/lib/actions/stripe-checkout";
+import {
+  claimCheckoutForCurrentUser,
+  preparePostCheckoutAccount,
+} from "@/lib/actions/patient-auth";
 import { createClient } from "@/lib/supabase/client";
 
 import OnboardingShell from "../_components/OnboardingShell";
@@ -14,6 +17,7 @@ import OnboardingFrame from "../_components/OnboardingFrame";
 import PageHeader from "./components/PageHeader";
 import InfoCard from "./components/InfoCard";
 import PaymentForm from "./components/PaymentForm";
+import OnboardingPaymentForm from "./components/OnboardingPaymentForm";
 import OrderSummary from "./components/OrderSummary";
 import TermsCheckbox from "./components/TermsCheckbox";
 import { useIntakeSummary } from "../_hooks/use-intake-catalog";
@@ -22,7 +26,7 @@ import { getStateName } from "../_lib/onboarding-config";
 import { getPrevStepPath } from "../_lib/onboarding-navigation";
 import { useOnboarding } from "../_lib/onboarding-store";
 
-const ORDER_CONFIRMATION_REDIRECT = "/onboarding/order-confirmation";
+const ORDER_CONFIRMATION_REDIRECT = "/order-confirmation";
 
 export default function BillingCheckoutPage() {
   const router = useRouter();
@@ -31,6 +35,7 @@ export default function BillingCheckoutPage() {
   const { data: summary } = useIntakeSummary();
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [promoCode, setPromoCode] = useState("");
   const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
   const [applyingPromo, setApplyingPromo] = useState(false);
@@ -75,11 +80,31 @@ export default function BillingCheckoutPage() {
     }
 
     setConfirming(true);
+    const result = await createOnboardingSubscription(appliedPromoCode);
+    setConfirming(false);
 
-    const checkoutResult = await confirmCheckoutStub();
-    if (!checkoutResult.ok) {
-      setConfirming(false);
-      toast.error(checkoutResult.message);
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
+
+    setClientSecret(result.clientSecret);
+    toast.success("Enter your card details below to complete payment.");
+  }
+
+  async function handlePaid() {
+    setConfirming(true);
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (user) {
+      // Already signed in — skip OTP; just link this checkout to the account.
+      await claimCheckoutForCurrentUser();
+      updateState({ checkoutConfirmed: true });
+      toast.success("Payment confirmed.");
+      router.push(ORDER_CONFIRMATION_REDIRECT);
       return;
     }
 
@@ -94,20 +119,14 @@ export default function BillingCheckoutPage() {
       email: accountResult.email,
     });
 
-    setConfirming(false);
-
     if (otpError) {
+      setConfirming(false);
       toast.error(otpError.message);
       return;
     }
 
     updateState({ checkoutConfirmed: true });
-
-    toast.success(
-      accountResult.created
-        ? "Payment confirmed. Check your email for a login code."
-        : "Payment confirmed. We sent a login code to your email.",
-    );
+    toast.success("Payment confirmed. We sent a login code to your email.");
 
     router.push(
       `/verify-otp?email=${encodeURIComponent(accountResult.email)}&redirect=${encodeURIComponent(ORDER_CONFIRMATION_REDIRECT)}`,
@@ -162,7 +181,17 @@ export default function BillingCheckoutPage() {
               </div>
 
               <div className="min-h-0 flex-1">
-                <PaymentForm />
+                {clientSecret ? (
+                  <OnboardingPaymentForm
+                    clientSecret={clientSecret}
+                    returnUrl={`${
+                      typeof window !== "undefined" ? window.location.origin : ""
+                    }/onboarding/checkout-complete`}
+                    onPaid={() => void handlePaid()}
+                  />
+                ) : (
+                  <PaymentForm />
+                )}
               </div>
 
               <TermsCheckbox checked={consentAccepted} onChange={setConsentAccepted} />
@@ -183,6 +212,8 @@ export default function BillingCheckoutPage() {
               applyingPromo={applyingPromo}
               consentAccepted={consentAccepted}
               confirming={confirming}
+              loading={summary?.packagePrice == null}
+              hideContinue={Boolean(clientSecret)}
               onPromoCodeChange={(value) => {
                 setPromoCode(value);
                 setPromoError(null);

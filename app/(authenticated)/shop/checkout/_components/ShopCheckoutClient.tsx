@@ -1,17 +1,15 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 
-import { createShopCheckoutOrder } from "@/lib/shop/client";
 import ShopHeader from "../../_components/ShopHeader";
 import CheckoutActions from "./CheckoutActions";
 import OrderSummaryCard from "./OrderSummaryCard";
-import PaymentMethodsSection from "./PaymentMethodsSection";
 import PlanSelector from "./PlanSelector";
 import ReferralCard from "./ReferralCard";
 import SelectedProductCard from "./SelectedProductCard";
-import type { CheckoutBootstrap, CheckoutPaymentMethodId, CheckoutPlanId } from "./types";
+import StripePaymentForm from "./StripePaymentForm";
+import type { CheckoutBootstrap, CheckoutPlanId } from "./types";
 
 type ShopCheckoutClientProps = {
   bootstrap: CheckoutBootstrap;
@@ -28,15 +26,13 @@ export default function ShopCheckoutClient({
   patientId,
   avatarUrl,
 }: ShopCheckoutClientProps) {
-  const router = useRouter();
   const [isCreating, startCreating] = useTransition();
   const [selectedPlan, setSelectedPlan] = useState<CheckoutPlanId>(bootstrap.defaultSelectedPlan);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<CheckoutPaymentMethodId>(
-    bootstrap.paymentMethods[0]?.id ?? "card",
-  );
   const [promoCode, setPromoCode] = useState("");
   const [promoSavings, setPromoSavings] = useState(0);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [payment, setPayment] = useState<{ clientSecret: string; returnUrl: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const selectedPlanMeta = useMemo(
     () => bootstrap.plans.find((plan) => plan.code === selectedPlan) ?? bootstrap.plans[0],
@@ -56,6 +52,45 @@ export default function ShopCheckoutClient({
       ? selectedPlanMeta.id
       : null;
 
+  function handleContinue() {
+    if (!selectedPlanMeta) return;
+    if (!selectedPackageId) {
+      setError("This plan is not available for purchase yet. Please contact support.");
+      return;
+    }
+
+    startCreating(async () => {
+      setError(null);
+      try {
+        const response = await fetch("/api/stripe/subscription", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            medicineId,
+            packageId: selectedPackageId,
+            promoCode: promoCode.trim() || null,
+          }),
+        });
+        const data = (await response.json()) as {
+          clientSecret?: string;
+          orderId?: string;
+          error?: string;
+        };
+        if (!response.ok || !data.clientSecret || !data.orderId) {
+          throw new Error(data.error ?? "Unable to start checkout.");
+        }
+        setPayment({
+          clientSecret: data.clientSecret,
+          returnUrl: `${window.location.origin}/shop/checkout/confirmation?orderId=${encodeURIComponent(
+            data.orderId,
+          )}`,
+        });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Unable to start checkout.");
+      }
+    });
+  }
+
   return (
     <div className="space-y-3">
       <ShopHeader
@@ -73,11 +108,6 @@ export default function ShopCheckoutClient({
         selectedPlan={selectedPlan}
         onChange={setSelectedPlan}
       />
-      <PaymentMethodsSection
-        methods={bootstrap.paymentMethods}
-        selectedMethod={selectedPaymentMethod}
-        onSelect={setSelectedPaymentMethod}
-      />
       <ReferralCard
         referralHint={bootstrap.referralHint}
         promoCode={promoCode}
@@ -87,32 +117,23 @@ export default function ShopCheckoutClient({
         }}
       />
       <OrderSummaryCard subtotal={subtotal} promoSavings={promoSavings} total={total} />
-      <CheckoutActions
-        termsAccepted={termsAccepted}
-        onTermsChange={setTermsAccepted}
-        continueDisabled={isCreating}
-        onContinue={() => {
-          if (!selectedPlanMeta) return;
-          startCreating(async () => {
-            try {
-              const order = await createShopCheckoutOrder({
-                medicineId,
-                packageId: selectedPackageId,
-                selectedPlanCode: selectedPlanMeta.code,
-                paymentMethodCode: selectedPaymentMethod,
-                promoCode: promoCode.trim() || null,
-                promoSavings,
-                subtotal,
-                shipping: 0,
-                total,
-              });
-              router.push(`/shop/checkout/confirmation?orderId=${encodeURIComponent(order.id)}`);
-            } catch (error) {
-              window.alert(error instanceof Error ? error.message : "Unable to create order.");
-            }
-          });
-        }}
-      />
+
+      {error ? (
+        <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {error}
+        </p>
+      ) : null}
+
+      {payment ? (
+        <StripePaymentForm clientSecret={payment.clientSecret} returnUrl={payment.returnUrl} />
+      ) : (
+        <CheckoutActions
+          termsAccepted={termsAccepted}
+          onTermsChange={setTermsAccepted}
+          continueDisabled={isCreating}
+          onContinue={handleContinue}
+        />
+      )}
     </div>
   );
 }

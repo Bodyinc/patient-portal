@@ -54,7 +54,9 @@ export async function resolveIntakeSession(
   }
 
   const isActive =
-    data.status === "in_progress" || (options?.allowCompleted && data.status === "completed");
+    data.status === "in_progress" ||
+    data.status === "payment_pending" ||
+    (options?.allowCompleted && data.status === "completed");
 
   if (!isActive) {
     return { session: null, error: "Session is no longer active" };

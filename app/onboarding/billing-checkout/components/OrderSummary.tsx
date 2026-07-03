@@ -14,6 +14,8 @@ type OrderSummaryProps = {
   applyingPromo: boolean;
   consentAccepted: boolean;
   confirming: boolean;
+  loading?: boolean;
+  hideContinue?: boolean;
   onPromoCodeChange: (value: string) => void;
   onApplyPromo: () => void;
   onContinue: () => void;
@@ -38,6 +40,8 @@ export default function OrderSummary({
   applyingPromo,
   consentAccepted,
   confirming,
+  loading = false,
+  hideContinue = false,
   onPromoCodeChange,
   onApplyPromo,
   onContinue,
@@ -58,7 +62,7 @@ export default function OrderSummary({
             <p className="truncate text-xs text-[#2E00AB]/70">{planLabel}</p>
           </div>
           <p className="shrink-0 text-sm font-semibold text-[#2E00AB]">
-            {formatMoney(medicationTotal)}
+            {loading ? "—" : formatMoney(medicationTotal)}
           </p>
         </div>
 
@@ -75,7 +79,7 @@ export default function OrderSummary({
         <div className="mt-4 space-y-2 text-sm text-[#2E00AB]">
           <div className="flex justify-between">
             <span>Subtotal</span>
-            <span>{formatMoney(subtotal)}</span>
+            <span>{loading ? "—" : formatMoney(subtotal)}</span>
           </div>
           <div className="flex justify-between">
             <span>Processing Fee</span>
@@ -96,7 +100,7 @@ export default function OrderSummary({
         {/* Total */}
         <div className="mt-5 flex items-center justify-between border-t border-[#2E00AB]/10 pt-4">
           <p className="text-base font-semibold text-[#2E00AB]">Total Due Today</p>
-          <p className="text-2xl font-bold text-[#2E00AB]">{formatMoney(total)}</p>
+          <p className="text-2xl font-bold text-[#2E00AB]">{loading ? "—" : formatMoney(total)}</p>
         </div>
 
         {/* Promo */}
@@ -122,16 +126,18 @@ export default function OrderSummary({
         </div>
 
         {/* Push Footer to Bottom */}
-        <div className="mt-auto pt-6">
-          <button
-            type="button"
-            onClick={onContinue}
-            disabled={!consentAccepted || confirming}
-            className="w-full rounded-md bg-[#2E00AB] py-3 text-base font-semibold text-white transition hover:bg-[#24008A] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {confirming ? "Processing payment..." : "Continue to Payment"}
-          </button>
-        </div>
+        {!hideContinue && (
+          <div className="mt-auto pt-6">
+            <button
+              type="button"
+              onClick={onContinue}
+              disabled={!consentAccepted || confirming}
+              className="w-full rounded-md bg-[#2E00AB] py-3 text-base font-semibold text-white transition hover:bg-[#24008A] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {confirming ? "Processing payment..." : "Continue to Payment"}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
