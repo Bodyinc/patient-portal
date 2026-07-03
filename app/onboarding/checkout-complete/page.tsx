@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import {
@@ -12,7 +12,15 @@ import { useOnboarding } from "../_lib/onboarding-store";
 
 const ORDER_CONFIRMATION_REDIRECT = "/order-confirmation";
 
-export default function CheckoutCompletePage() {
+function StatusScreen({ message }: { message: string }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[#FAF8FF] p-6">
+      <p className="text-sm text-[#2E00AB]">{message}</p>
+    </div>
+  );
+}
+
+function CheckoutCompleteInner() {
   const router = useRouter();
   const params = useSearchParams();
   const supabase = createClient();
@@ -64,9 +72,13 @@ export default function CheckoutCompletePage() {
     })();
   }, [params, router, supabase, updateState]);
 
+  return <StatusScreen message={message} />;
+}
+
+export default function CheckoutCompletePage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#FAF8FF] p-6">
-      <p className="text-sm text-[#2E00AB]">{message}</p>
-    </div>
+    <Suspense fallback={<StatusScreen message="Finalizing your order…" />}>
+      <CheckoutCompleteInner />
+    </Suspense>
   );
 }

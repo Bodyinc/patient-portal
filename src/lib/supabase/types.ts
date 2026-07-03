@@ -978,7 +978,13 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "provider", "patient"],
       eligibility_result: ["eligible", "ineligible", "needs_review"],
-      intake_session_status: ["in_progress", "payment_pending", "completed", "abandoned", "expired"],
+      intake_session_status: [
+        "in_progress",
+        "payment_pending",
+        "completed",
+        "abandoned",
+        "expired",
+      ],
       medication_relationship: ["contraindicated", "caution", "alternative"],
       medicine_status: ["draft", "active", "published", "archived"],
       q_question_type: [
