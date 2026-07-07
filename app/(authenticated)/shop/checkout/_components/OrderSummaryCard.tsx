@@ -5,30 +5,38 @@ type OrderSummaryCardProps = {
 };
 
 function formatUsd(value: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
+  return new Intl.NumberFormat("en-US", { 
+    style: "currency", 
+    currency: "USD",
+    minimumFractionDigits: 2 
+  }).format(value);
 }
 
 export default function OrderSummaryCard({ subtotal, promoSavings, total }: OrderSummaryCardProps) {
   return (
-    <section className="rounded-2xl border border-[#E6DEFF] bg-white p-4">
-      <h3 className="text-2xl font-semibold text-[#2E00AB]">Order Summary</h3>
-      <div className="mt-4 space-y-3 text-sm text-[#2E00AB]/80">
-        <div className="flex items-center justify-between border-b border-[#EFE9FF] pb-2">
-          <span>Subtotal</span>
-          <span>{formatUsd(subtotal)}</span>
+    <section className="rounded-2xl border border-[#E6DEFF] bg-white p-6">
+      <h3 className="text-xl font-semibold text-[#2E00AB]">Order Summary</h3>
+
+      <div className="mt-6 space-y-4 text-base">
+        <div className="flex justify-between pb-3 border-b border-[#EFE9FF]">
+          <span className="text-[#2E00AB]/80">Subtotal</span>
+          <span className="font-medium">{formatUsd(subtotal)}</span>
         </div>
-        <div className="flex items-center justify-between border-b border-[#EFE9FF] pb-2">
-          <span>Shipping</span>
-          <span>Free</span>
+        <div className="flex justify-between pb-3 border-b border-[#EFE9FF]">
+          <span className="text-[#2E00AB]/80">Shipping</span>
+          <span className="font-medium">Free</span>
         </div>
-        <div className="flex items-center justify-between border-b border-[#EFE9FF] pb-2">
-          <span>Promotional Savings</span>
-          <span>{promoSavings > 0 ? `-${formatUsd(promoSavings)}` : formatUsd(0)}</span>
-        </div>
+        {promoSavings > 0 && (
+          <div className="flex justify-between pb-3 border-b border-[#EFE9FF]">
+            <span className="text-[#2E00AB]/80">Promotional Savings</span>
+            <span className="font-medium text-green-600">-{formatUsd(promoSavings)}</span>
+          </div>
+        )}
       </div>
-      <div className="mt-4 flex items-center justify-between">
+
+      <div className="mt-6 flex items-baseline justify-between">
         <span className="text-lg font-semibold text-[#2E00AB]">Total Amount</span>
-        <span className="text-4xl font-semibold text-[#2E00AB]">{formatUsd(total)}</span>
+        <span className="text-2xl font-semibold text-[#2E00AB]">{formatUsd(total)}</span>
       </div>
     </section>
   );
