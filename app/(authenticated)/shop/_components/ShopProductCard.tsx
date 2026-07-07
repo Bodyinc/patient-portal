@@ -26,8 +26,9 @@ export default function ShopProductCard({ item }: { item: ShopMedicineCardDto })
 
   return (
     <>
-      <article className="overflow-hidden rounded-2xl border border-[#DCD2FF] bg-white">
-        <div className="relative flex min-h-[180px] items-center justify-center bg-[#F3EEFF] p-4">
+      <article className="overflow-hidden rounded-[32px] border border-[#DCD2FF] bg-white p-3 shadow-sm">
+        {/* Changed to rounded-[24px] to curve all four corners of the purple box */}
+        <div className="relative flex min-h-[190px] items-center justify-center overflow-hidden rounded-[24px] bg-[#F3EEFF] p-4">
           <img
             src="/curve-line.svg"
             alt=""
@@ -40,21 +41,20 @@ export default function ShopProductCard({ item }: { item: ShopMedicineCardDto })
           />
         </div>
 
-        <div className="space-y-2 p-4">
+        {/* Content Area */}
+        <div className="space-y-3 px-2 py-4">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="text-3 font-semibold text-[#2E00AB] sm:text-xl">{item.name}</h3>
-            <span className="rounded-md border border-[#2E00AB]/20 bg-[#F8F4FF] px-2 py-0.5 text-[11px] text-[#2E00AB]">
+            <h3 className="text-xl font-semibold text-[#2E00AB]">{item.name}</h3>
+            <span className="shrink-0 rounded-full border border-[#2E00AB]/20 bg-[#F8F4FF] px-3 py-0.5 text-[11px] text-[#2E00AB]">
               {item.categoryName}
             </span>
           </div>
-          <p className="line-clamp-3 min-h-[60px] text-sm text-[#2E00AB]/80">{item.description}</p>
-          <p className="text-3xl font-semibold leading-none text-[#2E00AB]">
-            ${item.priceMonthly}/mo
-          </p>
+          <p className="line-clamp-2 min-h-[40px] text-sm text-[#2E00AB]/70">{item.description}</p>
+          <p className="text-3xl font-bold leading-none text-[#2E00AB]">${item.priceMonthly}/mo</p>
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="w-full rounded-md border border-[#2E00AB]/30 bg-white py-2 text-sm font-medium text-[#2E00AB] transition hover:bg-[#F8F4FF]"
+            className="w-full rounded-xl bg-[#2E00AB] py-3 text-sm font-semibold text-white transition hover:bg-[#2E00AB]/90"
           >
             View Details
           </button>
