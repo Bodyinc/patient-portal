@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -20,8 +21,8 @@ export default function CheckoutActions({
   const router = useRouter();
 
   return (
-    <section className="space-y-6 pt-2">
-      <label className="flex items-start gap-3 text-sm text-[#2E00AB]/80 cursor-pointer">
+    <section className="space-y-4">
+      <label className="flex items-start gap-2 text-xs text-[#2E00AB]/80">
         <Checkbox
           checked={termsAccepted}
           onCheckedChange={(checked) => onTermsChange(Boolean(checked))}
@@ -39,17 +40,17 @@ export default function CheckoutActions({
           type="button"
           variant="outline"
           onClick={() => router.push("/shop")}
-          className="h-12 rounded-full border-[#2E00AB]/30 text-[#2E00AB] hover:bg-[#F8F4FF]"
+          className="h-11 border-[#2E00AB]/30 text-[#2E00AB]"
         >
-          ← Back
+          Back
         </Button>
         <Button
           type="button"
           disabled={!termsAccepted || continueDisabled}
           onClick={onContinue}
-          className="h-12 rounded-full bg-[#2E00AB] text-white hover:bg-[#2E00AB]/90 text-base font-medium"
+          className="h-11 bg-[#2E00AB] text-white hover:bg-[#2E00AB]/90"
         >
-          Continue to Payment →
+          Continue to Payment
         </Button>
       </div>
     </section>
