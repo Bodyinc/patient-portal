@@ -46,8 +46,16 @@ export async function linkStripeCustomerToUser(params: {
   stripeCustomerId: string;
   userId: string;
 }): Promise<void> {
+  // Sync the customer to the ACCOUNT's email/name (authoritative) — the guest customer
+  // was created with the intake email, which may differ if the user changed it at signup.
+  const { data: userData } = await supabaseAdmin.auth.admin.getUserById(params.userId);
+  const email = userData?.user?.email ?? undefined;
+  const name = (userData?.user?.user_metadata?.full_name as string | undefined) ?? undefined;
+
   await stripe.customers.update(params.stripeCustomerId, {
     metadata: { user_id: params.userId },
+    ...(email ? { email } : {}),
+    ...(name ? { name } : {}),
   });
   await supabaseAdmin
     .from("profiles")

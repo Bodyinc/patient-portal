@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { OTP_LENGTH } from "@/lib/auth/constants";
 import { onLoginSuccess } from "@/lib/auth/on-login-success";
+import { reconcileCheckoutEmail } from "@/lib/actions/patient-auth";
 import { createClient } from "@/lib/supabase/client";
 
 function VerifyOTPContent() {
@@ -36,6 +37,11 @@ function VerifyOTPContent() {
       if (error) {
         toast.error(error.message);
         return;
+      }
+
+      // Email change was verified just now — now propagate it to the profile + Stripe customer.
+      if (searchParams.get("sync") === "email") {
+        await reconcileCheckoutEmail();
       }
 
       if (redirectTo && redirectTo.startsWith("/")) {
@@ -73,7 +79,7 @@ function VerifyOTPContent() {
         </p>
 
         <Link
-          href="/otp-login"
+          href={`/change-email${redirectTo ? `?redirect=${encodeURIComponent(redirectTo)}` : ""}`}
           className="mt-4 inline-block text-base text-[#2E00AB] underline underline-offset-4 sm:text-[18px]"
         >
           Change email

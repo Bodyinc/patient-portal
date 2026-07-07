@@ -9,7 +9,10 @@ import PlanSelector from "./PlanSelector";
 import ReferralCard from "./ReferralCard";
 import SelectedProductCard from "./SelectedProductCard";
 import StripePaymentForm from "./StripePaymentForm";
+import { PROCESSING_FEE_CENTS } from "@/lib/stripe/fees";
 import type { CheckoutBootstrap, CheckoutPlanId } from "./types";
+
+const PROCESSING_FEE = PROCESSING_FEE_CENTS / 100;
 
 type ShopCheckoutClientProps = {
   bootstrap: CheckoutBootstrap;
@@ -43,7 +46,7 @@ export default function ShopCheckoutClient({
     () => selectedPlanMeta?.amount ?? bootstrap.product.baseMonthlyPrice,
     [bootstrap.product.baseMonthlyPrice, selectedPlanMeta],
   );
-  const total = Math.max(0, subtotal - promoSavings);
+  const total = Math.max(0, subtotal + PROCESSING_FEE - promoSavings);
   const selectedPackageId =
     selectedPlanMeta &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -116,7 +119,12 @@ export default function ShopCheckoutClient({
           setPromoSavings(promoCode.trim().toUpperCase() === "SAVE50" ? 50 : 0);
         }}
       />
-      <OrderSummaryCard subtotal={subtotal} promoSavings={promoSavings} total={total} />
+      <OrderSummaryCard
+        subtotal={subtotal}
+        processingFee={PROCESSING_FEE}
+        promoSavings={promoSavings}
+        total={total}
+      />
 
       {error ? (
         <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">

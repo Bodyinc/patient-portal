@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getOrCreateStripeCustomer } from "@/lib/stripe/customers";
 import { createSubscriptionForPrice } from "@/lib/stripe/subscriptions";
 import { resolveActivePromo, computePromoDiscountCents } from "@/lib/stripe/promos";
+import { PROCESSING_FEE_CENTS } from "@/lib/stripe/fees";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -77,7 +78,7 @@ export async function POST(request: Request) {
         promo_savings: discountCents / 100,
         subtotal: subtotalCents / 100,
         shipping: 0,
-        total: (subtotalCents - discountCents) / 100,
+        total: (subtotalCents + PROCESSING_FEE_CENTS - discountCents) / 100,
         status: "pending_payment",
       })
       .select("id")
@@ -97,6 +98,7 @@ export async function POST(request: Request) {
       customerId,
       priceId: pkg.stripe_price_id,
       promotionCodeId: promo?.stripe_promotion_code_id ?? null,
+      oneTimeFees: [{ amountCents: PROCESSING_FEE_CENTS, description: "Processing fee" }],
       metadata: {
         order_id: order.id,
         user_id: user.id,

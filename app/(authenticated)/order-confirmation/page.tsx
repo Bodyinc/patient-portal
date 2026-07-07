@@ -24,6 +24,13 @@ export default async function OrderConfirmationPage() {
   const med = (sub as { medicines?: { name: string } } | null)?.medicines;
   const pricing = pkg ? calculateCheckoutPricing(Number(pkg.price), pkg.duration_months) : null;
 
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("email")
+    .eq("id", user.id)
+    .maybeSingle();
+  const email = profile?.email ?? user.email ?? "";
+
   return (
     <main className="min-w-0 flex-1 bg-[#FAF8FF] p-4">
       <div className="mx-auto flex max-w-2xl flex-col items-center gap-6 py-6">
@@ -49,6 +56,18 @@ export default async function OrderConfirmationPage() {
             <div className="flex justify-between">
               <span className="text-[#2E00AB]/80">Plan</span>
               <span className="font-medium text-[#2E00AB]">{pkg?.name ?? "Treatment Plan"}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[#2E00AB]/80">Email</span>
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="truncate font-medium text-[#2E00AB]">{email}</span>
+                <Link
+                  href="/change-email?redirect=/order-confirmation"
+                  className="shrink-0 text-xs font-medium text-[#2E00AB] underline"
+                >
+                  Edit
+                </Link>
+              </span>
             </div>
             <div className="flex items-center justify-between border-t border-[#2E00AB]/10 pt-4">
               <span className="text-base font-medium text-[#2E00AB]">Total Paid</span>

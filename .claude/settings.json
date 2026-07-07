@@ -8,12 +8,27 @@
       "Bash(grep -nE \"^        \\(medicines|packages\\): \\\\{$|^      \\(medicines|packages\\): \\\\{$\" src/integrations/supabase/types.ts)",
       "Bash(awk '/^      packages: \\\\{/{f=1} f&&/is_active:/{print NR\": \"$0} f&&/Relationships/{print NR\": \"$0; c++} c>=1{exit}' src/integrations/supabase/types.ts)",
       "Read(//c/Programming/BeezTech/BodyInc/bodyinc-access-hub/src/integrations/supabase/**)",
-      "Bash(node \"C:/Users/ritik/AppData/Local/Temp/claude/c--Programming-BeezTech-BodyInc-patient-portal/8ead50a7-b69b-4b6e-923e-202aa8e17170/scratchpad/stripe-diag.cjs\" \"c:/Programming/BeezTech/BodyInc/patient-portal\")"
+      "Bash(node \"C:/Users/ritik/AppData/Local/Temp/claude/c--Programming-BeezTech-BodyInc-patient-portal/8ead50a7-b69b-4b6e-923e-202aa8e17170/scratchpad/stripe-diag.cjs\" \"c:/Programming/BeezTech/BodyInc/patient-portal\")",
+      "Bash(node \"C:/Users/ritik/AppData/Local/Temp/claude/c--Programming-BeezTech-BodyInc-patient-portal/8ead50a7-b69b-4b6e-923e-202aa8e17170/scratchpad/inspect-subs.cjs\" \"c:/Programming/BeezTech/BodyInc/patient-portal\")",
+      "Read(//c/Programming/BeezTech/BodyInc/bodyinc-access-hub/src/lib/**)",
+      "Read(//c/Programming/BeezTech/BodyInc/bodyinc-access-hub/src/routes/_authenticated/**)",
+      "Bash(git -C \"c:/Programming/BeezTech/BodyInc/patient-portal\" log --oneline -6)",
+      "Bash(git -C \"c:/Programming/BeezTech/BodyInc/patient-portal\" status --short)",
+      "Bash(git -C \"c:/Programming/BeezTech/BodyInc/bodyinc-access-hub\" log --oneline -6)",
+      "Bash(git -C \"c:/Programming/BeezTech/BodyInc/bodyinc-access-hub\" status --short)",
+      "Bash(node \"C:/Users/ritik/AppData/Local/Temp/claude/c--Programming-BeezTech-BodyInc-patient-portal/8ead50a7-b69b-4b6e-923e-202aa8e17170/scratchpad/check-orders.cjs\" \"c:/Programming/BeezTech/BodyInc/patient-portal\")",
+      "Bash(node \"C:/Users/ritik/AppData/Local/Temp/claude/c--Programming-BeezTech-BodyInc-patient-portal/8ead50a7-b69b-4b6e-923e-202aa8e17170/scratchpad/check-items.cjs\" \"c:/Programming/BeezTech/BodyInc/patient-portal\")",
+      "Bash(cd \"c:/Programming/BeezTech/BodyInc/bodyinc-access-hub\"; echo \"=== how admin patients gets email \\(patients.functions.ts\\) ===\"; grep -nE \"email|auth.admin|listUsers|from\\\\\\(.profiles|getUserById\" src/lib/patients.functions.ts 2>/dev/null | head -30; echo; echo \"=== files for patients ===\"; ls src/lib/patients* src/routes/_authenticated/admin.patients* 2>/dev/null)",
+      "Bash(cd \"c:/Programming/BeezTech/BodyInc\"; echo \"=== triggers/functions syncing auth.users -> profiles.email ===\"; grep -rnE \"NEW\\\\.email|on_auth_user|handle_user_update|UPDATE .*profiles|profiles.*SET.*email|AFTER UPDATE ON auth\" bodyinc-access-hub/supabase/migrations/ patient-portal/supabase/migrations/ 2>/dev/null | grep -iE \"email|profiles|auth\" | head -30)",
+      "Read(//c/Programming/BeezTech/BodyInc/**)",
+      "PowerShell(npm run build 2>&1)",
+      "PowerShell(npx prettier --write src/lib/actions/stripe-checkout.ts 2>&1)"
     ],
     "additionalDirectories": [
       "c:\\Programming\\BeezTech\\BodyInc\\bodyinc-access-hub\\supabase\\migrations",
       "c:\\Programming\\BeezTech\\BodyInc\\bodyinc-access-hub\\src\\routes\\_authenticated",
-      "c:\\Programming\\BeezTech\\BodyInc\\bodyinc-access-hub\\src\\integrations\\supabase"
+      "c:\\Programming\\BeezTech\\BodyInc\\bodyinc-access-hub\\src\\integrations\\supabase",
+      "C:\\Users\\ritik\\.claude\\plans"
     ]
   }
 }
