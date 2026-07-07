@@ -6,6 +6,7 @@ import { claimIntakeSession } from "@/lib/actions/intake";
 import { requireIntakeSession } from "@/lib/intake/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { stripe } from "@/lib/stripe/server";
 
 const signupSchema = z.object({
   email: z.string().trim().email().max(255),
@@ -189,6 +190,101 @@ async function ensurePatientRoleForUser(userId: string) {
   }
 
   return { ok: true as const, role: PORTAL_ROLE };
+}
+
+const changeEmailSchema = z.string().trim().email().max(255);
+
+export type ChangeCheckoutEmailResult =
+  | { ok: true; email: string }
+  | { ok: false; message: string };
+
+// Step 1 of an email change: only re-point the account's LOGIN email so a one-time code can
+// be sent to the new address. The visible "reflect" (profile + Stripe customer + admin) is
+// deferred to reconcileCheckoutEmail(), which runs only AFTER that code is verified.
+export async function changeCheckoutEmail(newEmailRaw: string): Promise<ChangeCheckoutEmailResult> {
+  const parsed = changeEmailSchema.safeParse(newEmailRaw);
+  if (!parsed.success) {
+    return { ok: false, message: "Enter a valid email address." };
+  }
+  const newEmail = parsed.data.toLowerCase();
+
+  // Prefer the authenticated user (change AFTER OTP verification); otherwise the intake
+  // session (change at the OTP screen, before sign-in).
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  let userId: string;
+  let currentEmail: string | null | undefined;
+
+  if (user) {
+    userId = user.id;
+    currentEmail = user.email ?? null;
+  } else {
+    const sessionResult = await requireIntakeSession();
+    if ("error" in sessionResult) {
+      return { ok: false, message: sessionResult.error };
+    }
+    const session = sessionResult.session;
+    if (!session.claimed_by_user_id) {
+      return { ok: false, message: "Complete checkout before changing your email." };
+    }
+    userId = session.claimed_by_user_id;
+    currentEmail = session.email;
+  }
+
+  if (currentEmail?.toLowerCase() === newEmail) {
+    return { ok: true, email: newEmail };
+  }
+
+  const { user: existing } = await findAuthUserByEmail(newEmail);
+  if (existing && existing.id !== userId) {
+    return { ok: false, message: "That email is already in use by another account." };
+  }
+
+  const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+    email: newEmail,
+    email_confirm: true,
+  });
+  if (updateErr) {
+    return { ok: false, message: updateErr.message ?? "Could not update email." };
+  }
+
+  // The auth→profiles email trigger (on_auth_user_email_update) just copied newEmail into
+  // profiles.email. Revert it so the admin Patients view keeps showing the current email until
+  // the new one's OTP is verified — reconcileCheckoutEmail() does the real propagation after.
+  if (currentEmail) {
+    await supabaseAdmin.from("profiles").update({ email: currentEmail }).eq("id", userId);
+  }
+
+  return { ok: true, email: newEmail };
+}
+
+// Step 2: after the new email's OTP is verified, propagate it to the places that reflect
+// externally — the profile row and the Stripe customer (the subscription follows the customer).
+export async function reconcileCheckoutEmail(): Promise<{ ok: boolean }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user?.email) return { ok: false };
+
+  await supabaseAdmin.from("profiles").update({ email: user.email }).eq("id", user.id);
+
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("stripe_customer_id")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (profile?.stripe_customer_id) {
+    try {
+      await stripe.customers.update(profile.stripe_customer_id, { email: user.email });
+    } catch {
+      // Non-fatal.
+    }
+  }
+  return { ok: true };
 }
 
 export async function claimCheckoutForCurrentUser(): Promise<{ ok: boolean }> {

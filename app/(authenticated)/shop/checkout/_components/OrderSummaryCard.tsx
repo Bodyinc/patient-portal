@@ -1,5 +1,6 @@
 type OrderSummaryCardProps = {
   subtotal: number;
+  processingFee: number;
   promoSavings: number;
   total: number;
 };
@@ -8,7 +9,12 @@ function formatUsd(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
 }
 
-export default function OrderSummaryCard({ subtotal, promoSavings, total }: OrderSummaryCardProps) {
+export default function OrderSummaryCard({
+  subtotal,
+  processingFee,
+  promoSavings,
+  total,
+}: OrderSummaryCardProps) {
   return (
     <section className="rounded-2xl border border-[#E6DEFF] bg-white p-4">
       <h3 className="text-2xl font-semibold text-[#2E00AB]">Order Summary</h3>
@@ -20,6 +26,10 @@ export default function OrderSummaryCard({ subtotal, promoSavings, total }: Orde
         <div className="flex items-center justify-between border-b border-[#EFE9FF] pb-2">
           <span>Shipping</span>
           <span>Free</span>
+        </div>
+        <div className="flex items-center justify-between border-b border-[#EFE9FF] pb-2">
+          <span>Processing Fee</span>
+          <span>{formatUsd(processingFee)}</span>
         </div>
         <div className="flex items-center justify-between border-b border-[#EFE9FF] pb-2">
           <span>Promotional Savings</span>

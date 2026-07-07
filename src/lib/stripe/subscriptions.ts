@@ -20,7 +20,7 @@ export async function createSubscriptionForPrice(params: {
   // Pending invoice items on the customer get pulled into the subscription's first
   // invoice, so the first charge equals the cart total (plan + one-time fees).
   for (const fee of oneTimeFees ?? []) {
-    if (fee.amountCents <= 0) continue;
+    if (fee.amountCents === 0) continue; // keep negative items (discounts); skip only zero
     await stripe.invoiceItems.create({
       customer: customerId,
       amount: fee.amountCents,

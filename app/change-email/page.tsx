@@ -1,0 +1,109 @@
+"use client";
+
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
+import { toast } from "sonner";
+import { z } from "zod";
+
+import AuthPageShell, {
+  AuthHeading,
+  authButtonClassName,
+  authInputClassName,
+} from "@/components/AuthPageShell";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { changeCheckoutEmail } from "@/lib/actions/patient-auth";
+import { createClient } from "@/lib/supabase/client";
+
+const emailSchema = z.object({ email: z.string().trim().email("Enter a valid email") });
+
+function ChangeEmailContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect");
+  const supabase = createClient();
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const parsed = emailSchema.safeParse({ email });
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0]?.message ?? "Invalid email");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const result = await changeCheckoutEmail(parsed.data.email);
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
+
+      const { error } = await supabase.auth.signInWithOtp({ email: result.email });
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+
+      toast.success("We sent a code to your new email. Verify it to finish the change.");
+      const redirectParam = redirectTo ? `&redirect=${encodeURIComponent(redirectTo)}` : "";
+      router.push(
+        `/verify-otp?email=${encodeURIComponent(result.email)}&sync=email${redirectParam}`,
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <AuthPageShell footer={null}>
+      <AuthHeading
+        title="Edit Email Address"
+        description="Update the email for your order. Your treatment plan and payment stay linked to your account."
+      />
+
+      <form onSubmit={onSubmit} className="space-y-6">
+        <div className="space-y-2">
+          <Label htmlFor="change-email" className="text-[14px] font-semibold text-[#2E00AB]">
+            New Email Address
+          </Label>
+          <Input
+            id="change-email"
+            type="email"
+            autoComplete="email"
+            placeholder="name@company.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className={authInputClassName}
+            required
+          />
+        </div>
+
+        <Button type="submit" className={authButtonClassName} disabled={busy}>
+          {busy ? "Updating..." : "Update Email →"}
+        </Button>
+      </form>
+
+      <p className="mt-6 text-center text-sm text-[#2E00AB]/80">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="font-medium text-[#2E00AB] hover:underline"
+        >
+          Back
+        </button>
+      </p>
+    </AuthPageShell>
+  );
+}
+
+export default function ChangeEmailPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-dvh items-center justify-center" />}>
+      <ChangeEmailContent />
+    </Suspense>
+  );
+}
