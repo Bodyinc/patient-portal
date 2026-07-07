@@ -79,25 +79,43 @@ function VerifyOTPContent() {
           Change email
         </Link>
 
-        <div className="mx-auto mt-8 flex max-w-full justify-center overflow-x-auto sm:mt-10">
-          <InputOTP
-            maxLength={OTP_LENGTH}
-            value={otp}
-            onChange={setOtp}
-            inputMode="numeric"
-            containerClassName="justify-center gap-1.5 sm:gap-3"
-          >
-            <InputOTPGroup>
-              {Array.from({ length: OTP_LENGTH }, (_, index) => (
-                <InputOTPSlot
-                  key={index}
-                  index={index}
-                  className="h-10 w-9 rounded-[8px] border border-[#2E00AB]/40 bg-white text-lg font-semibold text-[#2E00AB] shadow-none first:rounded-[8px] first:border-l last:rounded-[8px] sm:h-[50px] sm:w-[50px] sm:text-[24px]"
-                />
-              ))}
-            </InputOTPGroup>
-          </InputOTP>
-        </div>
+        {/* Updated OTP Input with better gap */}
+        {/* Custom OTP Input - No library gray line */}
+<div className="mx-auto mt-8 flex max-w-full justify-center sm:mt-10">
+  <div className="flex gap-1">
+    {Array.from({ length: OTP_LENGTH }, (_, index) => (
+      <input
+        key={index}
+        type="text"
+        inputMode="numeric"
+        maxLength={1}
+        value={otp[index] || ""}
+        onChange={(e) => {
+          const value = e.target.value;
+          if (!/^\d*$/.test(value)) return;
+
+          const newOtp = otp.split("");
+          newOtp[index] = value;
+          const updatedOtp = newOtp.join("");
+          setOtp(updatedOtp);
+
+          // Auto focus next input
+          if (value && index < OTP_LENGTH - 1) {
+            const nextInput = e.target.parentElement?.querySelectorAll("input")[index + 1];
+            nextInput?.focus();
+          }
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Backspace" && !otp[index] && index > 0) {
+            const prevInput = e.currentTarget.parentElement?.querySelectorAll("input")[index - 1];
+            prevInput?.focus();
+          }
+        }}
+        className="h-10 w-9 rounded-[8px] border border-[#2E00AB]/40 bg-white text-center text-lg font-semibold text-[#2E00AB] shadow-none focus:border-[#2E00AB] focus:ring-2 focus:ring-[#2E00AB]/30 sm:h-[50px] sm:w-[50px] sm:text-[24px] outline-none"
+      />
+    ))}
+  </div>
+</div>
 
         <Button onClick={verify} disabled={busy} className={`mt-6 ${authButtonClassName}`}>
           {busy ? "Verifying..." : "Verify"}

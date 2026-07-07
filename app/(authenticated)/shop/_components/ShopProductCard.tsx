@@ -62,86 +62,95 @@ export default function ShopProductCard({ item }: { item: ShopMedicineCardDto })
       </article>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[90vh] max-w-4xl gap-0 overflow-y-auto p-0 sm:rounded-2xl">
-          <div className="grid grid-cols-1 gap-6 p-5 sm:p-6 lg:grid-cols-[280px_1fr]">
-            <div className="flex flex-col gap-4">
-              <div className="relative flex min-h-[220px] items-center justify-center overflow-hidden rounded-2xl bg-[#F3EEFF]">
-                <img
-                  src="/curve-line.svg"
-                  alt=""
-                  className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-70"
-                />
-                <img
-                  src={item.imageSrc}
-                  alt={item.name}
-                  className="relative z-10 h-auto max-h-[180px] w-auto object-contain"
-                />
-              </div>
-              <p className="text-center text-2xl font-semibold text-[#2E00AB] sm:text-left">
-                From ${item.priceMonthly}/month
-              </p>
-            </div>
+        <DialogContent className="max-h-[90vh] max-w-4xl gap-0 overflow-y-auto p-0 sm:rounded-2xl min-h-[580px]">
+  {/* Main 2-column grid container */}
+  <div className="grid grid-cols-1 gap-6 p-5 sm:p-6 lg:grid-cols-[340px_1fr]">
+   
+    {/* LEFT SIDE: Unified Card containing both the purple bottle block and the price */}
+    <div className="flex flex-col rounded-2xl border border-[#DCD2FF] bg-[#F8F4FF]/30 p-3">
+      
+      {/* Light purple bottle image container */}
+      <div className="relative flex min-h-[380px] flex-1 items-center justify-center overflow-hidden rounded-xl bg-[#F3EEFF]">
+        <img
+          src="/curve-line.svg"
+          alt=""
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-70"
+        />
+        <img
+          src={item.imageSrc}
+          alt={item.name}
+          className="relative z-10 !h-[320px] w-auto object-contain drop-shadow-md"
+        />
+      </div>
 
-            <div className="min-w-0">
-              <DialogTitle className="text-2xl font-semibold text-[#2E00AB] sm:text-3xl">
-                {item.name}
-              </DialogTitle>
-              <DialogDescription className="sr-only">
-                Detailed information about {item.name}
-              </DialogDescription>
+      {/* Price amount anchored at the bottom of the left card */}
+      <p className="mt-4 px-2 text-2xl font-bold text-[#2E00AB]">
+        From ${item.priceMonthly}/month
+      </p>
+    </div>
 
-              <p className="mt-3 text-base text-[#2E00AB]">{item.description}</p>
-              <p className="mt-3 text-sm leading-relaxed text-[#2E00AB]/80 sm:text-base">
-                This treatment plan is personalized based on your health assessment and clinician
-                recommendations for safe and sustainable progress.
-              </p>
+    {/* RIGHT SIDE: Details container */}
+    <div className="min-w-0 py-2">
+      <DialogTitle className="text-2xl font-semibold text-[#2E00AB] sm:text-3xl">
+        {item.name}
+      </DialogTitle>
+      <DialogDescription className="sr-only">
+        Detailed information about {item.name}
+      </DialogDescription>
 
-              <div className="mt-5">
-                <h3 className="text-base font-semibold text-[#2E00AB]">Important Information</h3>
-                <ul className="mt-3 space-y-2">
-                  <li className="border-l-4 border-[#2E00AB] pl-3 text-sm text-[#2E00AB]/90 sm:text-base">
-                    Prescription required following clinical approval.
-                  </li>
-                  <li className="border-l-4 border-[#2E00AB] pl-3 text-sm text-[#2E00AB]/90 sm:text-base">
-                    Contact your provider if you experience unexpected side effects.
-                  </li>
-                  <li className="border-l-4 border-[#2E00AB] pl-3 text-sm text-[#2E00AB]/90 sm:text-base">
-                    Individual results may vary based on medical history and lifestyle.
-                  </li>
-                  <li className="border-l-4 border-[#2E00AB] pl-3 text-sm text-[#2E00AB]/90 sm:text-base">
-                    Use only as directed by your care team.
-                  </li>
-                </ul>
-              </div>
+      <p className="mt-3 text-base text-[#2E00AB]">{item.description}</p>
+      <p className="mt-3 text-sm leading-relaxed text-[#2E00AB]/80 sm:text-base">
+        This treatment plan is personalized based on your health assessment and clinician
+        recommendations for safe and sustainable progress.
+      </p>
 
-              <div className="mt-5 rounded-xl border border-[#2E00AB]/20 bg-[#F8F4FF] p-4">
-                <h4 className="font-semibold text-[#2E00AB]">Notice</h4>
-                <p className="mt-1 text-sm text-[#2E00AB]/80">
-                  Prescription required. Professional medical consultation necessary before
-                  fulfillment.
-                </p>
-              </div>
-            </div>
-          </div>
+      <div className="mt-5">
+        <h3 className="text-base font-semibold text-[#2E00AB]">Important Information</h3>
+        <ul className="mt-3 space-y-2">
+          <li className="border-l-4 border-[#2E00AB] pl-3 text-sm text-[#2E00AB]/90 sm:text-base">
+            Prescription required following clinical approval.
+          </li>
+          <li className="border-l-4 border-[#2E00AB] pl-3 text-sm text-[#2E00AB]/90 sm:text-base">
+            Contact your provider if you experience unexpected side effects.
+          </li>
+          <li className="border-l-4 border-[#2E00AB] pl-3 text-sm text-[#2E00AB]/90 sm:text-base">
+            Individual results may vary based on medical history and lifestyle.
+          </li>
+          <li className="border-l-4 border-[#2E00AB] pl-3 text-sm text-[#2E00AB]/90 sm:text-base">
+            Use only as directed by your care team.
+          </li>
+        </ul>
+      </div>
 
-          <div className="flex flex-col-reverse gap-3 border-t border-[#2E00AB]/10 bg-white p-4 sm:flex-row sm:justify-end sm:px-6 sm:pb-6">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              className="w-full border-[#2E00AB]/40 text-[#2E00AB] sm:w-auto"
-            >
-              Explore More
-            </Button>
-            <Button
-              type="button"
-              onClick={handleContinue}
-              className="w-full bg-[#2E00AB] hover:bg-[#2E00AB]/90 sm:w-auto"
-            >
-              Continue
-            </Button>
-          </div>
-        </DialogContent>
+      <div className="mt-5 rounded-xl border border-[#2E00AB]/20 bg-[#F8F4FF] p-4">
+        <h4 className="font-semibold text-[#2E00AB]">Notice</h4>
+        <p className="mt-1 text-sm text-[#2E00AB]/80">
+          Prescription required. Professional medical consultation necessary before
+          fulfillment.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  {/* Footer Action Buttons */}
+  <div className="flex flex-col-reverse gap-3 border-t border-[#2E00AB]/10 bg-white p-4 sm:flex-row sm:justify-end sm:px-6 sm:pb-6">
+    <Button
+      type="button"
+      variant="outline"
+      onClick={() => setOpen(false)}
+      className="w-full border-[#2E00AB]/40 text-[#2E00AB] sm:w-auto"
+    >
+      Explore More
+    </Button>
+    <Button
+      type="button"
+      onClick={handleContinue}
+      className="w-full bg-[#2E00AB] hover:bg-[#2E00AB]/90 sm:w-auto"
+    >
+      Continue
+    </Button>
+  </div>
+</DialogContent>
       </Dialog>
     </>
   );
