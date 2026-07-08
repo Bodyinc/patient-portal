@@ -4,9 +4,8 @@ import { requireIntakeSession } from "@/lib/intake/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createGuestStripeCustomer } from "@/lib/stripe/customers";
 import { createSubscriptionForPrice, ensureNoActiveDuplicate } from "@/lib/stripe/subscriptions";
-import { resolveActivePromo } from "@/lib/stripe/promos";
+import { resolveCheckoutDiscount, incrementPromoRedemption } from "@/lib/stripe/promos";
 import { CONSULTATION_FEE, PROCESSING_FEE } from "../../../app/onboarding/_lib/onboarding-config";
-import { resolvePromoDiscount } from "../../../app/onboarding/_lib/intake-pricing";
 
 export type OnboardingSubscriptionResult =
   | { ok: true; clientSecret: string }
@@ -30,7 +29,7 @@ export async function createOnboardingSubscription(
 
   const { data: pkg, error: pkgError } = await supabaseAdmin
     .from("packages")
-    .select("id, medicine_id, is_active, stripe_price_id, duration_months")
+    .select("id, medicine_id, is_active, stripe_price_id, duration_months, price")
     .eq("id", session.selected_plan_id)
     .maybeSingle();
 
@@ -56,12 +55,13 @@ export async function createOnboardingSubscription(
     }
   }
 
-  const promo = await resolveActivePromo(promoCode);
-  // A DB-backed promo (Phase 5) wins via a Stripe coupon; otherwise mirror the cart's
-  // current discount logic as a negative line item so the charge matches "Total Due Today".
-  const { discount, label } = promo
-    ? { discount: 0, label: null as string | null }
-    : resolvePromoDiscount(promoCode, pkg.duration_months);
+  // DB-driven discount: an entered code, or the admin's auto-apply (welcome) promo.
+  const subtotalCents = Math.round(Number(pkg.price) * 100);
+  const discount = await resolveCheckoutDiscount({
+    code: promoCode,
+    subtotalCents,
+    allowAuto: true,
+  });
 
   const oneTimeFees: Array<{ amountCents: number; description: string }> = [
     {
@@ -70,10 +70,10 @@ export async function createOnboardingSubscription(
     },
     { amountCents: Math.round(PROCESSING_FEE * 100), description: "Processing fee" },
   ];
-  if (discount > 0) {
+  if (discount) {
     oneTimeFees.push({
-      amountCents: -Math.round(discount * 100),
-      description: label ? `Discount (${label})` : "Discount",
+      amountCents: -discount.discountCents,
+      description: `Discount (${discount.label})`,
     });
   }
 
@@ -88,7 +88,6 @@ export async function createOnboardingSubscription(
   const { subscriptionId, clientSecret } = await createSubscriptionForPrice({
     customerId,
     priceId: pkg.stripe_price_id,
-    promotionCodeId: promo?.stripe_promotion_code_id ?? null,
     oneTimeFees,
     metadata: {
       intake_session_id: session.id,
@@ -96,6 +95,8 @@ export async function createOnboardingSubscription(
       medicine_id: pkg.medicine_id,
     },
   });
+
+  if (discount) await incrementPromoRedemption(discount.promo.id);
 
   await supabaseAdmin
     .from("intake_sessions")
@@ -120,4 +121,26 @@ export async function createOnboardingSubscription(
   );
 
   return { ok: true, clientSecret };
+}
+
+// Client-facing discount preview for the checkout cart. code=null returns the auto-apply
+// (welcome) discount when allowAuto is true.
+export async function getCheckoutDiscount(input: {
+  packageId: string;
+  code?: string | null;
+  allowAuto: boolean;
+}): Promise<{ discountCents: number; label: string } | null> {
+  const { data: pkg } = await supabaseAdmin
+    .from("packages")
+    .select("price")
+    .eq("id", input.packageId)
+    .maybeSingle();
+  if (!pkg) return null;
+  const subtotalCents = Math.round(Number(pkg.price) * 100);
+  const d = await resolveCheckoutDiscount({
+    code: input.code,
+    subtotalCents,
+    allowAuto: input.allowAuto,
+  });
+  return d ? { discountCents: d.discountCents, label: d.label } : null;
 }

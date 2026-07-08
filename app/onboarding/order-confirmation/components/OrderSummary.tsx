@@ -12,7 +12,7 @@ export default function OrderSummary() {
   const medicationName = summary?.medicineName ?? "Selected Medication";
   const planLabel = summary?.packageName ?? "Treatment Plan";
   const loaded = summary?.packagePrice != null;
-  const pricing = calculateCheckoutPricing(summary?.packagePrice, summary?.packageDurationMonths);
+  const pricing = calculateCheckoutPricing(summary?.packagePrice);
 
   return (
     <Card className="overflow-hidden rounded-2xl border border-[#2E00AB]/25 shadow-none">

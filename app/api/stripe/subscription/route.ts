@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getOrCreateStripeCustomer } from "@/lib/stripe/customers";
 import { createSubscriptionForPrice } from "@/lib/stripe/subscriptions";
-import { resolveActivePromo, computePromoDiscountCents } from "@/lib/stripe/promos";
+import { resolveCheckoutDiscount, incrementPromoRedemption } from "@/lib/stripe/promos";
 import { PROCESSING_FEE_CENTS } from "@/lib/stripe/fees";
 
 export const runtime = "nodejs";
@@ -61,9 +61,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const promo = await resolveActivePromo(body.promoCode);
     const subtotalCents = Math.round(Number(pkg.price) * 100);
-    const discountCents = promo ? computePromoDiscountCents(promo, subtotalCents) : 0;
+    const discount = await resolveCheckoutDiscount({
+      code: body.promoCode,
+      subtotalCents,
+      allowAuto: false,
+    });
+    const discountCents = discount?.discountCents ?? 0;
     const selectedPlanCode = pkg.duration_months === 1 ? "monthly" : "quarterly";
 
     const { data: order, error: orderError } = await supabaseAdmin
@@ -74,7 +78,7 @@ export async function POST(request: Request) {
         selected_package_id: pkg.id,
         selected_plan_code: selectedPlanCode,
         payment_method_code: "card",
-        promo_code: promo?.code ?? null,
+        promo_code: discount?.label ?? null,
         promo_savings: discountCents / 100,
         subtotal: subtotalCents / 100,
         shipping: 0,
@@ -94,11 +98,18 @@ export async function POST(request: Request) {
       name: (user.user_metadata?.full_name as string | undefined) ?? null,
     });
 
+    const oneTimeFees = [{ amountCents: PROCESSING_FEE_CENTS, description: "Processing fee" }];
+    if (discount) {
+      oneTimeFees.push({
+        amountCents: -discountCents,
+        description: `Discount (${discount.label})`,
+      });
+    }
+
     const { subscriptionId, clientSecret } = await createSubscriptionForPrice({
       customerId,
       priceId: pkg.stripe_price_id,
-      promotionCodeId: promo?.stripe_promotion_code_id ?? null,
-      oneTimeFees: [{ amountCents: PROCESSING_FEE_CENTS, description: "Processing fee" }],
+      oneTimeFees,
       metadata: {
         order_id: order.id,
         user_id: user.id,
@@ -106,6 +117,8 @@ export async function POST(request: Request) {
         medicine_id: medicineId,
       },
     });
+
+    if (discount) await incrementPromoRedemption(discount.promo.id);
 
     await supabaseAdmin
       .from("shop_checkout_orders")
