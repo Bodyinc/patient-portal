@@ -2,6 +2,7 @@ import "server-only";
 
 import type Stripe from "stripe";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { recordPayment } from "./record-payment";
 import type { Json } from "@/lib/supabase/types";
 
 // Field locations vary across Stripe API versions; read defensively.
@@ -89,20 +90,19 @@ async function handleInvoicePaid(invoice: Stripe.Invoice): Promise<void> {
 
   const piId = invoicePaymentIntentId(invoice);
 
-  await supabaseAdmin.from("payments").upsert(
-    {
-      user_id: subRow?.user_id ?? null,
-      session_id: subRow?.session_id ?? null,
-      plan_id: subRow?.package_id ?? null,
-      stripe_payment_intent_id: piId,
-      stripe_customer_id: customerId(invoice),
-      amount_cents: invoice.amount_paid ?? invoice.amount_due ?? 0,
-      currency: invoice.currency ?? "usd",
-      status: "succeeded",
-      raw_event: invoice as unknown as Json,
-    },
-    { onConflict: "stripe_payment_intent_id" },
-  );
+  await recordPayment({
+    user_id: subRow?.user_id ?? null,
+    session_id: subRow?.session_id ?? null,
+    plan_id: subRow?.package_id ?? null,
+    stripe_subscription_id: subId,
+    stripe_invoice_id: invoice.id,
+    stripe_payment_intent_id: piId,
+    stripe_customer_id: customerId(invoice),
+    amount_cents: invoice.amount_paid ?? invoice.amount_due ?? 0,
+    currency: invoice.currency ?? "usd",
+    status: "succeeded",
+    raw_event: invoice as unknown as Json,
+  });
 
   await supabaseAdmin
     .from("subscriptions")
@@ -140,7 +140,7 @@ async function handleInvoiceFailed(invoice: Stripe.Invoice): Promise<void> {
   const subId = invoiceSubscriptionId(invoice);
   const piId = invoicePaymentIntentId(invoice);
 
-  if (piId) {
+  if (invoice.id) {
     const { data: subRow } = subId
       ? await supabaseAdmin
           .from("subscriptions")
@@ -149,20 +149,19 @@ async function handleInvoiceFailed(invoice: Stripe.Invoice): Promise<void> {
           .maybeSingle()
       : { data: null };
 
-    await supabaseAdmin.from("payments").upsert(
-      {
-        user_id: subRow?.user_id ?? null,
-        session_id: subRow?.session_id ?? null,
-        plan_id: subRow?.package_id ?? null,
-        stripe_payment_intent_id: piId,
-        stripe_customer_id: customerId(invoice),
-        amount_cents: invoice.amount_due ?? 0,
-        currency: invoice.currency ?? "usd",
-        status: "failed",
-        raw_event: invoice as unknown as Json,
-      },
-      { onConflict: "stripe_payment_intent_id" },
-    );
+    await recordPayment({
+      user_id: subRow?.user_id ?? null,
+      session_id: subRow?.session_id ?? null,
+      plan_id: subRow?.package_id ?? null,
+      stripe_subscription_id: subId,
+      stripe_invoice_id: invoice.id,
+      stripe_payment_intent_id: piId,
+      stripe_customer_id: customerId(invoice),
+      amount_cents: invoice.amount_due ?? 0,
+      currency: invoice.currency ?? "usd",
+      status: "failed",
+      raw_event: invoice as unknown as Json,
+    });
   }
 
   if (subId) {

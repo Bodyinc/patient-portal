@@ -375,6 +375,8 @@ export type Database = {
           session_id: string | null;
           user_id: string | null;
           plan_id: string | null;
+          stripe_subscription_id: string | null;
+          stripe_invoice_id: string | null;
           stripe_payment_intent_id: string | null;
           stripe_customer_id: string | null;
           amount_cents: number;
@@ -389,6 +391,8 @@ export type Database = {
           session_id?: string | null;
           user_id?: string | null;
           plan_id?: string | null;
+          stripe_subscription_id?: string | null;
+          stripe_invoice_id?: string | null;
           stripe_payment_intent_id?: string | null;
           stripe_customer_id?: string | null;
           amount_cents: number;
@@ -403,6 +407,8 @@ export type Database = {
           session_id?: string | null;
           user_id?: string | null;
           plan_id?: string | null;
+          stripe_subscription_id?: string | null;
+          stripe_invoice_id?: string | null;
           stripe_payment_intent_id?: string | null;
           stripe_customer_id?: string | null;
           amount_cents?: number;
@@ -501,6 +507,7 @@ export type Database = {
           max_redemptions: number | null;
           redeem_by: string | null;
           is_active: boolean;
+          auto_apply: boolean;
           times_redeemed: number;
           created_at: string;
           updated_at: string;
@@ -519,6 +526,7 @@ export type Database = {
           max_redemptions?: number | null;
           redeem_by?: string | null;
           is_active?: boolean;
+          auto_apply?: boolean;
           times_redeemed?: number;
           created_at?: string;
           updated_at?: string;
@@ -537,6 +545,7 @@ export type Database = {
           max_redemptions?: number | null;
           redeem_by?: string | null;
           is_active?: boolean;
+          auto_apply?: boolean;
           times_redeemed?: number;
           created_at?: string;
           updated_at?: string;

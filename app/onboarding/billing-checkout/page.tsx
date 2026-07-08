@@ -1,10 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { createOnboardingSubscription } from "@/lib/actions/stripe-checkout";
+import { createOnboardingSubscription, getCheckoutDiscount } from "@/lib/actions/stripe-checkout";
 import {
   claimCheckoutForCurrentUser,
   preparePostCheckoutAccount,
@@ -21,7 +21,7 @@ import OnboardingPaymentForm from "./components/OnboardingPaymentForm";
 import OrderSummary from "./components/OrderSummary";
 import TermsCheckbox from "./components/TermsCheckbox";
 import { useIntakeSummary } from "../_hooks/use-intake-catalog";
-import { calculateCheckoutPricing, validatePromoCode } from "../_lib/intake-pricing";
+import { calculateCheckoutPricing } from "../_lib/intake-pricing";
 import { getStateName } from "../_lib/onboarding-config";
 import { getPrevStepPath } from "../_lib/onboarding-navigation";
 import { useOnboarding } from "../_lib/onboarding-store";
@@ -41,36 +41,49 @@ export default function BillingCheckoutPage() {
   const [applyingPromo, setApplyingPromo] = useState(false);
   const [promoMessage, setPromoMessage] = useState<string | null>(null);
   const [promoError, setPromoError] = useState<string | null>(null);
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [discountLabel, setDiscountLabel] = useState<string | null>(null);
 
+  const packageId = summary?.selectedPackageId ?? null;
   const medicationName = summary?.medicineName ?? "Selected Medication";
   const planLabel = summary?.packageName ?? "Treatment Plan";
   const pricing = useMemo(
-    () =>
-      calculateCheckoutPricing(
-        summary?.packagePrice,
-        summary?.packageDurationMonths,
-        appliedPromoCode,
-      ),
-    [summary?.packagePrice, summary?.packageDurationMonths, appliedPromoCode],
+    () => calculateCheckoutPricing(summary?.packagePrice, discountAmount, discountLabel),
+    [summary?.packagePrice, discountAmount, discountLabel],
   );
 
-  function handleApplyPromo() {
+  // Load the applicable discount (an applied code, or the admin's auto-apply welcome promo).
+  useEffect(() => {
+    if (!packageId) return;
+    let active = true;
+    void getCheckoutDiscount({ packageId, code: appliedPromoCode, allowAuto: true }).then((d) => {
+      if (!active) return;
+      setDiscountAmount(d ? d.discountCents / 100 : 0);
+      setDiscountLabel(d?.label ?? null);
+    });
+    return () => {
+      active = false;
+    };
+  }, [packageId, appliedPromoCode]);
+
+  async function handleApplyPromo() {
     setPromoError(null);
     setPromoMessage(null);
+    if (!packageId) return;
     setApplyingPromo(true);
-
-    const result = validatePromoCode(promoCode);
+    const d = await getCheckoutDiscount({ packageId, code: promoCode, allowAuto: false });
     setApplyingPromo(false);
 
-    if (!result.valid) {
-      setPromoError(result.message);
-      setAppliedPromoCode(null);
+    if (!d) {
+      setPromoError("Invalid or expired promo code");
       return;
     }
 
     setAppliedPromoCode(promoCode.trim().toUpperCase());
-    setPromoMessage(result.message);
-    toast.success(result.message);
+    setDiscountAmount(d.discountCents / 100);
+    setDiscountLabel(d.label);
+    setPromoMessage(`Promo ${d.label} applied`);
+    toast.success(`Promo ${d.label} applied`);
   }
 
   async function handleContinueToPayment() {

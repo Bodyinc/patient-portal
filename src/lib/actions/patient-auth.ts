@@ -271,6 +271,10 @@ export async function reconcileCheckoutEmail(): Promise<{ ok: boolean }> {
   if (!user?.email) return { ok: false };
 
   await supabaseAdmin.from("profiles").update({ email: user.email }).eq("id", user.id);
+  await supabaseAdmin
+    .from("intake_sessions")
+    .update({ email: user.email })
+    .eq("claimed_by_user_id", user.id);
 
   const { data: profile } = await supabaseAdmin
     .from("profiles")

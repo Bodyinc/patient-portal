@@ -3,10 +3,15 @@ import { CheckCircle2 } from "lucide-react";
 
 import { requirePatientSession } from "@/lib/auth/require-patient";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { reconcileLatestSubscriptionForUser } from "@/lib/stripe/reconcile";
 import { calculateCheckoutPricing } from "../../onboarding/_lib/intake-pricing";
 
 export default async function OrderConfirmationPage() {
   const { user } = await requirePatientSession();
+
+  // Self-heal: pull the latest state from Stripe so the order is confirmed even if the
+  // webhook was delayed or not running.
+  await reconcileLatestSubscriptionForUser(user.id);
 
   const { data: sub } = await supabaseAdmin
     .from("subscriptions")
@@ -22,7 +27,20 @@ export default async function OrderConfirmationPage() {
     sub as { packages?: { name: string; price: number; duration_months: number } } | null
   )?.packages;
   const med = (sub as { medicines?: { name: string } } | null)?.medicines;
-  const pricing = pkg ? calculateCheckoutPricing(Number(pkg.price), pkg.duration_months) : null;
+
+  // Show the real charged amount from the payment; fall back to a computed estimate.
+  const { data: pay } = await supabaseAdmin
+    .from("payments")
+    .select("amount_cents")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const totalPaid = pay
+    ? Number(pay.amount_cents) / 100
+    : pkg
+      ? calculateCheckoutPricing(Number(pkg.price)).total
+      : null;
 
   const { data: profile } = await supabaseAdmin
     .from("profiles")
@@ -72,7 +90,7 @@ export default async function OrderConfirmationPage() {
             <div className="flex items-center justify-between border-t border-[#2E00AB]/10 pt-4">
               <span className="text-base font-medium text-[#2E00AB]">Total Paid</span>
               <span className="text-3xl font-semibold text-[#2E00AB]">
-                {pricing ? `$${pricing.total.toFixed(2)}` : "—"}
+                {totalPaid != null ? `$${totalPaid.toFixed(2)}` : "—"}
               </span>
             </div>
           </div>

@@ -9,6 +9,7 @@ import PlanSelector from "./PlanSelector";
 import ReferralCard from "./ReferralCard";
 import SelectedProductCard from "./SelectedProductCard";
 import StripePaymentForm from "./StripePaymentForm";
+import { getCheckoutDiscount } from "@/lib/actions/stripe-checkout";
 import { PROCESSING_FEE_CENTS } from "@/lib/stripe/fees";
 import type { CheckoutBootstrap, CheckoutPlanId } from "./types";
 
@@ -115,8 +116,14 @@ export default function ShopCheckoutClient({
         referralHint={bootstrap.referralHint}
         promoCode={promoCode}
         onPromoCodeChange={setPromoCode}
-        onApply={() => {
-          setPromoSavings(promoCode.trim().toUpperCase() === "SAVE50" ? 50 : 0);
+        onApply={async () => {
+          if (!selectedPackageId) return;
+          const d = await getCheckoutDiscount({
+            packageId: selectedPackageId,
+            code: promoCode,
+            allowAuto: false,
+          });
+          setPromoSavings(d ? d.discountCents / 100 : 0);
         }}
       />
       <OrderSummaryCard

@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { requirePatientSession } from "@/lib/auth/require-patient";
 import { getShopCheckoutOrderByIdData } from "@/lib/shop/service-data";
+import { reconcileLatestSubscriptionForUser } from "@/lib/stripe/reconcile";
 
 function formatUsd(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
@@ -13,6 +14,7 @@ export default async function ShopCheckoutConfirmationPage({
   searchParams?: Promise<{ orderId?: string }>;
 }) {
   const { user } = await requirePatientSession();
+  await reconcileLatestSubscriptionForUser(user.id);
   const params = (await searchParams) ?? {};
   const orderId = params.orderId;
 

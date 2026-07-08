@@ -22,13 +22,39 @@
       "Bash(cd \"c:/Programming/BeezTech/BodyInc\"; echo \"=== triggers/functions syncing auth.users -> profiles.email ===\"; grep -rnE \"NEW\\\\.email|on_auth_user|handle_user_update|UPDATE .*profiles|profiles.*SET.*email|AFTER UPDATE ON auth\" bodyinc-access-hub/supabase/migrations/ patient-portal/supabase/migrations/ 2>/dev/null | grep -iE \"email|profiles|auth\" | head -30)",
       "Read(//c/Programming/BeezTech/BodyInc/**)",
       "PowerShell(npm run build 2>&1)",
-      "PowerShell(npx prettier --write src/lib/actions/stripe-checkout.ts 2>&1)"
+      "PowerShell(npx prettier --write src/lib/actions/stripe-checkout.ts 2>&1)",
+      "Bash(node \"C:/Users/ritik/AppData/Local/Temp/claude/c--Programming-BeezTech-BodyInc-patient-portal/8ead50a7-b69b-4b6e-923e-202aa8e17170/scratchpad/sim-orders.cjs\" \"c:/Programming/BeezTech/BodyInc/patient-portal\")",
+      "Bash(node \"C:/Users/ritik/AppData/Local/Temp/claude/c--Programming-BeezTech-BodyInc-patient-portal/8ead50a7-b69b-4b6e-923e-202aa8e17170/scratchpad/diag-e.cjs\" \"c:/Programming/BeezTech/BodyInc/patient-portal\")",
+      "Bash(node \"C:/Users/ritik/AppData/Local/Temp/claude/c--Programming-BeezTech-BodyInc-patient-portal/8ead50a7-b69b-4b6e-923e-202aa8e17170/scratchpad/check-sub-status.cjs\" \"c:/Programming/BeezTech/BodyInc/patient-portal\")",
+      "Read(//c/Programming/BeezTech/BodyInc/patient-portal/src/routes/_authenticated/**)",
+      "Bash(node \"C:/Users/ritik/AppData/Local/Temp/claude/c--Programming-BeezTech-BodyInc-patient-portal/8ead50a7-b69b-4b6e-923e-202aa8e17170/scratchpad/backfill.cjs\" \"c:/Programming/BeezTech/BodyInc/patient-portal\")",
+      "Bash(npx eslint *)",
+      "Bash(node -e ' *)",
+      "Bash(node \"C:/Users/ritik/AppData/Local/Temp/claude/c--Programming-BeezTech-BodyInc-patient-portal/8ead50a7-b69b-4b6e-923e-202aa8e17170/scratchpad/verify-e.cjs\" \"c:/Programming/BeezTech/BodyInc/patient-portal\")",
+      "Bash(cd \"c:/Programming/BeezTech/BodyInc/bodyinc-access-hub\"; grep -nE \"^import .* from \\\\\"@/\\(lib|components|hooks\\)\" src/routes/_authenticated/admin.patients.index.tsx | tail -3; echo \"--- header ---\"; sed -n '86,94p' src/routes/_authenticated/admin.patients.index.tsx)",
+      "Bash(cd \"c:/Programming/BeezTech/BodyInc/bodyinc-access-hub\"; grep -nE \"^import .* from \\\\\"@/\\(lib|hooks|components/admin\\)\" src/routes/_authenticated/admin.intake-sessions.index.tsx | tail -2)",
+      "Bash(perl -0pi -e 's/\\(          is_active: boolean;\\\\n          times_redeemed: number;\\)/          is_active: boolean;\\\\n          auto_apply: boolean;\\\\n          times_redeemed: number;/; s/\\(          is_active\\\\?: boolean;\\\\n          times_redeemed\\\\?: number;\\)/          is_active?: boolean;\\\\n          auto_apply?: boolean;\\\\n          times_redeemed?: number;/g' src/lib/supabase/types.ts)",
+      "Bash(grep -v \"//\")",
+      "Bash(npx tsc *)",
+      "Bash(echo \"EXIT=$?\")",
+      "Read(//tmp/**)",
+      "Bash(node \"C:/Users/ritik/AppData/Local/Temp/claude/c--Programming-BeezTech-BodyInc-patient-portal/8ead50a7-b69b-4b6e-923e-202aa8e17170/scratchpad/test-promos.mjs\")",
+      "Bash(cp \"C:/Users/ritik/AppData/Local/Temp/claude/c--Programming-BeezTech-BodyInc-patient-portal/8ead50a7-b69b-4b6e-923e-202aa8e17170/scratchpad/test-promos.mjs\" \"c:/Programming/BeezTech/BodyInc/patient-portal/__test-promos.mjs\")",
+      "Bash(node __test-promos.mjs)",
+      "Bash(rm -f \"c:/Programming/BeezTech/BodyInc/patient-portal/__test-promos.mjs\")",
+      "Bash(cd \"c:/Programming/BeezTech/BodyInc/patient-portal\" && grep -rnE \"otp|Otp|OTP\" src/lib/actions/patient-auth.ts | grep -iE \"supabase|sign|email|send|verify\" | head && echo \"--- admin refund/email checks ---\" && cd \"c:/Programming/BeezTech/BodyInc/bodyinc-access-hub\" && grep -rniE \"refund|resend|nodemailer\" src --include=\"*.ts\" --include=\"*.tsx\" | head)",
+      "PowerShell(npx prettier --write \"app/api/stripe/subscription/route.ts\" \"src/lib/actions/stripe-checkout.ts\" 2>&1)",
+      "PowerShell(npx prettier --write \"app/\\(authenticated\\)/order-confirmation/page.tsx\" \"app/\\(authenticated\\)/shop/checkout/_components/ShopCheckoutClient.tsx\" \"app/\\(authenticated\\)/shop/checkout/confirmation/page.tsx\" \"app/onboarding/_lib/intake-pricing.ts\" \"app/onboarding/billing-checkout/page.tsx\" \"app/onboarding/order-confirmation/components/OrderSummary.tsx\" \"src/lib/actions/patient-auth.ts\" \"src/lib/stripe/promos.ts\" \"src/lib/stripe/webhook-handlers.ts\" \"src/lib/supabase/types.ts\" \"src/lib/stripe/reconcile.ts\" \"src/lib/stripe/record-payment.ts\" 2>&1)",
+      "PowerShell(npm install --save-dev husky lint-staged 2>&1)",
+      "PowerShell(npx husky init 2>&1)"
     ],
     "additionalDirectories": [
       "c:\\Programming\\BeezTech\\BodyInc\\bodyinc-access-hub\\supabase\\migrations",
       "c:\\Programming\\BeezTech\\BodyInc\\bodyinc-access-hub\\src\\routes\\_authenticated",
       "c:\\Programming\\BeezTech\\BodyInc\\bodyinc-access-hub\\src\\integrations\\supabase",
-      "C:\\Users\\ritik\\.claude\\plans"
+      "C:\\Users\\ritik\\.claude\\plans",
+      "c:\\Programming\\BeezTech\\BodyInc\\bodyinc-access-hub\\src\\lib",
+      "c:\\Programming\\BeezTech\\BodyInc\\bodyinc-access-hub\\src\\components\\admin"
     ]
   }
 }
