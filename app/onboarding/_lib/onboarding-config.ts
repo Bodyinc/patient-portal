@@ -61,6 +61,3 @@ export function getStateName(code: string | null) {
   if (!code) return "";
   return US_STATES.find((s) => s.code === code)?.name ?? code;
 }
-
-export const CONSULTATION_FEE = 35;
-export const PROCESSING_FEE = 5;

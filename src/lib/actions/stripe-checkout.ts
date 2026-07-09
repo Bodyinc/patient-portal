@@ -5,10 +5,10 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createGuestStripeCustomer } from "@/lib/stripe/customers";
 import { createSubscriptionForPrice, ensureNoActiveDuplicate } from "@/lib/stripe/subscriptions";
 import { resolveCheckoutDiscount, incrementPromoRedemption } from "@/lib/stripe/promos";
-import { CONSULTATION_FEE, PROCESSING_FEE } from "../../../app/onboarding/_lib/onboarding-config";
 
 export type OnboardingSubscriptionResult =
-  { ok: true; clientSecret: string } | { ok: false; message: string };
+  | { ok: true; clientSecret: string }
+  | { ok: false; message: string };
 
 export async function createOnboardingSubscription(
   promoCode?: string | null,
@@ -62,13 +62,7 @@ export async function createOnboardingSubscription(
     allowAuto: true,
   });
 
-  const oneTimeFees: Array<{ amountCents: number; description: string }> = [
-    {
-      amountCents: Math.round(CONSULTATION_FEE * 100),
-      description: "Initial provider consultation",
-    },
-    { amountCents: Math.round(PROCESSING_FEE * 100), description: "Processing fee" },
-  ];
+  const oneTimeFees: Array<{ amountCents: number; description: string }> = [];
   if (discount) {
     oneTimeFees.push({
       amountCents: -discount.discountCents,

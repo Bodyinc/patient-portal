@@ -172,6 +172,59 @@ async function handleInvoiceFailed(invoice: Stripe.Invoice): Promise<void> {
   }
 }
 
+function chargePaymentIntentId(charge: Stripe.Charge): string | null {
+  const pi = (charge as unknown as { payment_intent?: string | { id?: string } }).payment_intent;
+  if (typeof pi === "string") return pi;
+  return pi?.id ?? null;
+}
+
+// Reconciles refunds regardless of origin: an admin approval (which calls
+// stripe.refunds.create) and a refund issued straight from the Stripe dashboard
+// both land here. Marks the payment refunded and closes any open request.
+async function handleChargeRefunded(charge: Stripe.Charge): Promise<void> {
+  const piId = chargePaymentIntentId(charge);
+  const chargeInvoice = (charge as unknown as { invoice?: string | { id?: string } | null })
+    .invoice;
+  const invoiceId = typeof chargeInvoice === "string" ? chargeInvoice : (chargeInvoice?.id ?? null);
+
+  // Match by payment_intent first; fall back to the invoice id so a refund issued from the
+  // Stripe dashboard reconciles even when the payment row never captured a payment_intent.
+  let payment: { id: string } | null = null;
+  if (piId) {
+    const { data } = await supabaseAdmin
+      .from("payments")
+      .select("id")
+      .eq("stripe_payment_intent_id", piId)
+      .maybeSingle();
+    payment = data ?? null;
+  }
+  if (!payment && invoiceId) {
+    const { data } = await supabaseAdmin
+      .from("payments")
+      .select("id")
+      .eq("stripe_invoice_id", invoiceId)
+      .maybeSingle();
+    payment = data ?? null;
+  }
+  if (!payment?.id) return;
+
+  await supabaseAdmin.from("payments").update({ status: "refunded" }).eq("id", payment.id);
+
+  const refundId =
+    (charge as unknown as { refunds?: { data?: Array<{ id?: string }> } }).refunds?.data?.[0]?.id ??
+    null;
+
+  await supabaseAdmin
+    .from("refund_requests")
+    .update({
+      status: "approved",
+      stripe_refund_id: refundId,
+      reviewed_at: new Date().toISOString(),
+    })
+    .eq("payment_id", payment.id)
+    .eq("status", "pending");
+}
+
 export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
   switch (event.type) {
     case "customer.subscription.created":
@@ -185,6 +238,9 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
       break;
     case "invoice.payment_failed":
       await handleInvoiceFailed(event.data.object as Stripe.Invoice);
+      break;
+    case "charge.refunded":
+      await handleChargeRefunded(event.data.object as Stripe.Charge);
       break;
     default:
       break;

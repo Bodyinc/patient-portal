@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 
-import { CANCELLATION_REASON_IDS } from "@/lib/billing/cancel-reasons";
+import {
+  CANCELLATION_REASON_IDS,
+  STRIPE_CANCELLATION_FEEDBACK,
+  cancellationReasonLabel,
+  type CancellationReasonId,
+} from "@/lib/billing/cancel-reasons";
+import type Stripe from "stripe";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { cancelSubscriptionAtPeriodEnd } from "@/lib/stripe/subscriptions";
@@ -75,8 +81,18 @@ export async function POST(request: Request) {
     );
   }
 
+  const trimmedOther = otherText?.trim() || null;
+  const reasonLabels = validReasons.map(cancellationReasonLabel).join("; ");
+  const comment = trimmedOther ? `${reasonLabels} — ${trimmedOther}` : reasonLabels;
+  const feedback = STRIPE_CANCELLATION_FEEDBACK[
+    validReasons[0] as CancellationReasonId
+  ] as Stripe.SubscriptionUpdateParams.CancellationDetails["feedback"];
+
   try {
-    const updated = await cancelSubscriptionAtPeriodEnd(subscription.stripe_subscription_id);
+    const updated = await cancelSubscriptionAtPeriodEnd(subscription.stripe_subscription_id, {
+      feedback,
+      comment,
+    });
 
     const { error: feedbackError } = await supabaseAdmin
       .from("subscription_cancellation_feedback")

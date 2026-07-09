@@ -6,6 +6,8 @@ import { useState, useTransition } from "react";
 import BillingHeader from "./BillingHeader";
 import BillingReferralCard from "./BillingReferralCard";
 import PaymentHistorySection from "./PaymentHistorySection";
+import PaymentMethodSection from "./PaymentMethodSection";
+import RefundRequestsSection from "./RefundRequestsSection";
 import SubscriptionsSection from "./SubscriptionsSection";
 import type { BillingPageDataDto } from "./types";
 
@@ -77,11 +79,13 @@ export default function BillingPageClient({
 
       <BillingReferralCard referralCode={referralCode} />
       <SubscriptionsSection subscriptions={data.subscriptions} />
+      <PaymentMethodSection />
       <PaymentHistorySection
         payments={data.payments}
         isPending={isPending}
         onChangePage={(page) => updateParams({ page })}
       />
+      <RefundRequestsSection requests={data.refundRequests} />
     </div>
   );
 }

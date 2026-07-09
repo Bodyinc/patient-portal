@@ -79,9 +79,16 @@ export async function ensureNoActiveDuplicate(
   return { alreadyPaid: false };
 }
 
-export async function cancelSubscriptionAtPeriodEnd(stripeSubscriptionId: string) {
+export async function cancelSubscriptionAtPeriodEnd(
+  stripeSubscriptionId: string,
+  cancellationDetails?: {
+    feedback?: Stripe.SubscriptionUpdateParams.CancellationDetails["feedback"];
+    comment?: string;
+  },
+) {
   return stripe.subscriptions.update(stripeSubscriptionId, {
     cancel_at_period_end: true,
+    ...(cancellationDetails ? { cancellation_details: cancellationDetails } : {}),
   });
 }
 

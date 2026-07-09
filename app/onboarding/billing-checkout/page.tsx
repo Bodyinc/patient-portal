@@ -215,7 +215,6 @@ export default function BillingCheckoutPage() {
               planLabel={planLabel}
               medicationTotal={pricing.medicationTotal}
               subtotal={pricing.subtotal}
-              processingFee={pricing.processingFee}
               discount={pricing.discount}
               discountLabel={pricing.discountLabel}
               total={pricing.total}
