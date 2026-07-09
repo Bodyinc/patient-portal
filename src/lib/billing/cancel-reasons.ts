@@ -11,3 +11,19 @@ export const CANCELLATION_REASONS = [
 export type CancellationReasonId = (typeof CANCELLATION_REASONS)[number]["id"];
 
 export const CANCELLATION_REASON_IDS = CANCELLATION_REASONS.map((reason) => reason.id);
+
+export function cancellationReasonLabel(id: string): string {
+  return CANCELLATION_REASONS.find((reason) => reason.id === id)?.label ?? id;
+}
+
+// Maps our reasons onto Stripe's fixed cancellation_details.feedback enum so the
+// reason is visible in the Stripe dashboard too. Unmapped reasons fall back to "other".
+export const STRIPE_CANCELLATION_FEEDBACK: Record<CancellationReasonId, string> = {
+  achieved_goals: "unused",
+  no_results: "low_quality",
+  too_expensive: "too_expensive",
+  pausing: "other",
+  switching_provider: "switched_service",
+  wrong_medication: "other",
+  other: "other",
+};

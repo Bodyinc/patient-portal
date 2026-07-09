@@ -30,6 +30,19 @@ export type BillingPaymentDto = {
   stripeInvoiceId: string | null;
   invoiceUrl: string | null;
   invoicePdfUrl: string | null;
+  refundStatus: string | null;
+  refundable: boolean;
+};
+
+export type RefundRequestDto = {
+  id: string;
+  paymentId: string;
+  amount: number;
+  status: string;
+  reason: string | null;
+  adminNote: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
 };
 
 export type BillingPaymentsListDto = {
@@ -44,4 +57,5 @@ export type BillingPaymentsListDto = {
 export type BillingPageDataDto = {
   subscriptions: BillingSubscriptionDto[];
   payments: BillingPaymentsListDto;
+  refundRequests: RefundRequestDto[];
 };

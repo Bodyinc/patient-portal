@@ -420,6 +420,54 @@ export type Database = {
         };
         Relationships: [];
       };
+      refund_requests: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          payment_id: string;
+          subscription_id: string | null;
+          amount_cents: number;
+          reason: string | null;
+          status: string;
+          admin_note: string | null;
+          stripe_refund_id: string | null;
+          reviewed_by: string | null;
+          reviewed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          payment_id: string;
+          subscription_id?: string | null;
+          amount_cents: number;
+          reason?: string | null;
+          status?: string;
+          admin_note?: string | null;
+          stripe_refund_id?: string | null;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string | null;
+          payment_id?: string;
+          subscription_id?: string | null;
+          amount_cents?: number;
+          reason?: string | null;
+          status?: string;
+          admin_note?: string | null;
+          stripe_refund_id?: string | null;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       stripe_events: {
         Row: {
           id: string;

@@ -9,9 +9,11 @@ import type {
   BillingPaymentDto,
   BillingPaymentsListDto,
   BillingSubscriptionDto,
+  RefundRequestDto,
 } from "./types";
 
 const ACTIVE_SUBSCRIPTION_STATUSES = ["active", "trialing", "past_due"];
+const REFUNDABLE_PAYMENT_STATUSES = ["succeeded", "paid"];
 
 function formatPaymentMethod(rawEvent: Json | null): string {
   if (!rawEvent || typeof rawEvent !== "object" || Array.isArray(rawEvent)) {
@@ -73,12 +75,22 @@ function parsePaymentDescription(rawEvent: Json | null, fallback: string): strin
   if (lines && typeof lines === "object" && !Array.isArray(lines)) {
     const data = (lines as Record<string, unknown>).data;
     if (Array.isArray(data) && data.length > 0) {
-      const first = data[0];
-      if (first && typeof first === "object" && !Array.isArray(first)) {
-        const description = (first as Record<string, unknown>).description;
-        if (typeof description === "string" && description.trim()) {
-          return description;
-        }
+      const asLine = (l: unknown) =>
+        l && typeof l === "object" ? (l as Record<string, unknown>) : null;
+      const isRecurring = (l: Record<string, unknown>) =>
+        Boolean(
+          l.subscription || l.plan || (l.price as Record<string, unknown> | undefined)?.recurring,
+        );
+      // The subscription/plan line — not the one-time fee invoice items (processing /
+      // consultation), which sort first in `lines` and otherwise hijack the description.
+      const planLine =
+        data.map(asLine).find((l) => l && isRecurring(l)) ??
+        data
+          .map(asLine)
+          .find((l) => l && !/\bfee\b|consultation/i.test(String(l.description ?? "")));
+      const description = planLine?.description;
+      if (typeof description === "string" && description.trim()) {
+        return description;
       }
     }
   }
@@ -169,6 +181,7 @@ export async function fetchBillingSubscriptions(userId: string): Promise<Billing
 export async function fetchBillingPayments(
   userId: string,
   options: { page?: number; pageSize?: number; query?: string } = {},
+  refundByPayment: Map<string, string> = new Map(),
 ): Promise<BillingPaymentsListDto> {
   const page = Math.max(1, options.page ?? 1);
   const pageSize = Math.max(1, Math.min(50, options.pageSize ?? 10));
@@ -229,6 +242,10 @@ export async function fetchBillingPayments(
       medicine?.name ?? packageName ?? (subscription ? "Treatment Subscription" : "—");
     const fallbackDescription = packageName ? `${packageName} renewal` : "Subscription payment";
     const { invoiceUrl, invoicePdfUrl } = parseInvoiceUrls(payment.raw_event);
+    const refundStatus = refundByPayment.get(payment.id) ?? null;
+    const refundable =
+      REFUNDABLE_PAYMENT_STATUSES.includes(payment.status) &&
+      (refundStatus === null || refundStatus === "rejected");
 
     return {
       id: payment.id,
@@ -241,6 +258,8 @@ export async function fetchBillingPayments(
       stripeInvoiceId: payment.stripe_invoice_id,
       invoiceUrl,
       invoicePdfUrl,
+      refundStatus,
+      refundable,
     };
   });
 
@@ -262,16 +281,46 @@ export async function fetchBillingPayments(
   };
 }
 
+export async function fetchRefundRequests(userId: string): Promise<RefundRequestDto[]> {
+  const { data, error } = await supabaseAdmin
+    .from("refund_requests")
+    .select("id, payment_id, amount_cents, status, reason, admin_note, created_at, reviewed_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
+
+  return (data ?? []).map((request) => ({
+    id: request.id,
+    paymentId: request.payment_id,
+    amount: Number(request.amount_cents) / 100,
+    status: request.status,
+    reason: request.reason,
+    adminNote: request.admin_note,
+    createdAt: request.created_at,
+    reviewedAt: request.reviewed_at,
+  }));
+}
+
 export async function fetchBillingPageData(
   userId: string,
   options: { page?: number; pageSize?: number; query?: string } = {},
 ): Promise<BillingPageDataDto> {
+  const refundRequests = await fetchRefundRequests(userId);
+  const refundByPayment = new Map<string, string>();
+  for (const request of refundRequests) {
+    // requests are newest-first, so the first seen per payment is the latest
+    if (!refundByPayment.has(request.paymentId)) {
+      refundByPayment.set(request.paymentId, request.status);
+    }
+  }
+
   const [subscriptions, payments] = await Promise.all([
     fetchBillingSubscriptions(userId),
-    fetchBillingPayments(userId, options),
+    fetchBillingPayments(userId, options, refundByPayment),
   ]);
 
-  return { subscriptions, payments };
+  return { subscriptions, payments, refundRequests };
 }
 
 export async function getBillingSubscriptionForCancel(options: {

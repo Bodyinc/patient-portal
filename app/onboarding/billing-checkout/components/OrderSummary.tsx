@@ -4,7 +4,6 @@ type OrderSummaryProps = {
   planLabel: string;
   medicationTotal: number;
   subtotal: number;
-  processingFee: number;
   discount: number;
   discountLabel: string | null;
   total: number;
@@ -30,7 +29,6 @@ export default function OrderSummary({
   planLabel,
   medicationTotal,
   subtotal,
-  processingFee,
   discount,
   discountLabel,
   total,
@@ -66,24 +64,11 @@ export default function OrderSummary({
           </p>
         </div>
 
-        {/* Consultation */}
-        <div className="mt-4 flex justify-between gap-3 border-b border-[#2E00AB]/10 pb-4">
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-[#2E00AB]">Initial Provider Consultation</p>
-            <p className="text-xs text-[#2E00AB]/70">Required Clinical Assessment</p>
-          </div>
-          <p className="shrink-0 text-sm font-semibold text-[#2E00AB]">$35.00</p>
-        </div>
-
         {/* Totals */}
-        <div className="mt-4 space-y-2 text-sm text-[#2E00AB]">
+        <div className="mt-4 space-y-2 border-t border-[#2E00AB]/10 pt-4 text-sm text-[#2E00AB]">
           <div className="flex justify-between">
             <span>Subtotal</span>
             <span>{loading ? "—" : formatMoney(subtotal)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Processing Fee</span>
-            <span>{formatMoney(processingFee)}</span>
           </div>
           {discount > 0 && (
             <div className="flex justify-between text-emerald-700">
