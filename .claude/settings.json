@@ -78,7 +78,11 @@
       "Bash(cd \"c:/Programming/BeezTech/BodyInc/bodyinc-access-hub\" && echo \"=== edge functions? ===\" && ls supabase/functions/ 2>/dev/null || echo \"\\(no functions dir\\)\"; echo \"=== config webhooks/hooks ===\" && grep -niE \"webhook|refund|hook\" supabase/config.toml 2>/dev/null | head; echo \"=== any 'refunds.create' or auto-approve in access-hub RefundsTable \\(auto-run on load?\\) ===\"; grep -nE \"useEffect|approve|onApprove|refunds\" src/components/admin/refunds-table.tsx | head)",
       "Bash(grep -nE \"Processing Fee|processing fee|Consultation|\\\\\\\\\\\\$35|\\\\\\\\\\\\$5\\\\.00\" \"app/\\(authenticated\\)/consultations/page.tsx\" \"app/\\(authenticated\\)/_lib/dashboard-nav.ts\")",
       "PowerShell(npx prettier --version)",
-      "PowerShell(npx eslint --fix \"app/\\(authenticated\\)/shop/checkout/_components/OrderSummaryCard.tsx\" \"app/\\(authenticated\\)/shop/checkout/_components/ShopCheckoutClient.tsx\" \"app/api/billing/payment-method/route.ts\" \"app/api/billing/refunds/route.ts\" \"src/lib/actions/patient-auth.ts\" \"src/lib/actions/profile.ts\" \"src/lib/actions/stripe-checkout.ts\" \"src/lib/billing/service-data.ts\" \"src/lib/intake/types.ts\" \"src/lib/stripe/webhook-handlers.ts\" \"src/lib/supabase/types.ts\" 2>&1)"
+      "PowerShell(npx eslint --fix \"app/\\(authenticated\\)/shop/checkout/_components/OrderSummaryCard.tsx\" \"app/\\(authenticated\\)/shop/checkout/_components/ShopCheckoutClient.tsx\" \"app/api/billing/payment-method/route.ts\" \"app/api/billing/refunds/route.ts\" \"src/lib/actions/patient-auth.ts\" \"src/lib/actions/profile.ts\" \"src/lib/actions/stripe-checkout.ts\" \"src/lib/billing/service-data.ts\" \"src/lib/intake/types.ts\" \"src/lib/stripe/webhook-handlers.ts\" \"src/lib/supabase/types.ts\" 2>&1)",
+      "PowerShell(npm run build 2>&1 | Select-String -Pattern \"error|fail|warn\" -CaseSensitive:$false | Select-Object -First 40; \"EXIT: $LASTEXITCODE\")",
+      "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 40; \"TSC EXIT: $LASTEXITCODE\")",
+      "PowerShell(npm run lint 2>&1 | Select-String -Pattern \"error\" -CaseSensitive:$false | Select-Object -First 40; \"LINT EXIT: $LASTEXITCODE\")",
+      "PowerShell(npm run lint 2>&1 | Select-String -Pattern \"error|problem\" -CaseSensitive:$false | Select-Object -First 20; \"LINT EXIT: $LASTEXITCODE\")"
     ],
     "additionalDirectories": [
       "c:\\Programming\\BeezTech\\BodyInc\\bodyinc-access-hub\\supabase\\migrations",
