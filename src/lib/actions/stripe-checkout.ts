@@ -8,8 +8,7 @@ import { resolveCheckoutDiscount, incrementPromoRedemption } from "@/lib/stripe/
 import { CONSULTATION_FEE, PROCESSING_FEE } from "../../../app/onboarding/_lib/onboarding-config";
 
 export type OnboardingSubscriptionResult =
-  | { ok: true; clientSecret: string }
-  | { ok: false; message: string };
+  { ok: true; clientSecret: string } | { ok: false; message: string };
 
 export async function createOnboardingSubscription(
   promoCode?: string | null,

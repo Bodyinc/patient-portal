@@ -1,0 +1,124 @@
+import { NextResponse } from "next/server";
+
+import { CANCELLATION_REASON_IDS } from "@/lib/billing/cancel-reasons";
+import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import { cancelSubscriptionAtPeriodEnd } from "@/lib/stripe/subscriptions";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const ACTIVE_SUBSCRIPTION_STATUSES = ["active", "trialing", "past_due"];
+
+type Body = {
+  subscriptionId?: string;
+  reasons?: string[];
+  otherText?: string | null;
+};
+
+export async function POST(request: Request) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  }
+
+  let body: Body;
+  try {
+    body = (await request.json()) as Body;
+  } catch {
+    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+  }
+
+  const { subscriptionId, reasons, otherText } = body;
+  if (!subscriptionId) {
+    return NextResponse.json({ error: "subscriptionId is required." }, { status: 400 });
+  }
+
+  if (!reasons?.length) {
+    return NextResponse.json(
+      { error: "At least one cancellation reason is required." },
+      { status: 400 },
+    );
+  }
+
+  const validReasons = reasons.filter((reason) =>
+    CANCELLATION_REASON_IDS.includes(reason as (typeof CANCELLATION_REASON_IDS)[number]),
+  );
+  if (validReasons.length === 0) {
+    return NextResponse.json({ error: "Invalid cancellation reasons." }, { status: 400 });
+  }
+
+  const { data: subscription, error: subError } = await supabaseAdmin
+    .from("subscriptions")
+    .select("id, stripe_subscription_id, status, cancel_at_period_end, current_period_end")
+    .eq("id", subscriptionId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (subError) {
+    return NextResponse.json({ error: subError.message }, { status: 500 });
+  }
+  if (!subscription) {
+    return NextResponse.json({ error: "Subscription not found." }, { status: 404 });
+  }
+  if (!ACTIVE_SUBSCRIPTION_STATUSES.includes(subscription.status)) {
+    return NextResponse.json({ error: "This subscription is not active." }, { status: 400 });
+  }
+  if (subscription.cancel_at_period_end) {
+    return NextResponse.json(
+      { error: "This subscription is already scheduled for cancellation." },
+      { status: 400 },
+    );
+  }
+
+  try {
+    const updated = await cancelSubscriptionAtPeriodEnd(subscription.stripe_subscription_id);
+
+    const { error: feedbackError } = await supabaseAdmin
+      .from("subscription_cancellation_feedback")
+      .insert({
+        user_id: user.id,
+        subscription_id: subscription.id,
+        stripe_subscription_id: subscription.stripe_subscription_id,
+        reasons: validReasons,
+        other_text: otherText?.trim() || null,
+      });
+
+    if (feedbackError) {
+      return NextResponse.json({ error: feedbackError.message }, { status: 500 });
+    }
+
+    const periodEndTs =
+      (updated as { current_period_end?: number }).current_period_end ??
+      updated.items?.data?.[0]?.current_period_end;
+    const currentPeriodEnd = periodEndTs
+      ? new Date(periodEndTs * 1000).toISOString()
+      : subscription.current_period_end;
+
+    const { error: updateError } = await supabaseAdmin
+      .from("subscriptions")
+      .update({
+        cancel_at_period_end: true,
+        current_period_end: currentPeriodEnd,
+      })
+      .eq("id", subscription.id);
+
+    if (updateError) {
+      return NextResponse.json({ error: updateError.message }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      ok: true,
+      currentPeriodEnd,
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Unable to cancel subscription." },
+      { status: 500 },
+    );
+  }
+}

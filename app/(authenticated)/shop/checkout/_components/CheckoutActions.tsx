@@ -10,6 +10,7 @@ type CheckoutActionsProps = {
   onTermsChange: (checked: boolean) => void;
   continueDisabled?: boolean;
   onContinue: () => void;
+  backHref?: string;
 };
 
 export default function CheckoutActions({
@@ -17,6 +18,7 @@ export default function CheckoutActions({
   onTermsChange,
   continueDisabled = false,
   onContinue,
+  backHref = "/shop",
 }: CheckoutActionsProps) {
   const router = useRouter();
 
@@ -39,7 +41,7 @@ export default function CheckoutActions({
         <Button
           type="button"
           variant="outline"
-          onClick={() => router.push("/shop")}
+          onClick={() => router.push(backHref)}
           className="h-11 border-[#2E00AB]/30 text-[#2E00AB]"
         >
           Back

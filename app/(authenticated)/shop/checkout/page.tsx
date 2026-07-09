@@ -17,11 +17,13 @@ export default async function ShopCheckoutPage({
     description?: string;
     image?: string;
     price?: string;
+    from?: string;
   }>;
 }) {
   const { user } = await requirePatientSession();
   const params = (await searchParams) ?? {};
   const medicineId = params.id;
+  const from = params.from ?? null;
 
   if (!medicineId) {
     return (
@@ -44,6 +46,7 @@ export default async function ShopCheckoutPage({
           patientId={toPatientId(user.id)}
           avatarUrl={(user.user_metadata?.avatar_url as string | null | undefined) ?? null}
           medicineId={medicineId}
+          from={from}
         />
       </main>
     );

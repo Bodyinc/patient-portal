@@ -21,8 +21,7 @@ const profileUpdateSchema = z.object({
 });
 
 export type ProfileActionResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; code: string; message: string };
+  { ok: true; data: T } | { ok: false; code: string; message: string };
 
 export type EditableProfileDto = {
   id: string;

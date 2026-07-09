@@ -21,6 +21,7 @@ type ShopCheckoutClientProps = {
   fullName: string;
   patientId: string;
   avatarUrl: string | null;
+  from?: string | null;
 };
 
 export default function ShopCheckoutClient({
@@ -29,7 +30,10 @@ export default function ShopCheckoutClient({
   fullName,
   patientId,
   avatarUrl,
+  from,
 }: ShopCheckoutClientProps) {
+  const isUpgradeFromBilling = from === "billing";
+  const backHref = isUpgradeFromBilling ? "/billing" : "/shop";
   const [isCreating, startCreating] = useTransition();
   const [selectedPlan, setSelectedPlan] = useState<CheckoutPlanId>(bootstrap.defaultSelectedPlan);
   const [promoCode, setPromoCode] = useState("");
@@ -106,6 +110,15 @@ export default function ShopCheckoutClient({
         sortBy="popular"
       />
 
+      {isUpgradeFromBilling ? (
+        <section className="space-y-1 px-1">
+          <h1 className="text-xl font-semibold text-[#2E00AB]">Upgrade Subscription</h1>
+          <p className="text-sm text-[#2E00AB]/70">
+            Choose a new plan for your treatment subscription.
+          </p>
+        </section>
+      ) : null}
+
       <SelectedProductCard product={bootstrap.product} />
       <PlanSelector
         plans={bootstrap.plans}
@@ -147,6 +160,7 @@ export default function ShopCheckoutClient({
           onTermsChange={setTermsAccepted}
           continueDisabled={isCreating}
           onContinue={handleContinue}
+          backHref={backHref}
         />
       )}
     </div>

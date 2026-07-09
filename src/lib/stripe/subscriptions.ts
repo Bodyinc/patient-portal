@@ -79,6 +79,12 @@ export async function ensureNoActiveDuplicate(
   return { alreadyPaid: false };
 }
 
+export async function cancelSubscriptionAtPeriodEnd(stripeSubscriptionId: string) {
+  return stripe.subscriptions.update(stripeSubscriptionId, {
+    cancel_at_period_end: true,
+  });
+}
+
 // The location of the first-invoice client secret differs by Stripe API version:
 // newer versions expose invoice.confirmation_secret, older ones a PaymentIntent.
 // Verify against the account's pinned API version when wiring test keys.

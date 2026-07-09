@@ -492,6 +492,36 @@ export type Database = {
         };
         Relationships: [];
       };
+      subscription_cancellation_feedback: {
+        Row: {
+          id: string;
+          user_id: string;
+          subscription_id: string;
+          stripe_subscription_id: string;
+          reasons: string[];
+          other_text: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          subscription_id: string;
+          stripe_subscription_id: string;
+          reasons: string[];
+          other_text?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          subscription_id?: string;
+          stripe_subscription_id?: string;
+          reasons?: string[];
+          other_text?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       promo_codes: {
         Row: {
           id: string;
@@ -886,11 +916,7 @@ export type Database = {
       app_role: "admin" | "provider" | "patient";
       eligibility_result: "eligible" | "ineligible" | "needs_review";
       intake_session_status:
-        | "in_progress"
-        | "payment_pending"
-        | "completed"
-        | "abandoned"
-        | "expired";
+        "in_progress" | "payment_pending" | "completed" | "abandoned" | "expired";
       medication_relationship: "contraindicated" | "caution" | "alternative";
       medicine_status: "draft" | "active" | "published" | "archived";
       q_question_type:
@@ -917,12 +943,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 }
@@ -942,13 +968,12 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 }
@@ -967,13 +992,12 @@ export type TablesInsert<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    keyof DefaultSchema["Enums"] | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 }
