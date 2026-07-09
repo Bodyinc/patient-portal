@@ -82,7 +82,13 @@
       "PowerShell(npm run build 2>&1 | Select-String -Pattern \"error|fail|warn\" -CaseSensitive:$false | Select-Object -First 40; \"EXIT: $LASTEXITCODE\")",
       "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 40; \"TSC EXIT: $LASTEXITCODE\")",
       "PowerShell(npm run lint 2>&1 | Select-String -Pattern \"error\" -CaseSensitive:$false | Select-Object -First 40; \"LINT EXIT: $LASTEXITCODE\")",
-      "PowerShell(npm run lint 2>&1 | Select-String -Pattern \"error|problem\" -CaseSensitive:$false | Select-Object -First 20; \"LINT EXIT: $LASTEXITCODE\")"
+      "PowerShell(npm run lint 2>&1 | Select-String -Pattern \"error|problem\" -CaseSensitive:$false | Select-Object -First 20; \"LINT EXIT: $LASTEXITCODE\")",
+      "PowerShell(node -e \"console.log\\(require\\('./node_modules/prettier/package.json'\\).version\\)\")",
+      "PowerShell(node -e \"const p=require\\('./package.json'\\); console.log\\(p.devDependencies && p.devDependencies.prettier, '|', p.dependencies && p.dependencies.prettier\\)\")",
+      "PowerShell(Get-ChildItem -Name -Force | Where-Object { $_ -match \"prettier\" }; Write-Output \"== resolved prettier config ==\"; npx prettier --find-config-path src/lib/intake/types.ts 2>&1)",
+      "PowerShell(npm install --no-save prettier@3.9.4 2>&1)",
+      "PowerShell(npm run lint 2>&1 | Select-String -Pattern \"error|problem|prettier\" -CaseSensitive:$false | Select-Object -First 20; \"LINT EXIT: $LASTEXITCODE\")",
+      "PowerShell(npm run build 2>&1 | Select-String -Pattern \"Failed|Error:|prettier|Compiled|passed\" -CaseSensitive:$false | Select-Object -First 15; \"BUILD EXIT: $LASTEXITCODE\")"
     ],
     "additionalDirectories": [
       "c:\\Programming\\BeezTech\\BodyInc\\bodyinc-access-hub\\supabase\\migrations",

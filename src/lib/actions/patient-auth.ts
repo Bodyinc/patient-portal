@@ -195,8 +195,7 @@ async function ensurePatientRoleForUser(userId: string) {
 const changeEmailSchema = z.string().trim().email().max(255);
 
 export type ChangeCheckoutEmailResult =
-  | { ok: true; email: string }
-  | { ok: false; message: string };
+  { ok: true; email: string } | { ok: false; message: string };
 
 // Step 1 of an email change: only re-point the account's LOGIN email so a one-time code can
 // be sent to the new address. The visible "reflect" (profile + Stripe customer + admin) is

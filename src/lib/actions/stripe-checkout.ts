@@ -7,8 +7,7 @@ import { createSubscriptionForPrice, ensureNoActiveDuplicate } from "@/lib/strip
 import { resolveCheckoutDiscount, incrementPromoRedemption } from "@/lib/stripe/promos";
 
 export type OnboardingSubscriptionResult =
-  | { ok: true; clientSecret: string }
-  | { ok: false; message: string };
+  { ok: true; clientSecret: string } | { ok: false; message: string };
 
 export async function createOnboardingSubscription(
   promoCode?: string | null,
