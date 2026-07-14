@@ -19,6 +19,7 @@ type ShopCheckoutClientProps = {
   patientId: string;
   avatarUrl: string | null;
   from?: string | null;
+  walletCreditCents?: number;
 };
 
 export default function ShopCheckoutClient({
@@ -28,6 +29,7 @@ export default function ShopCheckoutClient({
   patientId,
   avatarUrl,
   from,
+  walletCreditCents = 0,
 }: ShopCheckoutClientProps) {
   const isUpgradeFromBilling = from === "billing";
   const backHref = isUpgradeFromBilling ? "/billing" : "/shop";
@@ -48,7 +50,11 @@ export default function ShopCheckoutClient({
     () => selectedPlanMeta?.amount ?? bootstrap.product.baseMonthlyPrice,
     [bootstrap.product.baseMonthlyPrice, selectedPlanMeta],
   );
-  const total = Math.max(0, subtotal - promoSavings);
+  const totalBeforeCredit = Math.max(0, subtotal - promoSavings);
+  // Stripe consumes wallet credit automatically at payment; mirror it here so the
+  // displayed total matches the actual charge.
+  const walletApplied = Math.min(walletCreditCents / 100, totalBeforeCredit);
+  const total = Math.max(0, totalBeforeCredit - walletApplied);
   const selectedPackageId =
     selectedPlanMeta &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -136,7 +142,12 @@ export default function ShopCheckoutClient({
           setPromoSavings(d ? d.discountCents / 100 : 0);
         }}
       />
-      <OrderSummaryCard subtotal={subtotal} promoSavings={promoSavings} total={total} />
+      <OrderSummaryCard
+        subtotal={subtotal}
+        promoSavings={promoSavings}
+        walletApplied={walletApplied}
+        total={total}
+      />
 
       {error ? (
         <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">

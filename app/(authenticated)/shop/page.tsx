@@ -1,7 +1,6 @@
-import { headers } from "next/headers";
-
 import { requirePatientSession } from "@/lib/auth/require-patient";
-import { getShopCatalogFromService, getShopCategoriesFromService } from "@/lib/shop/client";
+import { buildReferralLink, getReferralSummary } from "@/lib/referrals";
+import { fetchShopCatalogData, fetchShopCategoriesData } from "@/lib/shop/service-data";
 import type { ShopSortOption } from "@/lib/shop/types";
 import ShopCatalogClient from "./_components/ShopCatalogClient";
 import ShopReferralCard from "./_components/ShopReferralCard";
@@ -30,11 +29,6 @@ export default async function ShopPage({
     q?: string;
   }>;
 }) {
-  const headerStore = await headers();
-  const host = headerStore.get("host");
-  const protocol = process.env.NODE_ENV === "development" ? "http" : "https";
-  const baseUrl = host ? `${protocol}://${host}` : undefined;
-
   const { user } = await requirePatientSession();
   const patientId = toPatientId(user.id);
   const fullName = user.user_metadata?.full_name ?? "Patient";
@@ -46,18 +40,18 @@ export default async function ShopPage({
   const searchQuery = (resolvedSearchParams.q ?? "").trim();
 
   try {
-    const [categories, list] = await Promise.all([
-      getShopCategoriesFromService({ baseUrl }),
-      getShopCatalogFromService(
-        {
-          category,
-          sort: sortBy,
-          page,
-          pageSize: PAGE_SIZE,
-          q: searchQuery,
-        },
-        { baseUrl },
-      ),
+    // Direct data-layer calls — the previous version fetched this app's own API
+    // routes over HTTP, paying two extra localhost round trips per page view.
+    const [categories, list, referral] = await Promise.all([
+      fetchShopCategoriesData(),
+      fetchShopCatalogData({
+        categorySlug: category,
+        sortBy,
+        page,
+        pageSize: PAGE_SIZE,
+        searchQuery,
+      }),
+      getReferralSummary(user.id),
     ]);
 
     return (
@@ -79,7 +73,10 @@ export default async function ShopPage({
                   </p>
                 </section>
 
-                <ShopReferralCard referralCode="BODYINC-REF-2024" />
+                <ShopReferralCard
+                  referralCode={referral?.code ?? "BODYINC"}
+                  referralLink={referral?.link ?? buildReferralLink("BODYINC")}
+                />
               </>
             }
           />

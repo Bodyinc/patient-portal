@@ -1,20 +1,23 @@
 "use client";
 
-import Link from "next/link";
 import { Gift } from "lucide-react";
 import { useState } from "react";
 
 type MyMedsReferralCardProps = {
   referralCode: string;
+  referralLink: string;
 };
 
-export default function MyMedsReferralCard({ referralCode }: MyMedsReferralCardProps) {
-  const [copied, setCopied] = useState<"idle" | "success" | "error">("idle");
+export default function MyMedsReferralCard({
+  referralCode,
+  referralLink,
+}: MyMedsReferralCardProps) {
+  const [copied, setCopied] = useState<"idle" | "code" | "link" | "error">("idle");
 
-  const handleCopy = async () => {
+  const handleCopy = async (value: string, kind: "code" | "link") => {
     try {
-      await navigator.clipboard.writeText(referralCode);
-      setCopied("success");
+      await navigator.clipboard.writeText(value);
+      setCopied(kind);
     } catch {
       setCopied("error");
     }
@@ -43,17 +46,18 @@ export default function MyMedsReferralCard({ referralCode }: MyMedsReferralCardP
           </span>
           <button
             type="button"
-            onClick={handleCopy}
+            onClick={() => handleCopy(referralCode, "code")}
             className="rounded-md border border-[#D5CAFF] bg-white px-3 py-2 text-xs text-[#2E00AB]"
           >
-            {copied === "success" ? "Copied" : copied === "error" ? "Copy failed" : "Copy Code"}
+            {copied === "code" ? "Copied" : copied === "error" ? "Copy failed" : "Copy Code"}
           </button>
-          <Link
-            href="/shop"
+          <button
+            type="button"
+            onClick={() => handleCopy(referralLink, "link")}
             className="rounded-md bg-[#2E00AB] px-4 py-2 text-center text-xs font-medium text-white hover:bg-[#2E00AB]/90"
           >
-            Refer Friends →
-          </Link>
+            {copied === "link" ? "Link Copied ✓" : "Copy Invite Link"}
+          </button>
         </div>
       </div>
     </section>

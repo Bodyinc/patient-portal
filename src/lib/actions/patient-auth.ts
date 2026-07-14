@@ -42,6 +42,17 @@ function isDuplicateEmailError(message: string) {
 
 async function findAuthUserByEmail(email: string) {
   const normalized = email.toLowerCase();
+
+  // profiles.email mirrors auth and is queryable in one round trip — avoids paging
+  // through the entire auth user list just to classify a duplicate-email signup.
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("id, email")
+    .ilike("email", normalized)
+    .maybeSingle();
+  if (profile) return { user: { id: profile.id, email: profile.email }, error: null };
+
+  // Auth user without a profile row (edge case) — fall back to the scan.
   for (let page = 1; page <= 5; page++) {
     const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 200 });
     if (error) return { user: null, error };
@@ -103,6 +114,7 @@ export async function signUpPatient(input: z.infer<typeof signupSchema>): Promis
     email: data.email,
     password: data.password,
     email_confirm: true,
+    app_metadata: { role: PORTAL_ROLE },
     user_metadata: {
       full_name: data.fullName,
       phone: data.phone || null,
@@ -338,6 +350,7 @@ export async function preparePostCheckoutAccount(): Promise<PostCheckoutAccountR
   const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
     email,
     email_confirm: true,
+    app_metadata: { role: PORTAL_ROLE },
     user_metadata: {
       full_name: fullName,
       phone: session.phone ?? null,

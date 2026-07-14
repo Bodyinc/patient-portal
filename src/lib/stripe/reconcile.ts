@@ -4,6 +4,8 @@ import type Stripe from "stripe";
 import { stripe } from "./server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { recordPayment } from "./record-payment";
+import { maybeConvertReferral } from "@/lib/referrals";
+import { recordInvoiceWalletDebit } from "@/lib/wallet";
 import type { Json } from "@/lib/supabase/types";
 
 function periodEndIso(sub: Stripe.Subscription): string | null {
@@ -99,6 +101,18 @@ export async function reconcileSubscription(stripeSubscriptionId: string): Promi
         .from("intake_sessions")
         .update({ status: "completed" })
         .eq("id", subRow.session_id);
+    }
+
+    // Locally (no webhook) this reconcile is what first records the payment, so it must
+    // also run the referral conversion check the webhook would normally perform.
+    const paidUserId = subRow?.user_id ?? meta.user_id ?? null;
+    if (paidUserId) {
+      try {
+        await maybeConvertReferral(paidUserId);
+      } catch (error) {
+        console.error("[referrals] convert on reconcile failed:", error);
+      }
+      await recordInvoiceWalletDebit(invoice, paidUserId);
     }
   }
 }

@@ -22,7 +22,15 @@ export type Database = {
           category_id?: string;
           created_at?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "intake_session_categories_category_id_fkey";
+            columns: ["category_id"];
+            isOneToOne: false;
+            referencedRelation: "medication_categories";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       intake_session_eligibility_results: {
         Row: {
@@ -70,7 +78,15 @@ export type Database = {
           medicine_id?: string;
           created_at?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "intake_session_medicines_medicine_id_fkey";
+            columns: ["medicine_id"];
+            isOneToOne: false;
+            referencedRelation: "medicines";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       intake_session_questionnaire_responses: {
         Row: {
@@ -105,6 +121,30 @@ export type Database = {
           answer_boolean?: boolean | null;
           answer_option_ids?: string[];
           created_at?: string;
+        };
+        Relationships: [];
+      };
+      email_reminders: {
+        Row: {
+          id: string;
+          reminder_type: string;
+          target_id: string;
+          period_key: string;
+          sent_at: string;
+        };
+        Insert: {
+          id?: string;
+          reminder_type: string;
+          target_id: string;
+          period_key?: string;
+          sent_at?: string;
+        };
+        Update: {
+          id?: string;
+          reminder_type?: string;
+          target_id?: string;
+          period_key?: string;
+          sent_at?: string;
         };
         Relationships: [];
       };
@@ -538,7 +578,22 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_medicine_id_fkey";
+            columns: ["medicine_id"];
+            isOneToOne: false;
+            referencedRelation: "medicines";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "subscriptions_package_id_fkey";
+            columns: ["package_id"];
+            isOneToOne: false;
+            referencedRelation: "packages";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       subscription_cancellation_feedback: {
         Row: {
@@ -773,6 +828,7 @@ export type Database = {
           created_at: string;
           updated_at: string;
           stripe_customer_id: string | null;
+          referral_code: string | null;
         };
         Insert: {
           id: string;
@@ -790,6 +846,7 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           stripe_customer_id?: string | null;
+          referral_code?: string | null;
         };
         Update: {
           id?: string;
@@ -807,6 +864,43 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           stripe_customer_id?: string | null;
+          referral_code?: string | null;
+        };
+        Relationships: [];
+      };
+      referrals: {
+        Row: {
+          id: string;
+          referrer_user_id: string;
+          referred_user_id: string | null;
+          code: string;
+          status: string;
+          reward_cents: number;
+          stripe_balance_txn_id: string | null;
+          created_at: string;
+          converted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          referrer_user_id: string;
+          referred_user_id?: string | null;
+          code: string;
+          status?: string;
+          reward_cents?: number;
+          stripe_balance_txn_id?: string | null;
+          created_at?: string;
+          converted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          referrer_user_id?: string;
+          referred_user_id?: string | null;
+          code?: string;
+          status?: string;
+          reward_cents?: number;
+          stripe_balance_txn_id?: string | null;
+          created_at?: string;
+          converted_at?: string | null;
         };
         Relationships: [];
       };
@@ -921,6 +1015,42 @@ export type Database = {
           is_active?: boolean;
           created_at?: string;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      wallet_transactions: {
+        Row: {
+          id: string;
+          user_id: string;
+          amount_cents: number;
+          type: string;
+          description: string | null;
+          referral_id: string | null;
+          stripe_invoice_id: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          amount_cents: number;
+          type: string;
+          description?: string | null;
+          referral_id?: string | null;
+          stripe_invoice_id?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          amount_cents?: number;
+          type?: string;
+          description?: string | null;
+          referral_id?: string | null;
+          stripe_invoice_id?: string | null;
+          created_by?: string | null;
+          created_at?: string;
         };
         Relationships: [];
       };

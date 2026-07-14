@@ -1,5 +1,6 @@
 import { requirePatientSession } from "@/lib/auth/require-patient";
 import { fetchShopCheckoutBootstrapData } from "@/lib/shop/service-data";
+import { getCustomerCreditCents } from "@/lib/stripe/customers";
 import ShopCheckoutClient from "./_components/ShopCheckoutClient";
 
 function toPatientId(userId: string) {
@@ -36,7 +37,10 @@ export default async function ShopCheckoutPage({
   }
 
   try {
-    const bootstrap = await fetchShopCheckoutBootstrapData({ medicineId });
+    const [bootstrap, walletCreditCents] = await Promise.all([
+      fetchShopCheckoutBootstrapData({ medicineId }),
+      getCustomerCreditCents(user.id),
+    ]);
 
     return (
       <main className="min-w-0 flex-1 bg-[#FAF8FF] p-3 sm:p-4">
@@ -47,6 +51,7 @@ export default async function ShopCheckoutPage({
           avatarUrl={(user.user_metadata?.avatar_url as string | null | undefined) ?? null}
           medicineId={medicineId}
           from={from}
+          walletCreditCents={walletCreditCents}
         />
       </main>
     );

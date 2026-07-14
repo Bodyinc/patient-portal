@@ -320,6 +320,9 @@ export async function createShopCheckoutOrderData(options: {
     promoSavings: Number(order.promo_savings),
     shipping: Number(order.shipping),
     total: Number(order.total),
+    walletApplied: null,
+    totalPaid: null,
+    discounts: null,
   };
 }
 
@@ -331,7 +334,7 @@ export async function getShopCheckoutOrderByIdData(options: {
   const { data: order, error } = await supabaseAdmin
     .from("shop_checkout_orders")
     .select(
-      "id, status, created_at, selected_plan_code, subtotal, promo_savings, shipping, total, medicine_id",
+      "id, status, created_at, selected_plan_code, subtotal, promo_savings, shipping, total, medicine_id, stripe_invoice_id",
     )
     .eq("id", orderId)
     .eq("user_id", userId)
@@ -345,6 +348,35 @@ export async function getShopCheckoutOrderByIdData(options: {
     .eq("id", order.medicine_id)
     .maybeSingle();
 
+  // Once paid, the Stripe invoice is the truth for what was charged and how much
+  // wallet credit Stripe consumed — the stored order totals are pre-payment estimates.
+  let walletApplied: number | null = null;
+  let totalPaid: number | null = null;
+  let discounts: Array<{ label: string; amount: number }> | null = null;
+  if (order.stripe_invoice_id) {
+    const { data: pay } = await supabaseAdmin
+      .from("payments")
+      .select("amount_cents, raw_event")
+      .eq("stripe_invoice_id", order.stripe_invoice_id)
+      .maybeSingle();
+    if (pay) {
+      totalPaid = Number(pay.amount_cents) / 100;
+      const invoice = pay.raw_event as {
+        lines?: { data?: Array<{ amount?: number | null; description?: string | null }> };
+        starting_balance?: number | null;
+        ending_balance?: number | null;
+      } | null;
+      const used = ((invoice?.ending_balance ?? 0) - (invoice?.starting_balance ?? 0)) / 100;
+      walletApplied = used > 0 ? used : 0;
+      discounts = (invoice?.lines?.data ?? [])
+        .filter((l) => (l.amount ?? 0) < 0)
+        .map((l) => ({
+          label: l.description ?? "Discount",
+          amount: Math.abs(l.amount ?? 0) / 100,
+        }));
+    }
+  }
+
   return {
     id: order.id,
     status: order.status,
@@ -355,5 +387,8 @@ export async function getShopCheckoutOrderByIdData(options: {
     promoSavings: Number(order.promo_savings),
     shipping: Number(order.shipping),
     total: Number(order.total),
+    walletApplied,
+    totalPaid,
+    discounts,
   };
 }

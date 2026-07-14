@@ -1,5 +1,7 @@
 import { requirePatientSession } from "@/lib/auth/require-patient";
 import { fetchBillingPageData } from "@/lib/billing/service-data";
+import { getReferralSummary } from "@/lib/referrals";
+import { getWalletSummary } from "@/lib/wallet";
 import BillingPageClient from "./_components/BillingPageClient";
 
 const PAGE_SIZE = 10;
@@ -23,11 +25,15 @@ export default async function BillingPage({
   const query = (resolvedSearchParams.q ?? "").trim();
 
   try {
-    const data = await fetchBillingPageData(user.id, {
-      page,
-      pageSize: PAGE_SIZE,
-      query,
-    });
+    const [data, referral, wallet] = await Promise.all([
+      fetchBillingPageData(user.id, {
+        page,
+        pageSize: PAGE_SIZE,
+        query,
+      }),
+      getReferralSummary(user.id),
+      getWalletSummary(user.id),
+    ]);
 
     return (
       <main className="min-w-0 flex-1 bg-[#FAF8FF] p-3 sm:p-4">
@@ -36,7 +42,8 @@ export default async function BillingPage({
           fullName={user.user_metadata?.full_name ?? "Patient"}
           patientId={toPatientId(user.id)}
           avatarUrl={(user.user_metadata?.avatar_url as string | null | undefined) ?? null}
-          referralCode="BODYINC-REF-2024"
+          referral={referral}
+          wallet={wallet}
         />
       </main>
     );

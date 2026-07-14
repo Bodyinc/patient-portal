@@ -31,13 +31,32 @@ export default async function ShopCheckoutConfirmationPage({
   try {
     const order = await getShopCheckoutOrderByIdData({ userId: user.id, orderId });
 
+    const isPaid = order.status === "paid";
+    const statusLabel = isPaid
+      ? "Paid"
+      : order.status === "pending_payment"
+        ? "Pending payment"
+        : order.status;
+    // Post-payment, the Stripe invoice is the truth; before that, the order estimate.
+    const walletApplied =
+      order.walletApplied ?? Math.max(0, order.subtotal - order.promoSavings - order.total);
+    const totalPaid = order.totalPaid ?? order.total;
+
     return (
       <main className="min-w-0 flex-1 bg-[#FAF8FF] p-4">
         <section className="mx-auto max-w-3xl space-y-4 rounded-2xl border border-[#E6DEFF] bg-white p-6">
-          <h1 className="text-3xl font-semibold text-[#2E00AB]">Order Created</h1>
+          <h1 className="text-3xl font-semibold text-[#2E00AB]">
+            {isPaid ? "Order Confirmed" : "Order Created"}
+          </h1>
           <p className="text-sm text-[#2E00AB]/75">
-            Your order has been created and is currently in{" "}
-            <span className="font-semibold">{order.status}</span> state.
+            {isPaid ? (
+              <>Your payment was successful and your order is confirmed.</>
+            ) : (
+              <>
+                Your order has been created and is currently{" "}
+                <span className="font-semibold">{statusLabel.toLowerCase()}</span>.
+              </>
+            )}
           </p>
 
           <div className="grid gap-2 rounded-md border border-[#EEE9FF] bg-[#FCFBFF] p-4 text-sm text-[#2E00AB]/80">
@@ -51,16 +70,39 @@ export default async function ShopCheckoutConfirmationPage({
               <span className="font-semibold text-[#2E00AB]">Plan:</span> {order.selectedPlanLabel}
             </p>
             <p>
-              <span className="font-semibold text-[#2E00AB]">Subtotal:</span>{" "}
-              {formatUsd(order.subtotal)}
+              <span className="font-semibold text-[#2E00AB]">Status:</span> {statusLabel}
             </p>
-            <p>
-              <span className="font-semibold text-[#2E00AB]">Savings:</span>{" "}
-              {`-${formatUsd(order.promoSavings)}`}
-            </p>
-            <p>
-              <span className="font-semibold text-[#2E00AB]">Total:</span> {formatUsd(order.total)}
-            </p>
+            <div className="mt-2 space-y-1 border-t border-[#EEE9FF] pt-3">
+              <p className="flex justify-between">
+                <span className="font-semibold text-[#2E00AB]">Subtotal</span>
+                <span>{formatUsd(order.subtotal)}</span>
+              </p>
+              {order.discounts !== null ? (
+                order.discounts.map((d) => (
+                  <p key={d.label} className="flex justify-between text-emerald-700">
+                    <span>{d.label}</span>
+                    <span>-{formatUsd(d.amount)}</span>
+                  </p>
+                ))
+              ) : order.promoSavings > 0 ? (
+                <p className="flex justify-between text-emerald-700">
+                  <span>Promotional savings</span>
+                  <span>-{formatUsd(order.promoSavings)}</span>
+                </p>
+              ) : null}
+              {walletApplied > 0 ? (
+                <p className="flex justify-between text-emerald-700">
+                  <span>Wallet credit applied</span>
+                  <span>-{formatUsd(walletApplied)}</span>
+                </p>
+              ) : null}
+              <p className="flex justify-between border-t border-[#EEE9FF] pt-2 text-base">
+                <span className="font-semibold text-[#2E00AB]">
+                  {isPaid ? "Total Paid" : "Total Due"}
+                </span>
+                <span className="font-semibold text-[#2E00AB]">{formatUsd(totalPaid)}</span>
+              </p>
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-2">

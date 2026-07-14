@@ -19,6 +19,7 @@ import {
   type IntakeSessionRow,
 } from "@/lib/intake/session";
 import { linkOnboardingStripeToUser } from "@/lib/stripe/customers";
+import { attachReferralFromCookie, maybeConvertReferral } from "@/lib/referrals";
 import type {
   CategoryDto,
   EligibilityResultDto,
@@ -56,22 +57,16 @@ function isMedicineCatalogVisible(medicine: { is_active: boolean; status: string
 }
 
 async function getSessionCategory(sessionId: string) {
+  // Embedded select: link + category in one round trip (was two sequential queries).
   const { data: link } = await supabaseAdmin
     .from("intake_session_categories")
-    .select("category_id")
+    .select("category_id, medication_categories(id, slug, name, eligibility_rules)")
     .eq("session_id", sessionId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  if (!link?.category_id) return null;
-
-  const { data: category } = await supabaseAdmin
-    .from("medication_categories")
-    .select("id, slug, name, eligibility_rules")
-    .eq("id", link.category_id)
-    .maybeSingle();
-
+  const category = link?.medication_categories ?? null;
   if (!category) return null;
 
   return {
@@ -109,21 +104,18 @@ async function buildIntakeSummary(
 
   if (!session) return null;
 
-  const [categoryLink, medicineLink] = await Promise.all([
+  // One parallel wave (was three sequential ones): the medicine rides along on the
+  // link query as an embedded select, and eligibility is fetched per-session then
+  // matched to the current medicine in JS.
+  const [categoryLink, medicineLinkResult, packageResult, eligibilityResult] = await Promise.all([
     getSessionCategory(sessionId),
-    getSessionMedicineLink(sessionId),
-  ]);
-
-  const medicineId = medicineLink?.medicine_id ?? null;
-
-  const [medicineResult, packageResult, eligibilityResult] = await Promise.all([
-    medicineId
-      ? supabaseAdmin
-          .from("medicines")
-          .select("id, name, requires_questionnaire")
-          .eq("id", medicineId)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
+    supabaseAdmin
+      .from("intake_session_medicines")
+      .select("medicine_id, medicines(id, name, requires_questionnaire)")
+      .eq("session_id", sessionId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
     session.selected_plan_id
       ? supabaseAdmin
           .from("packages")
@@ -131,21 +123,27 @@ async function buildIntakeSummary(
           .eq("id", session.selected_plan_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
-    medicineId
-      ? supabaseAdmin
-          .from("intake_session_eligibility_results")
-          .select("result")
-          .eq("session_id", sessionId)
-          .eq("medicine_id", medicineId)
-          .order("evaluated_at", { ascending: false })
-          .limit(1)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
+    supabaseAdmin
+      .from("intake_session_eligibility_results")
+      .select("result, medicine_id")
+      .eq("session_id", sessionId)
+      .order("evaluated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
-  const medicine = medicineResult.data;
+  const medicineId = medicineLinkResult.data?.medicine_id ?? null;
+  const medicine =
+    (
+      medicineLinkResult.data as {
+        medicines?: { id: string; name: string; requires_questionnaire: boolean } | null;
+      } | null
+    )?.medicines ?? null;
   const packageData = packageResult.data;
-  const eligibility = eligibilityResult.data;
+  const eligibility =
+    eligibilityResult.data && eligibilityResult.data.medicine_id === medicineId
+      ? eligibilityResult.data
+      : null;
 
   const bmi =
     session.height_cm !== null && session.weight_kg !== null
@@ -877,6 +875,14 @@ export async function completeIntakeSession(): Promise<IntakeActionResult<{ sess
 }
 
 export async function claimIntakeSession(userId: string): Promise<void> {
+  // Referral attach must never break signup, and runs before the intake-token check
+  // so direct signups (no onboarding session) still get linked to their referrer.
+  try {
+    await attachReferralFromCookie(userId);
+  } catch (error) {
+    console.error("[referrals] attach on signup failed:", error);
+  }
+
   const token = await getSessionTokenFromCookie();
   if (!token) return;
 
@@ -905,5 +911,12 @@ export async function claimIntakeSession(userId: string): Promise<void> {
       stripeCustomerId: session.stripe_customer_id,
       userId,
     });
+    // The onboarding payment happened as a guest, so it only becomes attributable to
+    // this user after the linking above — re-check the referral conversion now.
+    try {
+      await maybeConvertReferral(userId);
+    } catch (error) {
+      console.error("[referrals] convert after claim failed:", error);
+    }
   }
 }
