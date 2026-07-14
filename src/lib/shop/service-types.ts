@@ -80,6 +80,10 @@ export type ShopCheckoutOrderDto = {
   promoSavings: number;
   shipping: number;
   total: number;
+  // Actuals from the Stripe invoice once the order is paid; null before payment.
+  walletApplied: number | null;
+  totalPaid: number | null;
+  discounts: Array<{ label: string; amount: number }> | null;
 };
 
 export type ShopCategoriesPayload = ShopCategoryDto[];

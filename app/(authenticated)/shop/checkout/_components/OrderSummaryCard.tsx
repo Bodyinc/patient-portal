@@ -1,6 +1,7 @@
 type OrderSummaryCardProps = {
   subtotal: number;
   promoSavings: number;
+  walletApplied?: number;
   total: number;
 };
 
@@ -8,7 +9,12 @@ function formatUsd(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
 }
 
-export default function OrderSummaryCard({ subtotal, promoSavings, total }: OrderSummaryCardProps) {
+export default function OrderSummaryCard({
+  subtotal,
+  promoSavings,
+  walletApplied = 0,
+  total,
+}: OrderSummaryCardProps) {
   return (
     <section className="rounded-2xl border border-[#E6DEFF] bg-white p-4">
       <h3 className="text-2xl font-semibold text-[#2E00AB]">Order Summary</h3>
@@ -25,6 +31,12 @@ export default function OrderSummaryCard({ subtotal, promoSavings, total }: Orde
           <span>Promotional Savings</span>
           <span>{promoSavings > 0 ? `-${formatUsd(promoSavings)}` : formatUsd(0)}</span>
         </div>
+        {walletApplied > 0 ? (
+          <div className="flex items-center justify-between border-b border-[#EFE9FF] pb-2 text-emerald-700">
+            <span>Wallet Credit</span>
+            <span>-{formatUsd(walletApplied)}</span>
+          </div>
+        ) : null}
       </div>
       <div className="mt-4 flex items-center justify-between">
         <span className="text-lg font-semibold text-[#2E00AB]">Total Amount</span>

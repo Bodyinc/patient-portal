@@ -1,24 +1,28 @@
 "use client";
 
-import Link from "next/link";
-import { Gift } from "lucide-react";
+import { Gift, Users } from "lucide-react";
 import { useState } from "react";
 
+import type { ReferralSummary } from "@/lib/referrals";
+
 type BillingReferralCardProps = {
-  referralCode: string;
+  referral: ReferralSummary;
 };
 
-export default function BillingReferralCard({ referralCode }: BillingReferralCardProps) {
-  const [copied, setCopied] = useState<"idle" | "success" | "error">("idle");
+function formatUsd(cents: number) {
+  return (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
+}
 
-  const handleCopy = async () => {
+export default function BillingReferralCard({ referral }: BillingReferralCardProps) {
+  const [copied, setCopied] = useState<"idle" | "link" | "code" | "error">("idle");
+
+  const copy = async (value: string, kind: "link" | "code") => {
     try {
-      await navigator.clipboard.writeText(referralCode);
-      setCopied("success");
+      await navigator.clipboard.writeText(value);
+      setCopied(kind);
     } catch {
       setCopied("error");
     }
-
     window.setTimeout(() => setCopied("idle"), 1800);
   };
 
@@ -28,32 +32,40 @@ export default function BillingReferralCard({ referralCode }: BillingReferralCar
         <div>
           <p className="text-2xl font-semibold text-[#2E00AB]">Invite Friends & Earn Rewards</p>
           <p className="mt-1 max-w-xl text-sm text-[#2E00AB]/80">
-            Share your wellness journey with friends and family. Earn credits towards your next
-            prescription for every successful referral.
+            Share your link. When a friend starts a treatment plan, a {formatUsd(5000)} credit is
+            added to your account and applies to your next bill automatically.
           </p>
           <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-[#2E00AB]">
             <Gift className="h-4 w-4" />
-            $50 Reward Credit per referral
+            {formatUsd(5000)} Reward Credit per referral
           </p>
+          {referral.invited > 0 ? (
+            <p className="mt-1 flex items-center gap-2 text-sm text-[#2E00AB]/80">
+              <Users className="h-4 w-4" />
+              {referral.converted} of {referral.invited} invited friend
+              {referral.invited === 1 ? "" : "s"} joined · {formatUsd(referral.earnedCents)} earned
+            </p>
+          ) : null}
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <span className="rounded-md border border-[#E5DFFF] bg-[#F7F4FF] px-3 py-2 text-xs font-medium text-[#2E00AB]">
-            {referralCode}
+            {referral.code}
           </span>
           <button
             type="button"
-            onClick={handleCopy}
+            onClick={() => copy(referral.code, "code")}
             className="rounded-md border border-[#D5CAFF] bg-white px-3 py-2 text-xs text-[#2E00AB]"
           >
-            {copied === "success" ? "Copied" : copied === "error" ? "Copy failed" : "Copy Code"}
+            {copied === "code" ? "Copied" : copied === "error" ? "Copy failed" : "Copy Code"}
           </button>
-          <Link
-            href="/shop"
+          <button
+            type="button"
+            onClick={() => copy(referral.link, "link")}
             className="rounded-md bg-[#2E00AB] px-4 py-2 text-center text-xs font-medium text-white hover:bg-[#2E00AB]/90"
           >
-            Refer Friends →
-          </Link>
+            {copied === "link" ? "Link Copied ✓" : "Copy Invite Link"}
+          </button>
         </div>
       </div>
     </section>

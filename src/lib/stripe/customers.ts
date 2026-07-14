@@ -42,6 +42,26 @@ export async function createGuestStripeCustomer(params: {
   return customer.id;
 }
 
+// A negative Stripe customer balance is credit (referral rewards / admin top-ups) that
+// Stripe automatically deducts from the next invoice. Returned as positive cents.
+export async function getCustomerCreditCents(userId: string): Promise<number> {
+  try {
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("stripe_customer_id")
+      .eq("id", userId)
+      .maybeSingle();
+    if (!profile?.stripe_customer_id) return 0;
+    const customer = await stripe.customers.retrieve(profile.stripe_customer_id);
+    if (customer.deleted) return 0;
+    const balance = customer.balance ?? 0;
+    return balance < 0 ? -balance : 0;
+  } catch (error) {
+    console.warn("[stripe] credit lookup failed:", error);
+    return 0;
+  }
+}
+
 export async function linkStripeCustomerToUser(params: {
   stripeCustomerId: string;
   userId: string;

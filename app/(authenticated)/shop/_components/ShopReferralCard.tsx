@@ -4,15 +4,16 @@ import { useState } from "react";
 
 type ShopReferralCardProps = {
   referralCode: string;
+  referralLink: string;
 };
 
-export default function ShopReferralCard({ referralCode }: ShopReferralCardProps) {
-  const [copied, setCopied] = useState<"idle" | "success" | "error">("idle");
+export default function ShopReferralCard({ referralCode, referralLink }: ShopReferralCardProps) {
+  const [copied, setCopied] = useState<"idle" | "code" | "link" | "error">("idle");
 
-  const handleCopy = async () => {
+  const handleCopy = async (value: string, kind: "code" | "link") => {
     try {
-      await navigator.clipboard.writeText(referralCode);
-      setCopied("success");
+      await navigator.clipboard.writeText(value);
+      setCopied(kind);
     } catch {
       setCopied("error");
     }
@@ -40,10 +41,17 @@ export default function ShopReferralCard({ referralCode }: ShopReferralCardProps
           </span>
           <button
             type="button"
-            onClick={handleCopy}
+            onClick={() => handleCopy(referralCode, "code")}
             className="rounded-md border border-[#D5CAFF] bg-white px-3 py-2 text-xs text-[#2E00AB]"
           >
-            {copied === "success" ? "Copied" : copied === "error" ? "Copy failed" : "Copy Code"}
+            {copied === "code" ? "Copied" : copied === "error" ? "Copy failed" : "Copy Code"}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleCopy(referralLink, "link")}
+            className="rounded-md bg-[#2E00AB] px-4 py-2 text-xs font-medium text-white hover:bg-[#2E00AB]/90"
+          >
+            {copied === "link" ? "Link Copied ✓" : "Copy Invite Link"}
           </button>
         </div>
       </div>

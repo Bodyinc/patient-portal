@@ -9,14 +9,18 @@ import PaymentHistorySection from "./PaymentHistorySection";
 import PaymentMethodSection from "./PaymentMethodSection";
 import RefundRequestsSection from "./RefundRequestsSection";
 import SubscriptionsSection from "./SubscriptionsSection";
+import WalletCard from "./WalletCard";
 import type { BillingPageDataDto } from "./types";
+import type { ReferralSummary } from "@/lib/referrals";
+import type { WalletSummary } from "@/lib/wallet";
 
 type BillingPageClientProps = {
   data: BillingPageDataDto;
   fullName: string;
   patientId: string;
   avatarUrl: string | null;
-  referralCode: string;
+  referral: ReferralSummary | null;
+  wallet: WalletSummary | null;
 };
 
 export default function BillingPageClient({
@@ -24,7 +28,8 @@ export default function BillingPageClient({
   fullName,
   patientId,
   avatarUrl,
-  referralCode,
+  referral,
+  wallet,
 }: BillingPageClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -77,7 +82,8 @@ export default function BillingPageClient({
         </div>
       ) : null}
 
-      <BillingReferralCard referralCode={referralCode} />
+      {wallet ? <WalletCard wallet={wallet} /> : null}
+      {referral ? <BillingReferralCard referral={referral} /> : null}
       <SubscriptionsSection subscriptions={data.subscriptions} />
       <PaymentMethodSection />
       <PaymentHistorySection

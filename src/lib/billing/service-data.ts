@@ -117,11 +117,19 @@ function matchesPaymentQuery(payment: BillingPaymentDto, query: string): boolean
   return haystack.includes(query.toLowerCase());
 }
 
+type EmbeddedMedicine = {
+  name: string;
+  short_description: string | null;
+  image_url: string | null;
+};
+type EmbeddedPackage = { name: string; price: number; duration_months: number };
+
 export async function fetchBillingSubscriptions(userId: string): Promise<BillingSubscriptionDto[]> {
+  // Embedded select: subscriptions + medicine + package in ONE round trip (was 3).
   const { data: subscriptions, error } = await supabaseAdmin
     .from("subscriptions")
     .select(
-      "id, medicine_id, package_id, status, current_period_end, cancel_at_period_end, created_at",
+      "id, medicine_id, package_id, status, current_period_end, cancel_at_period_end, created_at, medicines(name, short_description, image_url), packages(name, price, duration_months)",
     )
     .eq("user_id", userId)
     .in("status", ACTIVE_SUBSCRIPTION_STATUSES)
@@ -130,36 +138,9 @@ export async function fetchBillingSubscriptions(userId: string): Promise<Billing
   if (error) throw new Error(error.message);
   if (!subscriptions?.length) return [];
 
-  const medicineIds = [
-    ...new Set(subscriptions.map((sub) => sub.medicine_id).filter(Boolean)),
-  ] as string[];
-  const packageIds = [
-    ...new Set(subscriptions.map((sub) => sub.package_id).filter(Boolean)),
-  ] as string[];
-
-  const [{ data: medicines }, { data: packages }] = await Promise.all([
-    medicineIds.length
-      ? supabaseAdmin
-          .from("medicines")
-          .select("id, name, short_description, image_url")
-          .in("id", medicineIds)
-      : Promise.resolve({ data: [] }),
-    packageIds.length
-      ? supabaseAdmin
-          .from("packages")
-          .select("id, name, price, duration_months")
-          .in("id", packageIds)
-      : Promise.resolve({ data: [] }),
-  ]);
-
-  const medicineById = new Map((medicines ?? []).map((medicine) => [medicine.id, medicine]));
-  const packageById = new Map((packages ?? []).map((pkg) => [pkg.id, pkg]));
-
   return subscriptions.map((subscription) => {
-    const medicine = subscription.medicine_id
-      ? medicineById.get(subscription.medicine_id)
-      : undefined;
-    const pkg = subscription.package_id ? packageById.get(subscription.package_id) : undefined;
+    const medicine = (subscription as { medicines?: EmbeddedMedicine | null }).medicines ?? null;
+    const pkg = (subscription as { packages?: EmbeddedPackage | null }).packages ?? null;
 
     return {
       id: subscription.id,
@@ -181,7 +162,6 @@ export async function fetchBillingSubscriptions(userId: string): Promise<Billing
 export async function fetchBillingPayments(
   userId: string,
   options: { page?: number; pageSize?: number; query?: string } = {},
-  refundByPayment: Map<string, string> = new Map(),
 ): Promise<BillingPaymentsListDto> {
   const page = Math.max(1, options.page ?? 1);
   const pageSize = Math.max(1, Math.min(50, options.pageSize ?? 10));
@@ -204,11 +184,13 @@ export async function fetchBillingPayments(
     ...new Set((payments ?? []).map((payment) => payment.plan_id).filter(Boolean)),
   ] as string[];
 
+  // Two parallel round trips (was three sequential waves): the medicine name rides
+  // along on the subscriptions query as an embedded select.
   const [{ data: subscriptions }, { data: packages }] = await Promise.all([
     subscriptionIds.length
       ? supabaseAdmin
           .from("subscriptions")
-          .select("stripe_subscription_id, medicine_id, package_id")
+          .select("stripe_subscription_id, medicine_id, package_id, medicines(name)")
           .in("stripe_subscription_id", subscriptionIds)
       : Promise.resolve({ data: [] }),
     packageIds.length
@@ -216,15 +198,6 @@ export async function fetchBillingPayments(
       : Promise.resolve({ data: [] }),
   ]);
 
-  const medicineIds = [
-    ...new Set((subscriptions ?? []).map((sub) => sub.medicine_id).filter(Boolean)),
-  ] as string[];
-
-  const { data: medicines } = medicineIds.length
-    ? await supabaseAdmin.from("medicines").select("id, name").in("id", medicineIds)
-    : { data: [] };
-
-  const medicineById = new Map((medicines ?? []).map((medicine) => [medicine.id, medicine]));
   const packageById = new Map((packages ?? []).map((pkg) => [pkg.id, pkg.name]));
   const subscriptionByStripeId = new Map(
     (subscriptions ?? []).map((sub) => [sub.stripe_subscription_id, sub]),
@@ -234,18 +207,13 @@ export async function fetchBillingPayments(
     const subscription = payment.stripe_subscription_id
       ? subscriptionByStripeId.get(payment.stripe_subscription_id)
       : undefined;
-    const medicine = subscription?.medicine_id
-      ? medicineById.get(subscription.medicine_id)
-      : undefined;
+    const medicine = (subscription as { medicines?: { name: string } | null } | undefined)
+      ?.medicines;
     const packageName = payment.plan_id ? packageById.get(payment.plan_id) : undefined;
     const subscriptionName =
       medicine?.name ?? packageName ?? (subscription ? "Treatment Subscription" : "—");
     const fallbackDescription = packageName ? `${packageName} renewal` : "Subscription payment";
     const { invoiceUrl, invoicePdfUrl } = parseInvoiceUrls(payment.raw_event);
-    const refundStatus = refundByPayment.get(payment.id) ?? null;
-    const refundable =
-      REFUNDABLE_PAYMENT_STATUSES.includes(payment.status) &&
-      (refundStatus === null || refundStatus === "rejected");
 
     return {
       id: payment.id,
@@ -258,8 +226,10 @@ export async function fetchBillingPayments(
       stripeInvoiceId: payment.stripe_invoice_id,
       invoiceUrl,
       invoicePdfUrl,
-      refundStatus,
-      refundable,
+      // Filled in by fetchBillingPageData once refund requests resolve (they load in
+      // parallel with payments rather than before them).
+      refundStatus: null,
+      refundable: REFUNDABLE_PAYMENT_STATUSES.includes(payment.status),
     };
   });
 
@@ -306,7 +276,14 @@ export async function fetchBillingPageData(
   userId: string,
   options: { page?: number; pageSize?: number; query?: string } = {},
 ): Promise<BillingPageDataDto> {
-  const refundRequests = await fetchRefundRequests(userId);
+  // All three sections in one parallel wave; refund state is merged into the
+  // payment rows afterwards instead of gating them behind a sequential fetch.
+  const [refundRequests, subscriptions, payments] = await Promise.all([
+    fetchRefundRequests(userId),
+    fetchBillingSubscriptions(userId),
+    fetchBillingPayments(userId, options),
+  ]);
+
   const refundByPayment = new Map<string, string>();
   for (const request of refundRequests) {
     // requests are newest-first, so the first seen per payment is the latest
@@ -315,10 +292,12 @@ export async function fetchBillingPageData(
     }
   }
 
-  const [subscriptions, payments] = await Promise.all([
-    fetchBillingSubscriptions(userId),
-    fetchBillingPayments(userId, options, refundByPayment),
-  ]);
+  for (const payment of payments.items) {
+    const refundStatus = refundByPayment.get(payment.id) ?? null;
+    payment.refundStatus = refundStatus;
+    payment.refundable =
+      payment.refundable && (refundStatus === null || refundStatus === "rejected");
+  }
 
   return { subscriptions, payments, refundRequests };
 }

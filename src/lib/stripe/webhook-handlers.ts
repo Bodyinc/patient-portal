@@ -3,6 +3,11 @@ import "server-only";
 import type Stripe from "stripe";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { recordPayment } from "./record-payment";
+import { stripe } from "./server";
+import { sendTransactionalEmail } from "@/lib/email/send";
+import { paymentReceiptEmail, refundNotificationEmail } from "@/lib/email/payment-emails";
+import { maybeConvertReferral } from "@/lib/referrals";
+import { recordInvoiceWalletDebit } from "@/lib/wallet";
 import type { Json } from "@/lib/supabase/types";
 
 // Field locations vary across Stripe API versions; read defensively.
@@ -78,7 +83,43 @@ async function upsertSubscription(sub: Stripe.Subscription): Promise<void> {
   });
 }
 
-async function handleInvoicePaid(invoice: Stripe.Invoice): Promise<void> {
+async function customerEmailById(custId: string | null): Promise<string | null> {
+  if (!custId) return null;
+  try {
+    const customer = await stripe.customers.retrieve(custId);
+    if (!customer.deleted && customer.email) return customer.email;
+  } catch {
+    // Customer lookup is best-effort; the caller falls back to no email.
+  }
+  return null;
+}
+
+async function sendPaymentReceipt(invoice: Stripe.Invoice): Promise<void> {
+  const to = invoice.customer_email ?? (await customerEmailById(customerId(invoice)));
+  if (!to) return;
+
+  const amountCents = invoice.amount_paid ?? invoice.amount_due ?? 0;
+  if (amountCents <= 0) return;
+
+  const description =
+    invoice.lines?.data?.map((l) => l.description).find(Boolean) ?? "Body Inc subscription";
+
+  const { subject, html } = paymentReceiptEmail({
+    amountCents,
+    currency: invoice.currency ?? "usd",
+    description,
+    invoiceNumber: invoice.number,
+    invoiceUrl: invoice.hosted_invoice_url,
+  });
+  await sendTransactionalEmail({ to, subject, html });
+}
+
+async function handleInvoicePaid(
+  invoice: Stripe.Invoice,
+  options?: { notifyCustomer?: boolean },
+): Promise<void> {
+  if (options?.notifyCustomer) await sendPaymentReceipt(invoice);
+
   const subId = invoiceSubscriptionId(invoice);
   if (!subId) return;
 
@@ -108,6 +149,15 @@ async function handleInvoicePaid(invoice: Stripe.Invoice): Promise<void> {
     .from("subscriptions")
     .update({ status: "active" })
     .eq("stripe_subscription_id", subId);
+
+  if (subRow?.user_id) {
+    try {
+      await maybeConvertReferral(subRow.user_id);
+    } catch (error) {
+      console.error("[referrals] convert on invoice.paid failed:", error);
+    }
+    await recordInvoiceWalletDebit(invoice, subRow.user_id);
+  }
 
   const { data: order } = await supabaseAdmin
     .from("shop_checkout_orders")
@@ -181,7 +231,33 @@ function chargePaymentIntentId(charge: Stripe.Charge): string | null {
 // Reconciles refunds regardless of origin: an admin approval (which calls
 // stripe.refunds.create) and a refund issued straight from the Stripe dashboard
 // both land here. Marks the payment refunded and closes any open request.
+async function sendRefundNotification(charge: Stripe.Charge): Promise<void> {
+  const to =
+    charge.receipt_email ??
+    charge.billing_details?.email ??
+    (await customerEmailById(customerId(charge)));
+  if (!to) return;
+
+  // charge.refunds is not always present on newer API versions; fall back to the
+  // cumulative amount_refunded.
+  const latestRefundCents =
+    (charge as unknown as { refunds?: { data?: Array<{ amount?: number }> } }).refunds?.data?.[0]
+      ?.amount ??
+    charge.amount_refunded ??
+    0;
+  if (latestRefundCents <= 0) return;
+
+  const { subject, html } = refundNotificationEmail({
+    amountCents: latestRefundCents,
+    currency: charge.currency ?? "usd",
+    cardLast4: charge.payment_method_details?.card?.last4 ?? null,
+  });
+  await sendTransactionalEmail({ to, subject, html });
+}
+
 async function handleChargeRefunded(charge: Stripe.Charge): Promise<void> {
+  await sendRefundNotification(charge);
+
   const piId = chargePaymentIntentId(charge);
   const chargeInvoice = (charge as unknown as { invoice?: string | { id?: string } | null })
     .invoice;
@@ -232,7 +308,11 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
     case "customer.subscription.deleted":
       await upsertSubscription(event.data.object as Stripe.Subscription);
       break;
+    // Both events fire for the same paid invoice; email only on invoice.paid so the
+    // customer gets a single receipt.
     case "invoice.paid":
+      await handleInvoicePaid(event.data.object as Stripe.Invoice, { notifyCustomer: true });
+      break;
     case "invoice.payment_succeeded":
       await handleInvoicePaid(event.data.object as Stripe.Invoice);
       break;

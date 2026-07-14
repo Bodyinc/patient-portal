@@ -70,9 +70,12 @@ function matchesRequestQuery(request: MyMedsMedicationRequestDto, query: string)
 export async function fetchCurrentMedication(
   userId: string,
 ): Promise<MyMedsCurrentMedicationDto | null> {
+  // Embedded select: subscription + medicine + package in one round trip (was 2 waves).
   const { data: subscription, error } = await supabaseAdmin
     .from("subscriptions")
-    .select("id, medicine_id, package_id, current_period_end, created_at")
+    .select(
+      "id, medicine_id, package_id, current_period_end, created_at, medicines(id, name, image_url, important_info), packages(id, name, duration_months)",
+    )
     .eq("user_id", userId)
     .in("status", ACTIVE_SUBSCRIPTION_STATUSES)
     .order("created_at", { ascending: false })
@@ -82,22 +85,19 @@ export async function fetchCurrentMedication(
   if (error) throw new Error(error.message);
   if (!subscription) return null;
 
-  const [{ data: medicine }, { data: pkg }] = await Promise.all([
-    subscription.medicine_id
-      ? supabaseAdmin
-          .from("medicines")
-          .select("id, name, image_url, important_info")
-          .eq("id", subscription.medicine_id)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-    subscription.package_id
-      ? supabaseAdmin
-          .from("packages")
-          .select("id, name, duration_months")
-          .eq("id", subscription.package_id)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-  ]);
+  const medicine =
+    (
+      subscription as {
+        medicines?: {
+          name: string;
+          image_url: string | null;
+          important_info: string | null;
+        } | null;
+      }
+    ).medicines ?? null;
+  const pkg =
+    (subscription as { packages?: { name: string; duration_months: number } | null }).packages ??
+    null;
 
   return {
     subscriptionId: subscription.id,

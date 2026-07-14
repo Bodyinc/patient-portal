@@ -31,7 +31,7 @@ export default async function OrderConfirmationPage() {
   // Show the real charged amount from the payment; fall back to a computed estimate.
   const { data: pay } = await supabaseAdmin
     .from("payments")
-    .select("amount_cents")
+    .select("amount_cents, raw_event")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -41,6 +41,29 @@ export default async function OrderConfirmationPage() {
     : pkg
       ? calculateCheckoutPricing(Number(pkg.price)).total
       : null;
+
+  // Itemize the charge from the invoice: positive lines = plan price, negative lines =
+  // discounts (promo / one-time credits), balance delta = wallet credit Stripe consumed.
+  const invoice = pay?.raw_event as {
+    lines?: { data?: Array<{ amount?: number | null; description?: string | null }> };
+    starting_balance?: number | null;
+    ending_balance?: number | null;
+  } | null;
+
+  const lines = invoice?.lines?.data ?? [];
+  const planPriceCents = lines
+    .filter((l) => (l.amount ?? 0) > 0)
+    .reduce((sum, l) => sum + (l.amount ?? 0), 0);
+  const discounts = lines
+    .filter((l) => (l.amount ?? 0) < 0)
+    .map((l) => ({
+      label: l.description ?? "Discount",
+      amount: Math.abs(l.amount ?? 0) / 100,
+    }));
+  const walletUsed = ((invoice?.ending_balance ?? 0) - (invoice?.starting_balance ?? 0)) / 100;
+
+  const planPrice = planPriceCents > 0 ? planPriceCents / 100 : pkg ? Number(pkg.price) : null;
+  const showBreakdown = planPrice != null && (discounts.length > 0 || walletUsed > 0);
 
   const { data: profile } = await supabaseAdmin
     .from("profiles")
@@ -87,6 +110,24 @@ export default async function OrderConfirmationPage() {
                 </Link>
               </span>
             </div>
+            {showBreakdown ? (
+              <div className="flex justify-between border-t border-[#2E00AB]/10 pt-4">
+                <span className="text-[#2E00AB]/80">Plan price</span>
+                <span className="font-medium text-[#2E00AB]">${planPrice!.toFixed(2)}</span>
+              </div>
+            ) : null}
+            {discounts.map((d) => (
+              <div key={d.label} className="flex justify-between text-emerald-700">
+                <span>{d.label}</span>
+                <span className="font-medium">-${d.amount.toFixed(2)}</span>
+              </div>
+            ))}
+            {walletUsed > 0 ? (
+              <div className="flex justify-between text-emerald-700">
+                <span>Wallet credit applied</span>
+                <span className="font-medium">-${walletUsed.toFixed(2)}</span>
+              </div>
+            ) : null}
             <div className="flex items-center justify-between border-t border-[#2E00AB]/10 pt-4">
               <span className="text-base font-medium text-[#2E00AB]">Total Paid</span>
               <span className="text-3xl font-semibold text-[#2E00AB]">
