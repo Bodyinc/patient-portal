@@ -52,7 +52,6 @@ export default function BillingCheckoutPage() {
     [summary?.packagePrice, discountAmount, discountLabel],
   );
 
-  // Load the applicable discount (an applied code, or the admin's auto-apply welcome promo).
   useEffect(() => {
     if (!packageId) return;
     let active = true;
@@ -113,7 +112,6 @@ export default function BillingCheckoutPage() {
     } = await supabase.auth.getUser();
 
     if (user) {
-      // Already signed in — skip OTP; just link this checkout to the account.
       await claimCheckoutForCurrentUser();
       updateState({ checkoutConfirmed: true });
       toast.success("Payment confirmed.");
@@ -160,7 +158,8 @@ export default function BillingCheckoutPage() {
         <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden lg:gap-3">
           <PageHeader />
 
-          <div className="grid min-h-0 flex-1 grid-cols-1 items-stretch gap-2 overflow-hidden lg:grid-cols-[1.65fr_1fr] lg:gap-4">
+          {}
+          <div className="grid min-h-0 flex-1 grid-cols-1 items-start gap-2 overflow-hidden lg:grid-cols-[1.65fr_1fr] lg:gap-4">
             <div className="flex min-h-0 flex-col gap-2 overflow-hidden">
               <div className="grid shrink-0 grid-cols-1 gap-2 sm:grid-cols-2">
                 <InfoCard

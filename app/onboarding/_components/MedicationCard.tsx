@@ -29,18 +29,20 @@ export default function MedicationCard({
           onSelect?.(medication.id);
         }
       }}
-      className={`flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl border bg-white p-1.5 shadow-none transition-all ${
+      // CHANGED: Added h-fit so the card refuses to stretch past its intrinsic contents
+      className={`flex h-fit cursor-pointer flex-col overflow-hidden rounded-2xl border bg-white p-1.5 shadow-none transition-all ${
         selected
           ? "border-[#2E00AB] ring-2 ring-[#2E00AB]/20"
           : "border-[#2E00AB]/20 hover:border-[#2E00AB]/50"
       }`}
     >
-      <div className="relative flex min-h-[88px] flex-[2] items-center justify-center overflow-hidden rounded-xl bg-[#F3EEFF] sm:min-h-[100px] lg:min-h-[110px]">
+      {/* CHANGED: Removed flex-[2] and changed min-h to hard heights (h-36 / sm:h-44) so the top block is completely static */}
+      <div className="relative flex h-36 w-full items-center justify-center overflow-hidden rounded-xl bg-[#F3EEFF] sm:h-44">
         <Image
           src="/curve-line.svg"
           alt=""
-          width={400}
-          height={220}
+          fill
+          priority
           className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-70 select-none"
         />
 
@@ -49,7 +51,7 @@ export default function MedicationCard({
           alt={medication.name}
           width={200}
           height={200}
-          className="relative z-10 h-auto max-h-[70%] w-auto object-contain"
+          className="relative z-10 h-auto max-h-[80%] w-auto object-contain"
         />
 
         <div
@@ -61,7 +63,8 @@ export default function MedicationCard({
         </div>
       </div>
 
-      <div className="flex flex-[3] flex-col gap-1.5 p-3 sm:gap-2 sm:p-3">
+      {/* CHANGED: Removed flex-[3] so content box stays tightly compacted */}
+      <div className="flex flex-col gap-1.5 p-3 sm:gap-2">
         <div className="flex items-start justify-between gap-2">
           <h2 className="text-base font-medium text-[#2E00AB] sm:text-lg">{medication.name}</h2>
           <span className="shrink-0 rounded-md border border-[#2E00AB]/15 bg-[#F8F4FF] px-2 py-0.5 text-[11px] font-medium text-[#2E00AB] sm:text-xs">
@@ -79,7 +82,8 @@ export default function MedicationCard({
           {medication.description}
         </p>
 
-        <div className="mt-auto space-y-2 pt-1">
+        {/* CHANGED: Removed mt-auto so the price and button layout doesn't detach or get dragged downward */}
+        <div className="space-y-2 pt-3">
           <h3 className="text-lg font-semibold leading-none text-[#2E00AB] sm:text-xl">
             ${medication.priceMonthly}/mo
           </h3>

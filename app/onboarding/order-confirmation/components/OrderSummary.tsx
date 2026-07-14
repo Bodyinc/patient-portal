@@ -15,7 +15,7 @@ export default function OrderSummary() {
   const pricing = calculateCheckoutPricing(summary?.packagePrice);
 
   return (
-    <Card className="overflow-hidden rounded-2xl border border-[#2E00AB]/25 shadow-none">
+    <Card className="h-fit w-full overflow-hidden rounded-2xl border border-[#2E00AB]/25 shadow-none">
       <div className="bg-[#EDE7FA] px-5 py-3">
         <h2 className="text-lg font-semibold text-[#2E00AB]">Order Summary</h2>
       </div>
