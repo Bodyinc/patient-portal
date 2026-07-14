@@ -7,7 +7,7 @@ import { toast } from "sonner";
 
 import AuthPageShell, { AuthHeading, authButtonClassName } from "@/components/AuthPageShell";
 import { Button } from "@/components/ui/button";
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { InputOTP, InputOTPSlot } from "@/components/ui/input-otp";
 import { OTP_LENGTH } from "@/lib/auth/constants";
 import { onLoginSuccess } from "@/lib/auth/on-login-success";
 import { reconcileCheckoutEmail } from "@/lib/actions/patient-auth";
@@ -39,7 +39,6 @@ function VerifyOTPContent() {
         return;
       }
 
-      // Email change was verified just now — now propagate it to the profile + Stripe customer.
       if (searchParams.get("sync") === "email") {
         await reconcileCheckoutEmail();
       }
@@ -69,6 +68,22 @@ function VerifyOTPContent() {
   return (
     <AuthPageShell footer={null}>
       <div className="text-center">
+        {/* GLOBAL CSS INJECTION: This directly finds shadcn's caret-blink element and destroys it */}
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+          .animate-caret-blink, 
+          [class*="animate-caret-blink"],
+          div[className*="animate-caret-blink"] {
+            display: none !important;
+            opacity: 0 !important;
+            visibility: hidden !important;
+            background-color: transparent !important;
+          }
+        `,
+          }}
+        />
+
         <AuthHeading
           title="Enter Verification Code"
           description={`Enter the ${OTP_LENGTH}-digit code sent to`}
@@ -85,23 +100,22 @@ function VerifyOTPContent() {
           Change email
         </Link>
 
-        <div className="mx-auto mt-8 flex max-w-full justify-center overflow-x-auto sm:mt-10">
+        {/* Changed overflow-x-auto to overflow-visible to prevent any sneaky hidden scrollbar artifacts */}
+        <div className="mx-auto mt-8 flex max-w-full justify-center overflow-visible sm:mt-10">
           <InputOTP
             maxLength={OTP_LENGTH}
             value={otp}
             onChange={setOtp}
             inputMode="numeric"
-            containerClassName="justify-center gap-1.5 sm:gap-3"
+            containerClassName="justify-center gap-0.5 sm:gap-2"
           >
-            <InputOTPGroup>
-              {Array.from({ length: OTP_LENGTH }, (_, index) => (
-                <InputOTPSlot
-                  key={index}
-                  index={index}
-                  className="h-10 w-9 rounded-[8px] border border-[#2E00AB]/40 bg-white text-lg font-semibold text-[#2E00AB] shadow-none first:rounded-[8px] first:border-l last:rounded-[8px] sm:h-[50px] sm:w-[50px] sm:text-[24px]"
-                />
-              ))}
-            </InputOTPGroup>
+            {Array.from({ length: OTP_LENGTH }, (_, index) => (
+              <InputOTPSlot
+                key={index}
+                index={index}
+                className="h-10 w-6.5 rounded-[8px] border border-[#2E00AB]/40 bg-white text-lg font-semibold text-[#2E00AB] shadow-none outline-none first:rounded-[8px] first:border-l last:rounded-[8px] focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-[#2E00AB] after:hidden sm:h-[50px] sm:w-[50px] sm:text-[24px]"
+              />
+            ))}
           </InputOTP>
         </div>
 

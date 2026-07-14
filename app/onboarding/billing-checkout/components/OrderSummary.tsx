@@ -45,14 +45,15 @@ export default function OrderSummary({
   onContinue,
 }: OrderSummaryProps) {
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col rounded-2xl border border-[#2E00AB]/20 bg-white p-4">
+    // CHANGED: Removed h-full, min-h-0, and flex-1. Added h-fit so the box stays completely static.
+    <div className="h-fit w-full rounded-2xl border border-[#2E00AB]/20 bg-white p-4">
       {/* Header */}
       <div className="shrink-0 border-b border-[#2E00AB]/10 pb-3">
         <h2 className="text-lg font-semibold text-[#2E00AB]">Order Summary</h2>
       </div>
 
-      {/* Scrollable Content - overflow removed */}
-      <div className="flex min-h-0 flex-1 flex-col py-3">
+      {/* Content Container - Changed from flex flex-col to clean content block formatting */}
+      <div className="py-3">
         {/* Medication */}
         <div className="flex justify-between gap-3">
           <div className="min-w-0">
@@ -110,9 +111,10 @@ export default function OrderSummary({
           {promoMessage && <p className="mt-2 text-xs text-emerald-700">{promoMessage}</p>}
         </div>
 
-        {/* Push Footer to Bottom */}
+        {/* Action Button Container */}
         {!hideContinue && (
-          <div className="mt-auto pt-6">
+          // CHANGED: Replaced mt-auto with an explicit top margin utility so the block is position-locked
+          <div className="pt-6">
             <button
               type="button"
               onClick={onContinue}
