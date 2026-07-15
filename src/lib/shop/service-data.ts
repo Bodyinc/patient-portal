@@ -319,6 +319,7 @@ export async function createShopCheckoutOrderData(options: {
     subtotal: Number(order.subtotal),
     promoSavings: Number(order.promo_savings),
     shipping: Number(order.shipping),
+    consultation: Number(order.consultation ?? 0),
     total: Number(order.total),
     walletApplied: null,
     totalPaid: null,
@@ -334,7 +335,7 @@ export async function getShopCheckoutOrderByIdData(options: {
   const { data: order, error } = await supabaseAdmin
     .from("shop_checkout_orders")
     .select(
-      "id, status, created_at, selected_plan_code, subtotal, promo_savings, shipping, total, medicine_id, stripe_invoice_id",
+      "id, status, created_at, selected_plan_code, subtotal, promo_savings, shipping, consultation, total, medicine_id, stripe_invoice_id",
     )
     .eq("id", orderId)
     .eq("user_id", userId)
@@ -386,6 +387,7 @@ export async function getShopCheckoutOrderByIdData(options: {
     subtotal: Number(order.subtotal),
     promoSavings: Number(order.promo_savings),
     shipping: Number(order.shipping),
+    consultation: Number(order.consultation),
     total: Number(order.total),
     walletApplied,
     totalPaid,

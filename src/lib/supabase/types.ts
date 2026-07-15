@@ -763,6 +763,7 @@ export type Database = {
           promo_savings: number;
           subtotal: number;
           shipping: number;
+          consultation: number;
           total: number;
           status: string;
           created_at: string;
@@ -782,6 +783,7 @@ export type Database = {
           promo_savings?: number;
           subtotal: number;
           shipping?: number;
+          consultation?: number;
           total: number;
           status?: string;
           created_at?: string;
@@ -801,6 +803,7 @@ export type Database = {
           promo_savings?: number;
           subtotal?: number;
           shipping?: number;
+          consultation?: number;
           total?: number;
           status?: string;
           created_at?: string;
@@ -1050,6 +1053,60 @@ export type Database = {
           referral_id?: string | null;
           stripe_invoice_id?: string | null;
           created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      platform_settings: {
+        Row: {
+          key: string;
+          value: Json;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          key: string;
+          value: Json;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          key?: string;
+          value?: Json;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [];
+      };
+      admin_activity_log: {
+        Row: {
+          id: string;
+          admin_user_id: string | null;
+          action: string;
+          entity: string;
+          entity_id: string | null;
+          before: Json | null;
+          after: Json | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          admin_user_id?: string | null;
+          action: string;
+          entity: string;
+          entity_id?: string | null;
+          before?: Json | null;
+          after?: Json | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          admin_user_id?: string | null;
+          action?: string;
+          entity?: string;
+          entity_id?: string | null;
+          before?: Json | null;
+          after?: Json | null;
           created_at?: string;
         };
         Relationships: [];

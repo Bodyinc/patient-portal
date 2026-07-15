@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { createOnboardingSubscription, getCheckoutDiscount } from "@/lib/actions/stripe-checkout";
+import { getPublicFees } from "@/lib/actions/fees";
 import {
   claimCheckoutForCurrentUser,
   preparePostCheckoutAccount,
@@ -43,6 +44,17 @@ export default function BillingCheckoutPage() {
   const [promoError, setPromoError] = useState<string | null>(null);
   const [discountAmount, setDiscountAmount] = useState(0);
   const [discountLabel, setDiscountLabel] = useState<string | null>(null);
+  const [renewalShippingCents, setRenewalShippingCents] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    void getPublicFees().then((f) => {
+      if (active) setRenewalShippingCents(f.shippingFeeCents);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const packageId = summary?.selectedPackageId ?? null;
   const medicationName = summary?.medicineName ?? "Selected Medication";
@@ -229,6 +241,7 @@ export default function BillingCheckoutPage() {
                 confirming={confirming}
                 loading={summary?.packagePrice == null}
                 hideContinue={Boolean(clientSecret)}
+                renewalShippingCents={renewalShippingCents}
                 onPromoCodeChange={(value) => {
                   setPromoCode(value);
                   setPromoError(null);

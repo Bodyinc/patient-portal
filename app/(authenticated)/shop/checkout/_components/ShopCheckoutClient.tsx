@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 
 import ShopHeader from "../../_components/ShopHeader";
 import CheckoutActions from "./CheckoutActions";
@@ -10,6 +10,7 @@ import ReferralCard from "./ReferralCard";
 import SelectedProductCard from "./SelectedProductCard";
 import StripePaymentForm from "./StripePaymentForm";
 import { getCheckoutDiscount } from "@/lib/actions/stripe-checkout";
+import { getShopOrderFees } from "@/lib/actions/fees";
 import type { CheckoutBootstrap, CheckoutPlanId } from "./types";
 
 type ShopCheckoutClientProps = {
@@ -40,6 +41,20 @@ export default function ShopCheckoutClient({
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [payment, setPayment] = useState<{ clientSecret: string; returnUrl: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [shipping, setShipping] = useState(0);
+  const [consultation, setConsultation] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    void getShopOrderFees(medicineId).then((f) => {
+      if (!active) return;
+      setShipping(f.shippingCents / 100);
+      setConsultation(f.consultationCents / 100);
+    });
+    return () => {
+      active = false;
+    };
+  }, [medicineId]);
 
   const selectedPlanMeta = useMemo(
     () => bootstrap.plans.find((plan) => plan.code === selectedPlan) ?? bootstrap.plans[0],
@@ -50,7 +65,7 @@ export default function ShopCheckoutClient({
     () => selectedPlanMeta?.amount ?? bootstrap.product.baseMonthlyPrice,
     [bootstrap.product.baseMonthlyPrice, selectedPlanMeta],
   );
-  const totalBeforeCredit = Math.max(0, subtotal - promoSavings);
+  const totalBeforeCredit = Math.max(0, subtotal - promoSavings + shipping + consultation);
   // Stripe consumes wallet credit automatically at payment; mirror it here so the
   // displayed total matches the actual charge.
   const walletApplied = Math.min(walletCreditCents / 100, totalBeforeCredit);
@@ -146,6 +161,8 @@ export default function ShopCheckoutClient({
         subtotal={subtotal}
         promoSavings={promoSavings}
         walletApplied={walletApplied}
+        shipping={shipping}
+        consultation={consultation}
         total={total}
       />
 

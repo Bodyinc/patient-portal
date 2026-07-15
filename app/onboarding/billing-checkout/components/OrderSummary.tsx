@@ -15,6 +15,7 @@ type OrderSummaryProps = {
   confirming: boolean;
   loading?: boolean;
   hideContinue?: boolean;
+  renewalShippingCents?: number;
   onPromoCodeChange: (value: string) => void;
   onApplyPromo: () => void;
   onContinue: () => void;
@@ -40,6 +41,7 @@ export default function OrderSummary({
   confirming,
   loading = false,
   hideContinue = false,
+  renewalShippingCents = 0,
   onPromoCodeChange,
   onApplyPromo,
   onContinue,
@@ -78,10 +80,26 @@ export default function OrderSummary({
             </div>
           )}
           <div className="flex justify-between">
+            <span>Consultation fee</span>
+            <span className="font-semibold text-emerald-700">FREE</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Shipping</span>
+            <span className="font-semibold text-emerald-700">FREE</span>
+          </div>
+          <div className="flex justify-between">
             <span>Tax</span>
             <span>$0.00</span>
           </div>
         </div>
+
+        {renewalShippingCents > 0 && (
+          <p className="mt-3 rounded-lg bg-[#2E00AB]/5 px-3 py-2 text-xs leading-relaxed text-[#2E00AB]/80">
+            Your first payment covers medication only — consultation and shipping are free. Starting
+            with your next renewal, a {formatMoney(renewalShippingCents / 100)} shipping fee will be
+            added to each automatic payment.
+          </p>
+        )}
 
         {/* Total */}
         <div className="mt-5 flex items-center justify-between border-t border-[#2E00AB]/10 pt-4">

@@ -5,6 +5,8 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getOrCreateStripeCustomer } from "@/lib/stripe/customers";
 import { createSubscriptionForPrice } from "@/lib/stripe/subscriptions";
 import { resolveCheckoutDiscount, incrementPromoRedemption } from "@/lib/stripe/promos";
+import { computeShopOrderFees } from "@/lib/shop/order-fees";
+import { getPlatformSettings } from "@/lib/settings/platform-settings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,6 +25,15 @@ export async function POST(request: Request) {
 
   if (!user) {
     return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  }
+
+  if ((await getPlatformSettings()).maintenance_mode) {
+    return NextResponse.json(
+      {
+        error: "The platform is temporarily unavailable for maintenance. Please try again shortly.",
+      },
+      { status: 503 },
+    );
   }
 
   let body: Body;
@@ -69,6 +80,8 @@ export async function POST(request: Request) {
     const discountCents = discount?.discountCents ?? 0;
     const selectedPlanCode = pkg.duration_months === 1 ? "monthly" : "quarterly";
 
+    const { shippingCents, consultationCents } = await computeShopOrderFees(user.id, medicineId);
+
     const { data: order, error: orderError } = await supabaseAdmin
       .from("shop_checkout_orders")
       .insert({
@@ -80,8 +93,9 @@ export async function POST(request: Request) {
         promo_code: discount?.label ?? null,
         promo_savings: discountCents / 100,
         subtotal: subtotalCents / 100,
-        shipping: 0,
-        total: (subtotalCents - discountCents) / 100,
+        shipping: shippingCents / 100,
+        consultation: consultationCents / 100,
+        total: (subtotalCents - discountCents + shippingCents + consultationCents) / 100,
         status: "pending_payment",
       })
       .select("id")
@@ -97,7 +111,12 @@ export async function POST(request: Request) {
       name: (user.user_metadata?.full_name as string | undefined) ?? null,
     });
 
+    // Consultation is one-time; shipping is a recurring subscription item (below) so it is
+    // NOT added here as a one-time fee.
     const oneTimeFees: Array<{ amountCents: number; description: string }> = [];
+    if (consultationCents > 0) {
+      oneTimeFees.push({ amountCents: consultationCents, description: "Consultation fee" });
+    }
     if (discount) {
       oneTimeFees.push({
         amountCents: -discountCents,
@@ -109,6 +128,9 @@ export async function POST(request: Request) {
       customerId,
       priceId: pkg.stripe_price_id,
       oneTimeFees,
+      // Shop orders pay shipping on the first invoice and every renewal.
+      recurringShippingCents: shippingCents,
+      shippingOnFirstInvoice: true,
       metadata: {
         order_id: order.id,
         user_id: user.id,

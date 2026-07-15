@@ -79,6 +79,7 @@ export type ShopCheckoutOrderDto = {
   subtotal: number;
   promoSavings: number;
   shipping: number;
+  consultation: number;
   total: number;
   // Actuals from the Stripe invoice once the order is paid; null before payment.
   walletApplied: number | null;

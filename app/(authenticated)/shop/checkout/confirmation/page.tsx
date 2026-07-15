@@ -77,6 +77,16 @@ export default async function ShopCheckoutConfirmationPage({
                 <span className="font-semibold text-[#2E00AB]">Subtotal</span>
                 <span>{formatUsd(order.subtotal)}</span>
               </p>
+              {order.consultation > 0 ? (
+                <p className="flex justify-between">
+                  <span>Consultation fee</span>
+                  <span>{formatUsd(order.consultation)}</span>
+                </p>
+              ) : null}
+              <p className="flex justify-between">
+                <span>Shipping</span>
+                <span>{order.shipping > 0 ? formatUsd(order.shipping) : "Free"}</span>
+              </p>
               {order.discounts !== null ? (
                 order.discounts.map((d) => (
                   <p key={d.label} className="flex justify-between text-emerald-700">

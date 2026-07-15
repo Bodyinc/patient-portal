@@ -8,6 +8,7 @@ import { getOrCreateStripeCustomer } from "@/lib/stripe/customers";
 import { sendTransactionalEmail } from "@/lib/email/send";
 import { referralRewardEmail } from "@/lib/email/referral-emails";
 import { recordWalletTransaction } from "@/lib/wallet";
+import { getPlatformSettings } from "@/lib/settings/platform-settings";
 
 export const REFERRAL_COOKIE = "bodyinc-ref";
 export const REFERRAL_REWARD_CENTS = 5000;
@@ -124,12 +125,15 @@ export async function attachReferral(params: {
   const createdAt = referred.created_at ? new Date(referred.created_at).getTime() : 0;
   if (Date.now() - createdAt > ATTACH_WINDOW_HOURS * 60 * 60 * 1000) return false;
 
+  const settings = await getPlatformSettings();
+  if (!settings.referral_enabled) return false;
+
   const { error } = await supabaseAdmin.from("referrals").insert({
     referrer_user_id: referrer.id,
     referred_user_id: params.referredUserId,
     code: params.code.trim(),
     status: "pending",
-    reward_cents: REFERRAL_REWARD_CENTS,
+    reward_cents: settings.referral_reward_cents,
   });
   if (error && error.code !== "23505") throw new Error(error.message);
   return !error;
