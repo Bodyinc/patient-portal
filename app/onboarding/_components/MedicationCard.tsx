@@ -29,15 +29,15 @@ export default function MedicationCard({
           onSelect?.(medication.id);
         }
       }}
-      // CHANGED: Added h-fit so the card refuses to stretch past its intrinsic contents
-      className={`flex h-fit cursor-pointer flex-col overflow-hidden rounded-2xl border bg-white p-1.5 shadow-none transition-all ${
+      // FIXED: Added max-h-[480px] to prevent desktop zoom stretch, kept h-full for row alignment
+      className={`flex h-full max-h-[450px] sm:max-h-[480px] w-full cursor-pointer flex-col overflow-hidden rounded-2xl border bg-white p-1.5 shadow-none transition-all ${
         selected
           ? "border-[#2E00AB] ring-2 ring-[#2E00AB]/20"
           : "border-[#2E00AB]/20 hover:border-[#2E00AB]/50"
       }`}
     >
-      {/* CHANGED: Removed flex-[2] and changed min-h to hard heights (h-36 / sm:h-44) so the top block is completely static */}
-      <div className="relative flex h-36 w-full items-center justify-center overflow-hidden rounded-xl bg-[#F3EEFF] sm:h-44">
+      {/* Top visual image section */}
+      <div className="relative flex h-36 w-full shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#F3EEFF] sm:h-44">
         <Image
           src="/curve-line.svg"
           alt=""
@@ -63,8 +63,8 @@ export default function MedicationCard({
         </div>
       </div>
 
-      {/* CHANGED: Removed flex-[3] so content box stays tightly compacted */}
-      <div className="flex flex-col gap-1.5 p-3 sm:gap-2">
+      {/* Text area that expands evenly */}
+      <div className="flex flex-1 flex-col gap-1.5 p-3 sm:gap-2">
         <div className="flex items-start justify-between gap-2">
           <h2 className="text-base font-medium text-[#2E00AB] sm:text-lg">{medication.name}</h2>
           <span className="shrink-0 rounded-md border border-[#2E00AB]/15 bg-[#F8F4FF] px-2 py-0.5 text-[11px] font-medium text-[#2E00AB] sm:text-xs">
@@ -82,8 +82,8 @@ export default function MedicationCard({
           {medication.description}
         </p>
 
-        {/* CHANGED: Removed mt-auto so the price and button layout doesn't detach or get dragged downward */}
-        <div className="space-y-2 pt-3">
+        {/* Bottom price and action area stays aligned */}
+        <div className="mt-auto space-y-2 pt-3">
           <h3 className="text-lg font-semibold leading-none text-[#2E00AB] sm:text-xl">
             ${medication.priceMonthly}/mo
           </h3>

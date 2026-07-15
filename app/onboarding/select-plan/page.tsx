@@ -83,17 +83,19 @@ export default function SelectPlanPage() {
           />
         }
       >
-        <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col">
+        <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col overflow-y-auto px-1 pb-4 scrollbar-thin">
           <PageHeader />
 
-          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 sm:gap-4">
+          <div className="flex flex-1 flex-col items-center justify-start gap-4 pt-2 sm:gap-6 md:justify-center md:pt-0">
             <PlanToggle
               packages={packages}
               selectedPackageId={selectedPackageId}
               onChange={setSelectedPackageId}
             />
+
             <PricingCard pkg={selectedPackage} />
-            <p className="max-w-xl shrink-0 text-center text-xs text-[#2E00AB]/80 sm:text-sm">
+
+            <p className="mt-2 max-w-xl text-center text-xs text-[#2E00AB]/80 sm:text-sm">
               *Clinical data suggests patients on 3+ month programs see 24% better outcomes on
               average compared to shorter duration.
             </p>

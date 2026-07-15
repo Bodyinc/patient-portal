@@ -155,12 +155,14 @@ export default function BillingCheckoutPage() {
         showProgress={false}
         footer={<OnboardingFooter onBack={handleBack} showContinue={false} />}
       >
-        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden lg:gap-3">
+        {/* Changed wrapper overflow to auto so layout adapts gracefully when zoomed */}
+        <div className="flex h-full w-full flex-col gap-2 overflow-y-auto lg:gap-3 lg:overflow-hidden">
           <PageHeader />
 
-          {}
-          <div className="grid min-h-0 flex-1 grid-cols-1 items-start gap-2 overflow-hidden lg:grid-cols-[1.65fr_1fr] lg:gap-4">
-            <div className="flex min-h-0 flex-col gap-2 overflow-hidden">
+          {/* Grid changes: Allowed height flexibility and scroll behaviors under heavy zoom */}
+          <div className="grid min-h-0 flex-1 grid-cols-1 items-start gap-3 overflow-y-auto pb-4 lg:grid-cols-[1.65fr_1fr] lg:gap-4 lg:overflow-hidden lg:pb-0">
+            {/* Left column becomes internally scrollable on larger layouts to contain forms nicely */}
+            <div className="flex flex-col gap-3 lg:h-full lg:overflow-y-auto lg:pr-2 scrollbar-thin">
               <div className="grid shrink-0 grid-cols-1 gap-2 sm:grid-cols-2">
                 <InfoCard
                   title="Patient Information"
@@ -192,7 +194,7 @@ export default function BillingCheckoutPage() {
                 />
               </div>
 
-              <div className="min-h-0 flex-1">
+              <div className="shrink-0">
                 {clientSecret ? (
                   <OnboardingPaymentForm
                     clientSecret={clientSecret}
@@ -209,30 +211,33 @@ export default function BillingCheckoutPage() {
               <TermsCheckbox checked={consentAccepted} onChange={setConsentAccepted} />
             </div>
 
-            <OrderSummary
-              medicationName={medicationName}
-              planLabel={planLabel}
-              medicationTotal={pricing.medicationTotal}
-              subtotal={pricing.subtotal}
-              discount={pricing.discount}
-              discountLabel={pricing.discountLabel}
-              total={pricing.total}
-              promoCode={promoCode}
-              promoMessage={promoMessage}
-              promoError={promoError}
-              applyingPromo={applyingPromo}
-              consentAccepted={consentAccepted}
-              confirming={confirming}
-              loading={summary?.packagePrice == null}
-              hideContinue={Boolean(clientSecret)}
-              onPromoCodeChange={(value) => {
-                setPromoCode(value);
-                setPromoError(null);
-                setPromoMessage(null);
-              }}
-              onApplyPromo={handleApplyPromo}
-              onContinue={() => void handleContinueToPayment()}
-            />
+            {/* Right column handles order summary layout constraint */}
+            <div className="lg:h-full lg:overflow-y-auto">
+              <OrderSummary
+                medicationName={medicationName}
+                planLabel={planLabel}
+                medicationTotal={pricing.medicationTotal}
+                subtotal={pricing.subtotal}
+                discount={pricing.discount}
+                discountLabel={pricing.discountLabel}
+                total={pricing.total}
+                promoCode={promoCode}
+                promoMessage={promoMessage}
+                promoError={promoError}
+                applyingPromo={applyingPromo}
+                consentAccepted={consentAccepted}
+                confirming={confirming}
+                loading={summary?.packagePrice == null}
+                hideContinue={Boolean(clientSecret)}
+                onPromoCodeChange={(value) => {
+                  setPromoCode(value);
+                  setPromoError(null);
+                  setPromoMessage(null);
+                }}
+                onApplyPromo={handleApplyPromo}
+                onContinue={() => void handleContinueToPayment()}
+              />
+            </div>
           </div>
         </div>
       </OnboardingFrame>
