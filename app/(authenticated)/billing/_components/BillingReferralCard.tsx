@@ -32,12 +32,13 @@ export default function BillingReferralCard({ referral }: BillingReferralCardPro
         <div>
           <p className="text-2xl font-semibold text-[#2E00AB]">Invite Friends & Earn Rewards</p>
           <p className="mt-1 max-w-xl text-sm text-[#2E00AB]/80">
-            Share your link. When a friend starts a treatment plan, a {formatUsd(5000)} credit is
-            added to your account and applies to your next bill automatically.
+            Share your link. When a friend starts a treatment plan, a{" "}
+            {formatUsd(referral.rewardCents)} credit is added to your account and applies to your
+            next bill automatically.
           </p>
           <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-[#2E00AB]">
             <Gift className="h-4 w-4" />
-            {formatUsd(5000)} Reward Credit per referral
+            {formatUsd(referral.rewardCents)} Reward Credit per referral
           </p>
           {referral.invited > 0 ? (
             <p className="mt-1 flex items-center gap-2 text-sm text-[#2E00AB]/80">

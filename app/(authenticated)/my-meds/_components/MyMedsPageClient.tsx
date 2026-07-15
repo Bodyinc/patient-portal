@@ -17,6 +17,7 @@ type MyMedsPageClientProps = {
   avatarUrl: string | null;
   referralCode: string;
   referralLink: string;
+  rewardCents: number;
 };
 
 export default function MyMedsPageClient({
@@ -26,6 +27,7 @@ export default function MyMedsPageClient({
   avatarUrl,
   referralCode,
   referralLink,
+  rewardCents,
 }: MyMedsPageClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -71,7 +73,11 @@ export default function MyMedsPageClient({
         </p>
       </section>
 
-      <MyMedsReferralCard referralCode={referralCode} referralLink={referralLink} />
+      <MyMedsReferralCard
+        referralCode={referralCode}
+        referralLink={referralLink}
+        rewardCents={rewardCents}
+      />
       <CurrentMedicationCard medication={data.currentMedication} />
       <DeliverySupportBanner />
       <MedicationRequestsSection
