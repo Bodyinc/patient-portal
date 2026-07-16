@@ -5,9 +5,18 @@ import { useState } from "react";
 type ShopReferralCardProps = {
   referralCode: string;
   referralLink: string;
+  rewardCents: number;
 };
 
-export default function ShopReferralCard({ referralCode, referralLink }: ShopReferralCardProps) {
+function formatUsd(cents: number) {
+  return (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
+}
+
+export default function ShopReferralCard({
+  referralCode,
+  referralLink,
+  rewardCents,
+}: ShopReferralCardProps) {
   const [copied, setCopied] = useState<"idle" | "code" | "link" | "error">("idle");
 
   const handleCopy = async (value: string, kind: "code" | "link") => {
@@ -31,7 +40,7 @@ export default function ShopReferralCard({ referralCode, referralLink }: ShopRef
             prescription for every successful referral.
           </p>
           <p className="mt-2 text-sm font-semibold text-[#2E00AB]">
-            $50 Reward Credit per referral
+            {formatUsd(rewardCents)} Reward Credit per referral
           </p>
         </div>
 

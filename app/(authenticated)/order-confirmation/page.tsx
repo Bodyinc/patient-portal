@@ -5,6 +5,7 @@ import { requirePatientSession } from "@/lib/auth/require-patient";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { reconcileLatestSubscriptionForUser } from "@/lib/stripe/reconcile";
 import { calculateCheckoutPricing } from "../../onboarding/_lib/intake-pricing";
+import { getPlatformSettings, effectiveShippingCents } from "@/lib/settings/platform-settings";
 
 export default async function OrderConfirmationPage() {
   const { user } = await requirePatientSession();
@@ -51,8 +52,18 @@ export default async function OrderConfirmationPage() {
   } | null;
 
   const lines = invoice?.lines?.data ?? [];
+  const isShipping = (l: { description?: string | null }) =>
+    (l.description ?? "").toLowerCase().includes("shipping");
+  const isConsultation = (l: { description?: string | null }) =>
+    (l.description ?? "").toLowerCase().includes("consultation");
+  const shippingCents = lines
+    .filter((l) => (l.amount ?? 0) > 0 && isShipping(l))
+    .reduce((sum, l) => sum + (l.amount ?? 0), 0);
+  const consultationCents = lines
+    .filter((l) => (l.amount ?? 0) > 0 && isConsultation(l))
+    .reduce((sum, l) => sum + (l.amount ?? 0), 0);
   const planPriceCents = lines
-    .filter((l) => (l.amount ?? 0) > 0)
+    .filter((l) => (l.amount ?? 0) > 0 && !isShipping(l) && !isConsultation(l))
     .reduce((sum, l) => sum + (l.amount ?? 0), 0);
   const discounts = lines
     .filter((l) => (l.amount ?? 0) < 0)
@@ -63,7 +74,14 @@ export default async function OrderConfirmationPage() {
   const walletUsed = ((invoice?.ending_balance ?? 0) - (invoice?.starting_balance ?? 0)) / 100;
 
   const planPrice = planPriceCents > 0 ? planPriceCents / 100 : pkg ? Number(pkg.price) : null;
-  const showBreakdown = planPrice != null && (discounts.length > 0 || walletUsed > 0);
+  const shipping = shippingCents / 100;
+  const consultation = consultationCents / 100;
+
+  // First onboarding order never carries shipping; surface the renewal shipping fee so the
+  // patient knows it applies from the next automatic payment onward.
+  const settings = await getPlatformSettings();
+  const renewalShipping = effectiveShippingCents(settings) / 100;
+  const showRenewalNote = shipping === 0 && renewalShipping > 0;
 
   const { data: profile } = await supabaseAdmin
     .from("profiles")
@@ -110,10 +128,36 @@ export default async function OrderConfirmationPage() {
                 </Link>
               </span>
             </div>
-            {showBreakdown ? (
+            {planPrice != null ? (
               <div className="flex justify-between border-t border-[#2E00AB]/10 pt-4">
                 <span className="text-[#2E00AB]/80">Plan price</span>
-                <span className="font-medium text-[#2E00AB]">${planPrice!.toFixed(2)}</span>
+                <span className="font-medium text-[#2E00AB]">${planPrice.toFixed(2)}</span>
+              </div>
+            ) : null}
+            {planPrice != null ? (
+              <div className="flex justify-between">
+                <span className="text-[#2E00AB]/80">Consultation fee</span>
+                <span
+                  className={
+                    consultation > 0
+                      ? "font-medium text-[#2E00AB]"
+                      : "font-semibold text-emerald-700"
+                  }
+                >
+                  {consultation > 0 ? `$${consultation.toFixed(2)}` : "FREE"}
+                </span>
+              </div>
+            ) : null}
+            {planPrice != null ? (
+              <div className="flex justify-between">
+                <span className="text-[#2E00AB]/80">Shipping</span>
+                <span
+                  className={
+                    shipping > 0 ? "font-medium text-[#2E00AB]" : "font-semibold text-emerald-700"
+                  }
+                >
+                  {shipping > 0 ? `$${shipping.toFixed(2)}` : "FREE"}
+                </span>
               </div>
             ) : null}
             {discounts.map((d) => (
@@ -134,6 +178,12 @@ export default async function OrderConfirmationPage() {
                 {totalPaid != null ? `$${totalPaid.toFixed(2)}` : "—"}
               </span>
             </div>
+            {showRenewalNote ? (
+              <p className="rounded-lg bg-[#2E00AB]/5 px-3 py-2 text-xs leading-relaxed text-[#2E00AB]/80">
+                This payment covers medication only. Starting with your next renewal, a $
+                {renewalShipping.toFixed(2)} shipping fee will be added to each automatic payment.
+              </p>
+            ) : null}
           </div>
         </div>
 

@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createGuestStripeCustomer } from "@/lib/stripe/customers";
 import { createSubscriptionForPrice, ensureNoActiveDuplicate } from "@/lib/stripe/subscriptions";
 import { resolveCheckoutDiscount, incrementPromoRedemption } from "@/lib/stripe/promos";
+import { getPlatformSettings, effectiveShippingCents } from "@/lib/settings/platform-settings";
 
 export type OnboardingSubscriptionResult =
   { ok: true; clientSecret: string } | { ok: false; message: string };
@@ -12,6 +13,20 @@ export type OnboardingSubscriptionResult =
 export async function createOnboardingSubscription(
   promoCode?: string | null,
 ): Promise<OnboardingSubscriptionResult> {
+  const settings = await getPlatformSettings();
+  if (settings.maintenance_mode) {
+    return {
+      ok: false,
+      message: "The platform is temporarily unavailable for maintenance. Please try again shortly.",
+    };
+  }
+  if (!settings.new_signups_enabled) {
+    return {
+      ok: false,
+      message: "New patient signups are currently paused. Please check back soon.",
+    };
+  }
+
   const sessionResult = await requireIntakeSession();
   if ("error" in sessionResult) {
     return { ok: false, message: sessionResult.error };
@@ -81,6 +96,9 @@ export async function createOnboardingSubscription(
     customerId,
     priceId: pkg.stripe_price_id,
     oneTimeFees,
+    // First onboarding invoice is medication-only; shipping recurs from the first renewal.
+    recurringShippingCents: effectiveShippingCents(settings),
+    shippingOnFirstInvoice: false,
     metadata: {
       intake_session_id: session.id,
       package_id: pkg.id,

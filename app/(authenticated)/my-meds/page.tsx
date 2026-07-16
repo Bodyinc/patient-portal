@@ -42,6 +42,7 @@ export default async function MyMedsPage({
           avatarUrl={(user.user_metadata?.avatar_url as string | null | undefined) ?? null}
           referralCode={referral?.code ?? "BODYINC"}
           referralLink={referral?.link ?? buildReferralLink("BODYINC")}
+          rewardCents={referral?.rewardCents ?? 0}
         />
       </main>
     );

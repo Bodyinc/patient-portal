@@ -2,6 +2,8 @@ type OrderSummaryCardProps = {
   subtotal: number;
   promoSavings: number;
   walletApplied?: number;
+  shipping?: number;
+  consultation?: number;
   total: number;
 };
 
@@ -13,6 +15,8 @@ export default function OrderSummaryCard({
   subtotal,
   promoSavings,
   walletApplied = 0,
+  shipping = 0,
+  consultation = 0,
   total,
 }: OrderSummaryCardProps) {
   return (
@@ -23,9 +27,15 @@ export default function OrderSummaryCard({
           <span>Subtotal</span>
           <span>{formatUsd(subtotal)}</span>
         </div>
+        {consultation > 0 ? (
+          <div className="flex items-center justify-between border-b border-[#EFE9FF] pb-2">
+            <span>Consultation fee</span>
+            <span>{formatUsd(consultation)}</span>
+          </div>
+        ) : null}
         <div className="flex items-center justify-between border-b border-[#EFE9FF] pb-2">
           <span>Shipping</span>
-          <span>Free</span>
+          <span>{shipping > 0 ? formatUsd(shipping) : "Free"}</span>
         </div>
         <div className="flex items-center justify-between border-b border-[#EFE9FF] pb-2">
           <span>Promotional Savings</span>

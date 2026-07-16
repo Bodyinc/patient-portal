@@ -8,9 +8,9 @@ import { getOrCreateStripeCustomer } from "@/lib/stripe/customers";
 import { sendTransactionalEmail } from "@/lib/email/send";
 import { referralRewardEmail } from "@/lib/email/referral-emails";
 import { recordWalletTransaction } from "@/lib/wallet";
+import { getPlatformSettings } from "@/lib/settings/platform-settings";
 
 export const REFERRAL_COOKIE = "bodyinc-ref";
-export const REFERRAL_REWARD_CENTS = 5000;
 
 // No 0/O/1/I/L — codes get read aloud and retyped.
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
@@ -68,14 +68,16 @@ export type ReferralSummary = {
   invited: number;
   converted: number;
   earnedCents: number;
+  rewardCents: number;
 };
 
 // Fail-soft so pages render even before the referrals migration is applied.
 export async function getReferralSummary(userId: string): Promise<ReferralSummary | null> {
   try {
-    const [code, { data: rows }] = await Promise.all([
+    const [code, { data: rows }, settings] = await Promise.all([
       getOrCreateReferralCode(userId),
       supabaseAdmin.from("referrals").select("status, reward_cents").eq("referrer_user_id", userId),
+      getPlatformSettings(),
     ]);
     const all = rows ?? [];
     const converted = all.filter((r) => r.status === "converted");
@@ -85,6 +87,7 @@ export async function getReferralSummary(userId: string): Promise<ReferralSummar
       invited: all.length,
       converted: converted.length,
       earnedCents: converted.reduce((sum, r) => sum + (r.reward_cents ?? 0), 0),
+      rewardCents: settings.referral_enabled ? settings.referral_reward_cents : 0,
     };
   } catch (error) {
     console.warn("[referrals] summary unavailable:", error);
@@ -124,12 +127,15 @@ export async function attachReferral(params: {
   const createdAt = referred.created_at ? new Date(referred.created_at).getTime() : 0;
   if (Date.now() - createdAt > ATTACH_WINDOW_HOURS * 60 * 60 * 1000) return false;
 
+  const settings = await getPlatformSettings();
+  if (!settings.referral_enabled) return false;
+
   const { error } = await supabaseAdmin.from("referrals").insert({
     referrer_user_id: referrer.id,
     referred_user_id: params.referredUserId,
     code: params.code.trim(),
     status: "pending",
-    reward_cents: REFERRAL_REWARD_CENTS,
+    reward_cents: settings.referral_reward_cents,
   });
   if (error && error.code !== "23505") throw new Error(error.message);
   return !error;
@@ -167,9 +173,19 @@ export async function maybeConvertReferral(referredUserId: string): Promise<void
     .maybeSingle();
   if (!payment) return;
 
+  // Reward the amount the admin currently has configured (not a value captured at signup),
+  // so changes to the referral reward take effect. Skip if referrals are off or set to $0.
+  const settings = await getPlatformSettings();
+  const rewardCents = settings.referral_enabled ? settings.referral_reward_cents : 0;
+  if (rewardCents <= 0) return;
+
   const { data: claimed } = await supabaseAdmin
     .from("referrals")
-    .update({ status: "converted", converted_at: new Date().toISOString() })
+    .update({
+      status: "converted",
+      converted_at: new Date().toISOString(),
+      reward_cents: rewardCents,
+    })
     .eq("id", referral.id)
     .eq("status", "pending")
     .select("id");
@@ -188,7 +204,7 @@ export async function maybeConvertReferral(referredUserId: string): Promise<void
       name: referrerProfile?.full_name ?? null,
     });
     const txn = await stripe.customers.createBalanceTransaction(customerId, {
-      amount: -referral.reward_cents,
+      amount: -rewardCents,
       currency: "usd",
       description: `Referral reward (${referral.code})`,
     });
@@ -198,7 +214,7 @@ export async function maybeConvertReferral(referredUserId: string): Promise<void
       .eq("id", referral.id);
     await recordWalletTransaction({
       userId: referral.referrer_user_id,
-      amountCents: referral.reward_cents,
+      amountCents: rewardCents,
       type: "referral_reward",
       description: "Referral reward — friend started a plan",
       referralId: referral.id,
@@ -216,7 +232,7 @@ export async function maybeConvertReferral(referredUserId: string): Promise<void
   if (referrerProfile?.email) {
     const { subject, html } = referralRewardEmail({
       fullName: referrerProfile.full_name,
-      amountCents: referral.reward_cents,
+      amountCents: rewardCents,
     });
     void sendTransactionalEmail({ to: referrerProfile.email, subject, html });
   }

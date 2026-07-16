@@ -6,11 +6,17 @@ import { useState } from "react";
 type MyMedsReferralCardProps = {
   referralCode: string;
   referralLink: string;
+  rewardCents: number;
 };
+
+function formatUsd(cents: number) {
+  return (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
+}
 
 export default function MyMedsReferralCard({
   referralCode,
   referralLink,
+  rewardCents,
 }: MyMedsReferralCardProps) {
   const [copied, setCopied] = useState<"idle" | "code" | "link" | "error">("idle");
 
@@ -36,7 +42,7 @@ export default function MyMedsReferralCard({
           </p>
           <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-[#2E00AB]">
             <Gift className="h-4 w-4" />
-            $50 Reward Credit per referral
+            {formatUsd(rewardCents)} Reward Credit per referral
           </p>
         </div>
 

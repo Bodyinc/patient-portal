@@ -76,6 +76,7 @@ export default async function ShopPage({
                 <ShopReferralCard
                   referralCode={referral?.code ?? "BODYINC"}
                   referralLink={referral?.link ?? buildReferralLink("BODYINC")}
+                  rewardCents={referral?.rewardCents ?? 0}
                 />
               </>
             }

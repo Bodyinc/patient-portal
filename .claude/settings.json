@@ -130,7 +130,14 @@
       "Bash(cd \"/c/Programming/BeezTech/BodyInc\" *)",
       "Bash(PORT=3002 npm run dev:turbo > /c/Users/ritik/AppData/Local/Temp/claude/c--Programming-BeezTech-BodyInc-patient-portal/bed3ec07-06fa-476d-bae4-0e8b48b85b6b/scratchpad/turbo.log 2>&1)",
       "Bash(grep -v \"Delete \\\\`\")",
-      "Bash(npx prettier *)"
+      "Bash(npx prettier *)",
+      "Bash(ls \"/c/Programming/BeezTech/BodyInc/patient-portal/app/auth/\" 2>/dev/null; ls \"/c/Programming/BeezTech/BodyInc/patient-portal/app/auth/callback/\" 2>/dev/null; grep -rn \"redirect_to\\\\|redirectTo\" /c/Programming/BeezTech/BodyInc/bodyinc-access-hub/src/routes/_authenticated/admin.patients.index.tsx | head -3)",
+      "Bash(./node_modules/.bin/tsc --noEmit)",
+      "Read(//c/Programming/BeezTech/BodyInc/bodyinc-access-hub/node_modules/typescript/bin/**)",
+      "Bash(node /c/Programming/BeezTech/BodyInc/bodyinc-access-hub/node_modules/typescript/bin/tsc --noEmit -p /c/Programming/BeezTech/BodyInc/bodyinc-access-hub)",
+      "Bash(ls /c/Programming/BeezTech/BodyInc/bodyinc-access-hub/node_modules/.bin/ 2>/dev/null | grep -i \"^tsc\\\\|typescript\" ; ls /c/Programming/BeezTech/BodyInc/bodyinc-access-hub/node_modules/typescript 2>/dev/null | head -3; grep -n '\"typescript\"' /c/Programming/BeezTech/BodyInc/bodyinc-access-hub/package.json)",
+      "Read(//c/Programming/BeezTech/BodyInc/bodyinc-access-hub/node_modules/**)",
+      "Bash(node node_modules/typescript/bin/tsc --noEmit)"
     ],
     "additionalDirectories": [
       "c:\\Programming\\BeezTech\\BodyInc\\bodyinc-access-hub\\supabase\\migrations",

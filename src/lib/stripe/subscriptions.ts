@@ -2,6 +2,7 @@ import "server-only";
 
 import type Stripe from "stripe";
 import { stripe } from "./server";
+import { getOrCreateShippingPrice } from "./recurring-shipping";
 
 export type CreatedSubscription = {
   subscriptionId: string;
@@ -14,8 +15,20 @@ export async function createSubscriptionForPrice(params: {
   metadata: Record<string, string>;
   promotionCodeId?: string | null;
   oneTimeFees?: Array<{ amountCents: number; description: string }>;
+  // >0 adds shipping as a recurring subscription item. shippingOnFirstInvoice=true bills it
+  // from the first invoice (shop orders); false starts it on the first renewal (onboarding).
+  recurringShippingCents?: number;
+  shippingOnFirstInvoice?: boolean;
 }): Promise<CreatedSubscription> {
-  const { customerId, priceId, metadata, promotionCodeId, oneTimeFees } = params;
+  const {
+    customerId,
+    priceId,
+    metadata,
+    promotionCodeId,
+    oneTimeFees,
+    recurringShippingCents = 0,
+    shippingOnFirstInvoice = false,
+  } = params;
 
   // Pending invoice items on the customer get pulled into the subscription's first
   // invoice, so the first charge equals the cart total (plan + one-time fees).
@@ -29,9 +42,26 @@ export async function createSubscriptionForPrice(params: {
     });
   }
 
+  // A recurring shipping item must share the plan's billing interval, so mirror it.
+  let shippingPriceId: string | null = null;
+  if (recurringShippingCents > 0) {
+    const planPrice = await stripe.prices.retrieve(priceId);
+    if (planPrice.recurring) {
+      shippingPriceId = await getOrCreateShippingPrice({
+        amountCents: recurringShippingCents,
+        interval: planPrice.recurring.interval,
+        intervalCount: planPrice.recurring.interval_count,
+        currency: planPrice.currency ?? "usd",
+      });
+    }
+  }
+
+  const items: Stripe.SubscriptionCreateParams.Item[] = [{ price: priceId }];
+  if (shippingPriceId && shippingOnFirstInvoice) items.push({ price: shippingPriceId });
+
   const subscription = await stripe.subscriptions.create({
     customer: customerId,
-    items: [{ price: priceId }],
+    items,
     discounts: promotionCodeId ? [{ promotion_code: promotionCodeId }] : undefined,
     payment_behavior: "default_incomplete",
     payment_settings: {
@@ -41,6 +71,16 @@ export async function createSubscriptionForPrice(params: {
     metadata,
     expand: ["latest_invoice.payment_intent", "latest_invoice.confirmation_secret"],
   });
+
+  // Onboarding: add shipping AFTER the first invoice exists, with no proration, so the first
+  // invoice stays medication-only and shipping begins on the first renewal.
+  if (shippingPriceId && !shippingOnFirstInvoice) {
+    await stripe.subscriptionItems.create({
+      subscription: subscription.id,
+      price: shippingPriceId,
+      proration_behavior: "none",
+    });
+  }
 
   const clientSecret = extractClientSecret(subscription);
   if (!clientSecret) {
