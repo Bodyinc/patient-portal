@@ -27,11 +27,11 @@ export type ShopCatalogQuery = {
 
 export type ShopCheckoutPlanDto = {
   id: string;
-  code: "monthly" | "quarterly";
   title: string;
   subtitle: string;
   priceLabel: string;
   amount: number;
+  durationMonths: number;
   badge?: string;
 };
 
@@ -55,7 +55,8 @@ export type ShopCheckoutBootstrapDto = {
   plans: ShopCheckoutPlanDto[];
   paymentMethods: ShopCheckoutPaymentMethodDto[];
   referralHint: string;
-  defaultSelectedPlan: "monthly" | "quarterly";
+  // Id of the plan selected by default (matches one of `plans[].id`).
+  defaultSelectedPlan: string;
 };
 
 export type ShopCheckoutOrderCreateInput = {
@@ -75,6 +76,7 @@ export type ShopCheckoutOrderDto = {
   status: string;
   createdAt: string;
   productName: string;
+  variantName: string | null;
   selectedPlanLabel: string;
   subtotal: number;
   promoSavings: number;

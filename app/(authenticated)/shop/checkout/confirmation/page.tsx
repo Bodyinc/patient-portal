@@ -66,6 +66,11 @@ export default async function ShopCheckoutConfirmationPage({
             <p>
               <span className="font-semibold text-[#2E00AB]">Product:</span> {order.productName}
             </p>
+            {order.variantName ? (
+              <p>
+                <span className="font-semibold text-[#2E00AB]">Variant:</span> {order.variantName}
+              </p>
+            ) : null}
             <p>
               <span className="font-semibold text-[#2E00AB]">Plan:</span> {order.selectedPlanLabel}
             </p>

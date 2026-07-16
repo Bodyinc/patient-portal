@@ -1,6 +1,17 @@
 import { resolveMedicineImageSrc } from "@/lib/intake/medicine-image";
+import {
+  fromPriceDollars,
+  planSubtitleFromDuration,
+  planTitleFromDuration,
+  priceLabelFromDuration,
+} from "@/lib/pricing";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import type { ShopCategoryDto, ShopMedicinesListDto, ShopSortOption } from "./types";
+import type {
+  ShopCategoryDto,
+  ShopMedicineVariantOption,
+  ShopMedicinesListDto,
+  ShopSortOption,
+} from "./types";
 import type {
   ShopCheckoutBootstrapDto,
   ShopCheckoutOrderCreateInput,
@@ -80,7 +91,7 @@ export async function fetchShopCatalogData(options: {
 
   let query = supabaseAdmin
     .from("medicines")
-    .select("id, name, short_description, image_url, price_monthly, sort_order", {
+    .select("id, name, short_description, image_url, from_price_cents, sort_order", {
       count: "exact",
     })
     .eq("is_active", true)
@@ -91,8 +102,10 @@ export async function fetchShopCatalogData(options: {
     query = query.or(`name.ilike.%${searchQuery}%,short_description.ilike.%${searchQuery}%`);
   }
 
-  if (sortBy === "price_asc") query = query.order("price_monthly", { ascending: true });
-  if (sortBy === "price_desc") query = query.order("price_monthly", { ascending: false });
+  if (sortBy === "price_asc")
+    query = query.order("from_price_cents", { ascending: true, nullsFirst: false });
+  if (sortBy === "price_desc")
+    query = query.order("from_price_cents", { ascending: false, nullsFirst: false });
   if (sortBy === "name_asc") query = query.order("name", { ascending: true });
   if (sortBy === "popular") query = query.order("sort_order", { ascending: true });
   query = query.order("id", { ascending: true });
@@ -128,6 +141,25 @@ export async function fetchShopCatalogData(options: {
     }
   }
 
+  const variantsByMedicineId = new Map<string, ShopMedicineVariantOption[]>();
+  if (medicineIds.length > 0) {
+    const { data: variantRows } = await supabaseAdmin
+      .from("medicine_variants")
+      .select("id, medicine_id, name, from_price_cents")
+      .in("medicine_id", medicineIds)
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true });
+    for (const v of variantRows ?? []) {
+      const list = variantsByMedicineId.get(v.medicine_id) ?? [];
+      list.push({
+        id: v.id,
+        name: v.name,
+        fromPriceCents: v.from_price_cents == null ? null : Number(v.from_price_cents),
+      });
+      variantsByMedicineId.set(v.medicine_id, list);
+    }
+  }
+
   const total = count ?? 0;
   const totalPages = total === 0 ? 0 : Math.ceil(total / pageSize);
 
@@ -138,7 +170,8 @@ export async function fetchShopCatalogData(options: {
       categoryName: selectedCategoryName ?? categoryNameByMedicineId.get(medicine.id) ?? "Wellness",
       description: medicine.short_description,
       imageSrc: resolveMedicineImageSrc(medicine.image_url),
-      priceMonthly: Number(medicine.price_monthly),
+      fromPriceCents: medicine.from_price_cents == null ? null : Number(medicine.from_price_cents),
+      variants: variantsByMedicineId.get(medicine.id) ?? [],
     })),
     total,
     page,
@@ -150,20 +183,15 @@ export async function fetchShopCatalogData(options: {
   };
 }
 
-function formatMoneyLabel(amount: number, durationMonths: number) {
-  if (durationMonths === 1) return `$${amount}/month`;
-  if (durationMonths === 3) return `$${amount}/quarter`;
-  return `$${amount}/${durationMonths} months`;
-}
-
 export async function fetchShopCheckoutBootstrapData(options: {
   medicineId: string;
+  variantId?: string | null;
 }): Promise<ShopCheckoutBootstrapDto> {
-  const { medicineId } = options;
+  const { medicineId, variantId } = options;
 
   const { data: medicine, error: medicineError } = await supabaseAdmin
     .from("medicines")
-    .select("id, name, short_description, image_url, price_monthly")
+    .select("id, name, short_description, image_url, from_price_cents")
     .eq("id", medicineId)
     .eq("is_active", true)
     .eq("status", "active")
@@ -171,21 +199,54 @@ export async function fetchShopCheckoutBootstrapData(options: {
 
   if (medicineError || !medicine) throw new Error("Medicine not found.");
 
+  // When a variant is chosen, pricing comes from that variant's packages; otherwise from the
+  // medicine's own (variant-less) packages.
+  let variant: { id: string; name: string; from_price_cents: number | null } | null = null;
+  if (variantId) {
+    const { data: variantRow } = await supabaseAdmin
+      .from("medicine_variants")
+      .select("id, name, from_price_cents, is_active, medicine_id")
+      .eq("id", variantId)
+      .maybeSingle();
+    if (!variantRow || variantRow.medicine_id !== medicine.id || variantRow.is_active !== true) {
+      throw new Error("Selected variant is not available.");
+    }
+    variant = {
+      id: variantRow.id,
+      name: variantRow.name,
+      from_price_cents: variantRow.from_price_cents,
+    };
+  }
+
+  let packagesQuery = supabaseAdmin
+    .from("packages")
+    .select("id, name, duration_months, price, is_most_popular, is_active")
+    .eq("medicine_id", medicine.id)
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true });
+  packagesQuery = variant
+    ? packagesQuery.eq("variant_id", variant.id)
+    : packagesQuery.is("variant_id", null);
+
   const [{ data: categoryLinks }, { data: packages, error: packagesError }] = await Promise.all([
     supabaseAdmin
       .from("medication_category_medicines")
       .select("category_id")
       .eq("medicine_id", medicine.id)
       .limit(1),
-    supabaseAdmin
-      .from("packages")
-      .select("id, name, duration_months, price, is_most_popular, is_active")
-      .eq("medicine_id", medicine.id)
-      .eq("is_active", true)
-      .order("sort_order", { ascending: true }),
+    packagesQuery,
   ]);
 
   if (packagesError) throw new Error(packagesError.message);
+
+  // No active package means this is "Pricing coming soon" — not purchasable.
+  if (!packages || packages.length === 0) {
+    throw new Error(
+      variant
+        ? "Pricing for this option is coming soon — checkout isn't available yet."
+        : "Pricing for this medicine is coming soon — checkout isn't available yet.",
+    );
+  }
 
   let categoryName = "Wellness";
   const categoryId = categoryLinks?.[0]?.category_id;
@@ -198,58 +259,40 @@ export async function fetchShopCheckoutBootstrapData(options: {
     if (category?.name) categoryName = category.name;
   }
 
-  const plans = (packages ?? []).map((pkg) => ({
+  const plans = packages.map((pkg) => ({
     id: pkg.id,
-    code: pkg.duration_months === 1 ? ("monthly" as const) : ("quarterly" as const),
-    title: pkg.duration_months === 1 ? "Monthly Plan" : `${pkg.duration_months}-Month Plan`,
-    subtitle:
-      pkg.duration_months === 1
-        ? "Billed every 30 days. Cancel anytime."
-        : `Billed every ${pkg.duration_months * 30} days with free shipping.`,
-    priceLabel: formatMoneyLabel(Number(pkg.price), pkg.duration_months),
+    title: planTitleFromDuration(pkg.duration_months),
+    subtitle: planSubtitleFromDuration(pkg.duration_months),
+    priceLabel: priceLabelFromDuration(Number(pkg.price), pkg.duration_months),
     amount: Number(pkg.price),
+    durationMonths: pkg.duration_months,
     badge: pkg.is_most_popular ? "Most Popular" : undefined,
   }));
-  const fallbackPlans =
-    plans.length > 0
-      ? plans
-      : [
-          {
-            id: `${medicine.id}-monthly`,
-            code: "monthly" as const,
-            title: "Monthly Plan",
-            subtitle: "Billed every 30 days. Cancel anytime.",
-            priceLabel: formatMoneyLabel(Number(medicine.price_monthly), 1),
-            amount: Number(medicine.price_monthly),
-          },
-          {
-            id: `${medicine.id}-quarterly`,
-            code: "quarterly" as const,
-            title: "3-Month Plan",
-            subtitle: "Billed every 90 days with free shipping.",
-            priceLabel: formatMoneyLabel(Number(medicine.price_monthly) * 3, 3),
-            amount: Number(medicine.price_monthly) * 3,
-            badge: "Most Popular",
-          },
-        ];
+  const baseMonthly = fromPriceDollars(
+    variant ? variant.from_price_cents : medicine.from_price_cents,
+  );
+
+  // Default to the highlighted plan, else the first available one; keyed by plan id so any
+  // set of durations selects cleanly.
+  const defaultPlan = plans.find((p) => p.badge) ?? plans[0];
 
   return {
     product: {
       id: medicine.id,
-      name: medicine.name,
+      name: variant ? `${medicine.name} — ${variant.name}` : medicine.name,
       category: categoryName,
       description: medicine.short_description,
       imageSrc: resolveMedicineImageSrc(medicine.image_url),
-      baseMonthlyPrice: Number(medicine.price_monthly),
+      baseMonthlyPrice: baseMonthly,
     },
-    plans: fallbackPlans,
+    plans,
     paymentMethods: [
       { id: "card", title: "Visa •••• 4242", subtitle: "Expires 12/26" },
       { id: "alt", title: "Alternative Payment", subtitle: "Apple Pay / PayPal" },
       { id: "new", title: "Add Payment Method", subtitle: "" },
     ],
     referralHint: "Invite a friend and you'll both receive a $50 account credit.",
-    defaultSelectedPlan: "quarterly",
+    defaultSelectedPlan: defaultPlan?.id ?? "",
   };
 }
 
@@ -266,6 +309,19 @@ export async function createShopCheckoutOrderData(options: {
     .maybeSingle();
 
   if (!medicine) throw new Error("Medicine not found.");
+
+  const { data: selectedPackage } = input.packageId
+    ? await supabaseAdmin
+        .from("packages")
+        .select("name, duration_months, medicine_variants(name)")
+        .eq("id", input.packageId)
+        .maybeSingle()
+    : { data: null };
+  const selectedPlanLabel =
+    selectedPackage?.name?.trim() || planTitleFromDuration(selectedPackage?.duration_months);
+  const variantName =
+    (selectedPackage as { medicine_variants?: { name: string } | null } | null)?.medicine_variants
+      ?.name ?? null;
 
   const { data: order, error: orderError } = await supabaseAdmin
     .from("shop_checkout_orders")
@@ -315,7 +371,8 @@ export async function createShopCheckoutOrderData(options: {
     status: order.status,
     createdAt: order.created_at,
     productName: medicine.name,
-    selectedPlanLabel: input.selectedPlanCode === "monthly" ? "Monthly Plan" : "3-Month Plan",
+    variantName,
+    selectedPlanLabel,
     subtotal: Number(order.subtotal),
     promoSavings: Number(order.promo_savings),
     shipping: Number(order.shipping),
@@ -335,7 +392,7 @@ export async function getShopCheckoutOrderByIdData(options: {
   const { data: order, error } = await supabaseAdmin
     .from("shop_checkout_orders")
     .select(
-      "id, status, created_at, selected_plan_code, subtotal, promo_savings, shipping, consultation, total, medicine_id, stripe_invoice_id",
+      "id, status, created_at, selected_plan_code, selected_package_id, subtotal, promo_savings, shipping, consultation, total, medicine_id, stripe_invoice_id",
     )
     .eq("id", orderId)
     .eq("user_id", userId)
@@ -343,11 +400,21 @@ export async function getShopCheckoutOrderByIdData(options: {
 
   if (error || !order) throw new Error("Order not found.");
 
-  const { data: medicine } = await supabaseAdmin
-    .from("medicines")
-    .select("name")
-    .eq("id", order.medicine_id)
-    .maybeSingle();
+  const [{ data: medicine }, { data: selectedPackage }] = await Promise.all([
+    supabaseAdmin.from("medicines").select("name").eq("id", order.medicine_id).maybeSingle(),
+    order.selected_package_id
+      ? supabaseAdmin
+          .from("packages")
+          .select("name, duration_months, medicine_variants(name)")
+          .eq("id", order.selected_package_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  const selectedPlanLabel =
+    selectedPackage?.name?.trim() || planTitleFromDuration(selectedPackage?.duration_months);
+  const variantName =
+    (selectedPackage as { medicine_variants?: { name: string } | null } | null)?.medicine_variants
+      ?.name ?? null;
 
   // Once paid, the Stripe invoice is the truth for what was charged and how much
   // wallet credit Stripe consumed — the stored order totals are pre-payment estimates.
@@ -383,7 +450,8 @@ export async function getShopCheckoutOrderByIdData(options: {
     status: order.status,
     createdAt: order.created_at,
     productName: medicine?.name ?? "Product",
-    selectedPlanLabel: order.selected_plan_code === "monthly" ? "Monthly Plan" : "3-Month Plan",
+    variantName,
+    selectedPlanLabel,
     subtotal: Number(order.subtotal),
     promoSavings: Number(order.promo_savings),
     shipping: Number(order.shipping),

@@ -24,6 +24,7 @@ export default function OrderSummary() {
   }, []);
 
   const medicationName = summary?.medicineName ?? "Selected Medication";
+  const variantName = summary?.variantName ?? null;
   const planLabel = summary?.packageName ?? "Treatment Plan";
   const loaded = summary?.packagePrice != null;
   const pricing = calculateCheckoutPricing(summary?.packagePrice);
@@ -39,6 +40,16 @@ export default function OrderSummary() {
           <span className="text-[#2E00AB]/80">Selected Medication</span>
           <span className="text-base text-[#2E00AB]">{medicationName}</span>
         </div>
+
+        {variantName ? (
+          <>
+            <Separator />
+            <div className="flex justify-between text-sm">
+              <span className="text-[#2E00AB]/80">Variant</span>
+              <span className="text-base text-[#2E00AB]">{variantName}</span>
+            </div>
+          </>
+        ) : null}
 
         <Separator />
 

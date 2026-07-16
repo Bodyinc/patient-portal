@@ -57,7 +57,7 @@ export default function ShopCheckoutClient({
   }, [medicineId]);
 
   const selectedPlanMeta = useMemo(
-    () => bootstrap.plans.find((plan) => plan.code === selectedPlan) ?? bootstrap.plans[0],
+    () => bootstrap.plans.find((plan) => plan.id === selectedPlan) ?? bootstrap.plans[0],
     [bootstrap.plans, selectedPlan],
   );
 

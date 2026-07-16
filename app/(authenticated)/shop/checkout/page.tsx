@@ -19,11 +19,13 @@ export default async function ShopCheckoutPage({
     image?: string;
     price?: string;
     from?: string;
+    variant?: string;
   }>;
 }) {
   const { user } = await requirePatientSession();
   const params = (await searchParams) ?? {};
   const medicineId = params.id;
+  const variantId = params.variant ?? null;
   const from = params.from ?? null;
 
   if (!medicineId) {
@@ -38,7 +40,7 @@ export default async function ShopCheckoutPage({
 
   try {
     const [bootstrap, walletCreditCents] = await Promise.all([
-      fetchShopCheckoutBootstrapData({ medicineId }),
+      fetchShopCheckoutBootstrapData({ medicineId, variantId }),
       getCustomerCreditCents(user.id),
     ]);
 

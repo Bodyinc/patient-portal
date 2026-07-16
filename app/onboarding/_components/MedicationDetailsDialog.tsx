@@ -1,18 +1,20 @@
 "use client";
 
 import Image from "next/image";
+import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 
 import MedicineImage from "./MedicineImage";
 import type { MedicineDto } from "@/lib/intake/types";
+import { formatFromPrice } from "@/lib/pricing";
 
 type MedicationDetailsDialogProps = {
   medication: MedicineDto | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSelect: (id: string) => void;
+  onSelect: (id: string, variantId: string | null) => void;
 };
 
 export default function MedicationDetailsDialog({
@@ -21,11 +23,26 @@ export default function MedicationDetailsDialog({
   onOpenChange,
   onSelect,
 }: MedicationDetailsDialogProps) {
+  const variants = medication?.variants ?? [];
+  const hasVariants = variants.length > 0;
+  const defaultVariantId = useMemo(() => {
+    if (!hasVariants) return null;
+    return [...variants].sort(
+      (a, b) => (a.fromPriceCents ?? Infinity) - (b.fromPriceCents ?? Infinity),
+    )[0].id;
+  }, [hasVariants, variants]);
+  const [variantId, setVariantId] = useState<string | null>(defaultVariantId);
+
   if (!medication) return null;
+
+  const selectedVariant = hasVariants ? (variants.find((v) => v.id === variantId) ?? null) : null;
+  const displayFromPriceCents = hasVariants
+    ? (selectedVariant?.fromPriceCents ?? null)
+    : medication.fromPriceCents;
 
   function handleContinue() {
     if (!medication) return;
-    onSelect(medication.id);
+    onSelect(medication.id, variantId);
     onOpenChange(false);
   }
 
@@ -53,10 +70,26 @@ export default function MedicationDetailsDialog({
               />
             </div>
 
-            {/* Anchored price text at the bottom edge of the left card boundary */}
-            <p className="mt-5 px-2 text-2xl font-bold text-[#2E00AB]">
-              From ${medication.priceMonthly}/month
-            </p>
+            {/* Anchored price + option selector at the bottom edge of the left card boundary */}
+            <div className="mt-5 space-y-2 px-2">
+              {hasVariants ? (
+                <select
+                  value={variantId ?? ""}
+                  onChange={(e) => setVariantId(e.target.value)}
+                  className="w-full rounded-lg border border-[#2E00AB]/30 bg-white px-3 py-2 text-sm font-medium text-[#2E00AB] focus:outline-none focus:ring-2 focus:ring-[#2E00AB]/30"
+                >
+                  {variants.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.name}
+                      {v.fromPriceCents == null ? " — coming soon" : ""}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+              <p className="text-2xl font-bold text-[#2E00AB]">
+                {formatFromPrice(displayFromPriceCents)}
+              </p>
+            </div>
           </div>
 
           {/* RIGHT SIDE: Details, Notice, and Buttons nested together */}

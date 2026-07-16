@@ -1,14 +1,16 @@
 "use client";
 
 import Image from "next/image";
+import { useMemo, useState } from "react";
 
 import MedicineImage from "./MedicineImage";
 import type { MedicineDto } from "@/lib/intake/types";
+import { formatFromPrice } from "@/lib/pricing";
 
 type MedicationCardProps = {
   medication: MedicineDto;
   selected?: boolean;
-  onSelect?: (id: string) => void;
+  onSelect?: (id: string, variantId: string | null) => void;
   onViewDetails?: (id: string) => void;
 };
 
@@ -18,15 +20,33 @@ export default function MedicationCard({
   onSelect,
   onViewDetails,
 }: MedicationCardProps) {
+  const hasVariants = medication.variants.length > 0;
+  // The variant dropdown is shown on the card (defaulting to the cheapest) so patients see the
+  // options even if they hit Continue without opening details.
+  const defaultVariantId = useMemo(() => {
+    if (!hasVariants) return null;
+    return [...medication.variants].sort(
+      (a, b) => (a.fromPriceCents ?? Infinity) - (b.fromPriceCents ?? Infinity),
+    )[0].id;
+  }, [hasVariants, medication.variants]);
+
+  const [variantId, setVariantId] = useState<string | null>(defaultVariantId);
+  const selectedVariant = hasVariants
+    ? (medication.variants.find((v) => v.id === variantId) ?? null)
+    : null;
+  const displayFromPriceCents = hasVariants
+    ? (selectedVariant?.fromPriceCents ?? null)
+    : medication.fromPriceCents;
+
   return (
     <div
       role="button"
       tabIndex={0}
-      onClick={() => onSelect?.(medication.id)}
+      onClick={() => onSelect?.(medication.id, variantId)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          onSelect?.(medication.id);
+          onSelect?.(medication.id, variantId);
         }
       }}
       // FIXED: Added max-h-[480px] to prevent desktop zoom stretch, kept h-full for row alignment
@@ -84,8 +104,29 @@ export default function MedicationCard({
 
         {/* Bottom price and action area stays aligned */}
         <div className="mt-auto space-y-2 pt-3">
+          {hasVariants ? (
+            <select
+              value={variantId ?? ""}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => {
+                e.stopPropagation();
+                const next = e.target.value;
+                setVariantId(next);
+                // Choosing a variant also selects this medicine.
+                onSelect?.(medication.id, next);
+              }}
+              className="w-full rounded-md border border-[#2E00AB]/30 bg-white px-2.5 py-1.5 text-xs font-medium text-[#2E00AB] focus:outline-none focus:ring-2 focus:ring-[#2E00AB]/30"
+            >
+              {medication.variants.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.name}
+                  {v.fromPriceCents == null ? " — coming soon" : ""}
+                </option>
+              ))}
+            </select>
+          ) : null}
           <h3 className="text-lg font-semibold leading-none text-[#2E00AB] sm:text-xl">
-            ${medication.priceMonthly}/mo
+            {formatFromPrice(displayFromPriceCents)}
           </h3>
 
           <button

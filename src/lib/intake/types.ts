@@ -10,6 +10,12 @@ export type CategoryDto = {
   icon: string | null;
 };
 
+export type IntakeVariantOption = {
+  id: string;
+  name: string;
+  fromPriceCents: number | null;
+};
+
 export type MedicineDto = {
   id: string;
   name: string;
@@ -19,7 +25,9 @@ export type MedicineDto = {
   importantInfo: string[];
   notice: string;
   imageSrc: string | null;
-  priceMonthly: number;
+  fromPriceCents: number | null;
+  // Empty when the medicine has no variants (buy the medicine directly).
+  variants: IntakeVariantOption[];
   requiresQuestionnaire: boolean;
 };
 
@@ -85,6 +93,7 @@ export type IntakeSummaryDto = {
   requiresQuestionnaire: boolean;
   selectedPackageId: string | null;
   packageName: string | null;
+  variantName: string | null;
   packageDurationMonths: number | null;
   packagePrice: number | null;
   eligibilityResult: string | null;

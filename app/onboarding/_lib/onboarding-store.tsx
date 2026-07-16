@@ -34,6 +34,7 @@ export type OnboardingState = {
   weightLbs: number | null;
   bmi: number | null;
   medicationId: string | null;
+  variantId: string | null;
   requiresQuestionnaire: boolean;
   fullName: string;
   email: string;
@@ -57,6 +58,7 @@ export const initialOnboardingState: OnboardingState = {
   weightLbs: null,
   bmi: null,
   medicationId: null,
+  variantId: null,
   requiresQuestionnaire: false,
   fullName: "",
   email: "",

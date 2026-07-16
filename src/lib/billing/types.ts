@@ -12,6 +12,8 @@ export type BillingSubscriptionDto = {
   medicineId: string | null;
   medicineName: string;
   description: string;
+  variantName: string | null;
+  planLabel: string | null;
   imageSrc: string;
   nextBillingDate: string | null;
   upcomingCharge: number;
@@ -24,6 +26,8 @@ export type BillingPaymentDto = {
   date: string;
   description: string;
   subscriptionName: string;
+  variantName: string | null;
+  planLabel: string;
   amount: number;
   paymentMethod: string;
   status: string;

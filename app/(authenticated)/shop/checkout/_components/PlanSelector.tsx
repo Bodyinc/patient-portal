@@ -17,12 +17,12 @@ export default function PlanSelector({ plans, selectedPlan, onChange }: PlanSele
       </div>
 
       {plans.map((plan) => {
-        const active = selectedPlan === plan.code;
+        const active = selectedPlan === plan.id;
         return (
           <button
             key={plan.id}
             type="button"
-            onClick={() => onChange(plan.code)}
+            onClick={() => onChange(plan.id)}
             className={`w-full rounded-md border p-4 text-left transition ${
               active ? "border-[#A895FF] bg-[#F6F3FF]" : "border-[#E6DEFF] bg-white"
             }`}

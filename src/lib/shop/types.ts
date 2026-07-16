@@ -6,13 +6,21 @@ export type ShopCategoryDto = {
   name: string;
 };
 
+export type ShopMedicineVariantOption = {
+  id: string;
+  name: string;
+  fromPriceCents: number | null;
+};
+
 export type ShopMedicineCardDto = {
   id: string;
   name: string;
   categoryName: string;
   description: string;
   imageSrc: string;
-  priceMonthly: number;
+  fromPriceCents: number | null;
+  // Empty when the medicine has no variants (buy the medicine directly).
+  variants: ShopMedicineVariantOption[];
 };
 
 export type ShopMedicinesListDto = {

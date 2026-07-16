@@ -29,6 +29,7 @@ export async function prefetchMedicinesForCategory(queryClient: QueryClient, cat
 export async function prefetchQuestionnaireAndPackages(
   queryClient: QueryClient,
   medicineId: string,
+  variantId?: string | null,
 ) {
   await Promise.all([
     queryClient.prefetchQuery({
@@ -41,9 +42,9 @@ export async function prefetchQuestionnaireAndPackages(
       staleTime: CATALOG_STALE_MS,
     }),
     queryClient.prefetchQuery({
-      queryKey: intakeQueryKeys.packages(medicineId),
+      queryKey: intakeQueryKeys.packages(medicineId, variantId),
       queryFn: async () => {
-        const result = await getPackagesForMedicine(medicineId);
+        const result = await getPackagesForMedicine(medicineId, variantId ?? null);
         if (!result.ok) throw new Error(result.message);
         return result.data;
       },

@@ -1,32 +1,69 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import type { ShopMedicineCardDto } from "@/lib/shop/types";
+import { formatFromPrice } from "@/lib/pricing";
 
 export default function ShopProductCard({ item }: { item: ShopMedicineCardDto }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
 
+  const hasVariants = item.variants.length > 0;
+  const defaultVariantId = useMemo(() => {
+    if (!hasVariants) return null;
+    return [...item.variants].sort(
+      (a, b) => (a.fromPriceCents ?? Infinity) - (b.fromPriceCents ?? Infinity),
+    )[0].id;
+  }, [hasVariants, item.variants]);
+
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(defaultVariantId);
+  const selectedVariant = hasVariants
+    ? (item.variants.find((v) => v.id === selectedVariantId) ?? null)
+    : null;
+  const displayFromPriceCents = hasVariants
+    ? (selectedVariant?.fromPriceCents ?? null)
+    : item.fromPriceCents;
+  const available = displayFromPriceCents != null;
+
   function handleContinue() {
+    if (!available) return;
     const params = new URLSearchParams({
       id: item.id,
       name: item.name,
       category: item.categoryName,
       description: item.description,
       image: item.imageSrc,
-      price: String(item.priceMonthly),
     });
+    if (selectedVariant) params.set("variant", selectedVariant.id);
     setOpen(false);
     router.push(`/shop/checkout?${params.toString()}`);
   }
 
+  const variantSelect = hasVariants ? (
+    <div className="space-y-1">
+      <label className="text-xs font-semibold text-[#2E00AB]/70">Select option</label>
+      <select
+        value={selectedVariantId ?? ""}
+        onChange={(e) => setSelectedVariantId(e.target.value)}
+        className="w-full rounded-xl border border-[#DCD2FF] bg-white px-3 py-2.5 text-sm font-medium text-[#2E00AB] focus:outline-none focus:ring-2 focus:ring-[#2E00AB]/30"
+      >
+        {item.variants.map((v) => (
+          <option key={v.id} value={v.id}>
+            {v.name}
+            {v.fromPriceCents == null ? " — coming soon" : ""}
+          </option>
+        ))}
+      </select>
+    </div>
+  ) : null;
+
   return (
     <>
-      <article className="overflow-hidden rounded-[32px] border border-[#DCD2FF] bg-white p-3 shadow-sm">
+      <article className="flex h-full flex-col overflow-hidden rounded-[32px] border border-[#DCD2FF] bg-white p-3 shadow-sm">
         <div className="relative flex min-h-[190px] items-center justify-center overflow-hidden rounded-[24px] bg-[#F3EEFF] p-4">
           <img
             src="/curve-line.svg"
@@ -41,7 +78,7 @@ export default function ShopProductCard({ item }: { item: ShopMedicineCardDto })
         </div>
 
         {/* Content Area */}
-        <div className="space-y-3 px-2 py-4">
+        <div className="flex flex-1 flex-col space-y-3 px-2 py-4">
           <div className="flex items-start justify-between gap-2">
             <h3 className="text-xl font-semibold text-[#2E00AB]">{item.name}</h3>
             <span className="shrink-0 rounded-full border border-[#2E00AB]/20 bg-[#F8F4FF] px-3 py-0.5 text-[11px] text-[#2E00AB]">
@@ -49,14 +86,20 @@ export default function ShopProductCard({ item }: { item: ShopMedicineCardDto })
             </span>
           </div>
           <p className="line-clamp-2 min-h-[40px] text-sm text-[#2E00AB]/70">{item.description}</p>
-          <p className="text-3xl font-bold leading-none text-[#2E00AB]">${item.priceMonthly}/mo</p>
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            className="w-full rounded-xl bg-[#2E00AB] py-3 text-sm font-semibold text-white transition hover:bg-[#2E00AB]/90"
-          >
-            View Details
-          </button>
+          {/* Price + button pinned to the bottom so buttons align across all cards. Variant
+              selection lives in the details dialog. */}
+          <div className="mt-auto space-y-3">
+            <p className="text-3xl font-bold leading-none text-[#2E00AB]">
+              {formatFromPrice(item.fromPriceCents)}
+            </p>
+            <button
+              type="button"
+              onClick={() => setOpen(true)}
+              className="w-full rounded-xl bg-[#2E00AB] py-3 text-sm font-semibold text-white transition hover:bg-[#2E00AB]/90"
+            >
+              View Details
+            </button>
+          </div>
         </div>
       </article>
 
@@ -82,7 +125,7 @@ export default function ShopProductCard({ item }: { item: ShopMedicineCardDto })
 
               {/* Anchored text at the bottom edge of the left card boundary */}
               <p className="mt-4 px-1 text-xl font-bold text-[#2E00AB]">
-                From ${item.priceMonthly}/month
+                {formatFromPrice(displayFromPriceCents)}
               </p>
             </div>
 
@@ -101,6 +144,8 @@ export default function ShopProductCard({ item }: { item: ShopMedicineCardDto })
                   This treatment plan is personalized based on your health assessment and clinician
                   recommendations for safe and sustainable progress.
                 </p>
+
+                {hasVariants ? <div className="mt-5 max-w-xs">{variantSelect}</div> : null}
 
                 <div className="mt-6">
                   <h3 className="text-base font-bold text-[#2E00AB]">Important Information</h3>
@@ -142,9 +187,10 @@ export default function ShopProductCard({ item }: { item: ShopMedicineCardDto })
                 <Button
                   type="button"
                   onClick={handleContinue}
-                  className="w-full bg-[#2E00AB] hover:bg-[#2E00AB]/90 text-white  font-semibold sm:w-auto px-6 py-5"
+                  disabled={!available}
+                  className="w-full bg-[#2E00AB] hover:bg-[#2E00AB]/90 text-white  font-semibold sm:w-auto px-6 py-5 disabled:opacity-50 disabled:hover:bg-[#2E00AB]"
                 >
-                  Continue
+                  {available ? "Continue" : "Pricing coming soon"}
                 </Button>
               </div>
             </div>
