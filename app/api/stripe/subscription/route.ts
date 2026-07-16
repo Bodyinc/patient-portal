@@ -51,7 +51,9 @@ export async function POST(request: Request) {
   try {
     const { data: pkg, error: pkgError } = await supabaseAdmin
       .from("packages")
-      .select("id, medicine_id, name, price, duration_months, is_active, stripe_price_id")
+      .select(
+        "id, medicine_id, variant_id, name, price, duration_months, is_active, stripe_price_id, medicines(name), medicine_variants(name)",
+      )
       .eq("id", packageId)
       .maybeSingle();
 
@@ -70,6 +72,14 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+
+    const medicineName =
+      (pkg as { medicines?: { name: string } | null }).medicines?.name ?? "Treatment";
+    const variantName =
+      (pkg as { medicine_variants?: { name: string } | null }).medicine_variants?.name ?? null;
+    const planLabel =
+      pkg.duration_months === 1 ? "Monthly Plan" : `${pkg.duration_months}-Month Plan`;
+    const subscriptionDescription = `${medicineName}${variantName ? ` — ${variantName}` : ""} · ${planLabel}`;
 
     const subtotalCents = Math.round(Number(pkg.price) * 100);
     const discount = await resolveCheckoutDiscount({
@@ -127,6 +137,7 @@ export async function POST(request: Request) {
     const { subscriptionId, clientSecret } = await createSubscriptionForPrice({
       customerId,
       priceId: pkg.stripe_price_id,
+      description: subscriptionDescription,
       oneTimeFees,
       // Shop orders pay shipping on the first invoice and every renewal.
       recurringShippingCents: shippingCents,
@@ -136,6 +147,8 @@ export async function POST(request: Request) {
         user_id: user.id,
         package_id: pkg.id,
         medicine_id: medicineId,
+        ...(pkg.variant_id ? { variant_id: pkg.variant_id } : {}),
+        ...(variantName ? { variant_name: variantName } : {}),
       },
     });
 

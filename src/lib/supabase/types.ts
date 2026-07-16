@@ -311,7 +311,7 @@ export type Database = {
           short_description: string;
           long_description: string | null;
           image_url: string | null;
-          price_monthly: number;
+          from_price_cents: number | null;
           status: Database["public"]["Enums"]["medicine_status"];
           important_info: Json;
           notice_text: string | null;
@@ -328,7 +328,7 @@ export type Database = {
           short_description: string;
           long_description?: string | null;
           image_url?: string | null;
-          price_monthly?: number;
+          from_price_cents?: number | null;
           status?: Database["public"]["Enums"]["medicine_status"];
           important_info?: Json;
           notice_text?: string | null;
@@ -345,7 +345,7 @@ export type Database = {
           short_description?: string;
           long_description?: string | null;
           image_url?: string | null;
-          price_monthly?: number;
+          from_price_cents?: number | null;
           status?: Database["public"]["Enums"]["medicine_status"];
           important_info?: Json;
           notice_text?: string | null;
@@ -374,6 +374,7 @@ export type Database = {
           created_at: string;
           updated_at: string;
           stripe_price_id: string | null;
+          variant_id: string | null;
         };
         Insert: {
           id?: string;
@@ -390,6 +391,7 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           stripe_price_id?: string | null;
+          variant_id?: string | null;
         };
         Update: {
           id?: string;
@@ -406,6 +408,55 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           stripe_price_id?: string | null;
+          variant_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "packages_medicine_id_fkey";
+            columns: ["medicine_id"];
+            isOneToOne: false;
+            referencedRelation: "medicines";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "packages_variant_id_fkey";
+            columns: ["variant_id"];
+            isOneToOne: false;
+            referencedRelation: "medicine_variants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      medicine_variants: {
+        Row: {
+          id: string;
+          medicine_id: string;
+          name: string;
+          from_price_cents: number | null;
+          sort_order: number;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          medicine_id: string;
+          name: string;
+          from_price_cents?: number | null;
+          sort_order?: number;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          medicine_id?: string;
+          name?: string;
+          from_price_cents?: number | null;
+          sort_order?: number;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
         };
         Relationships: [];
       };

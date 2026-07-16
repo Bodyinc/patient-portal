@@ -22,7 +22,7 @@ export default function SelectPlanPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { state, updateState, hydrated } = useOnboarding();
-  const { data: packages = [], isLoading } = usePackages(state.medicationId);
+  const { data: packages = [], isLoading } = usePackages(state.medicationId, state.variantId);
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(
     state.selectedPackageId,
   );

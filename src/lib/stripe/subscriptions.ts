@@ -13,6 +13,8 @@ export async function createSubscriptionForPrice(params: {
   customerId: string;
   priceId: string;
   metadata: Record<string, string>;
+  // Human-readable label shown on the subscription in the Stripe dashboard.
+  description?: string;
   promotionCodeId?: string | null;
   oneTimeFees?: Array<{ amountCents: number; description: string }>;
   // >0 adds shipping as a recurring subscription item. shippingOnFirstInvoice=true bills it
@@ -24,6 +26,7 @@ export async function createSubscriptionForPrice(params: {
     customerId,
     priceId,
     metadata,
+    description,
     promotionCodeId,
     oneTimeFees,
     recurringShippingCents = 0,
@@ -62,6 +65,7 @@ export async function createSubscriptionForPrice(params: {
   const subscription = await stripe.subscriptions.create({
     customer: customerId,
     items,
+    description: description || undefined,
     discounts: promotionCodeId ? [{ promotion_code: promotionCodeId }] : undefined,
     payment_behavior: "default_incomplete",
     payment_settings: {

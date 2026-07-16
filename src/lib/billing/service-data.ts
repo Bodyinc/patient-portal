@@ -1,6 +1,7 @@
 import "server-only";
 
 import { resolveMedicineImageSrc } from "@/lib/intake/medicine-image";
+import { planTitleFromDuration } from "@/lib/pricing";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { Json } from "@/lib/supabase/types";
 import type {
@@ -108,6 +109,8 @@ function matchesPaymentQuery(payment: BillingPaymentDto, query: string): boolean
   const haystack = [
     payment.description,
     payment.subscriptionName,
+    payment.variantName ?? "",
+    payment.planLabel,
     payment.paymentMethod,
     payment.status,
     payment.date,
@@ -122,14 +125,20 @@ type EmbeddedMedicine = {
   short_description: string | null;
   image_url: string | null;
 };
-type EmbeddedPackage = { name: string; price: number; duration_months: number };
+type EmbeddedVariant = { name: string } | null;
+type EmbeddedPackage = {
+  name: string;
+  price: number;
+  duration_months: number;
+  medicine_variants?: EmbeddedVariant;
+};
 
 export async function fetchBillingSubscriptions(userId: string): Promise<BillingSubscriptionDto[]> {
-  // Embedded select: subscriptions + medicine + package in ONE round trip (was 3).
+  // Embedded select: subscriptions + medicine + package (+ its variant) in ONE round trip.
   const { data: subscriptions, error } = await supabaseAdmin
     .from("subscriptions")
     .select(
-      "id, medicine_id, package_id, status, current_period_end, cancel_at_period_end, created_at, medicines(name, short_description, image_url), packages(name, price, duration_months)",
+      "id, medicine_id, package_id, status, current_period_end, cancel_at_period_end, created_at, medicines(name, short_description, image_url), packages(name, price, duration_months, medicine_variants(name))",
     )
     .eq("user_id", userId)
     .in("status", ACTIVE_SUBSCRIPTION_STATUSES)
@@ -141,6 +150,7 @@ export async function fetchBillingSubscriptions(userId: string): Promise<Billing
   return subscriptions.map((subscription) => {
     const medicine = (subscription as { medicines?: EmbeddedMedicine | null }).medicines ?? null;
     const pkg = (subscription as { packages?: EmbeddedPackage | null }).packages ?? null;
+    const variantName = pkg?.medicine_variants?.name ?? null;
 
     return {
       id: subscription.id,
@@ -150,6 +160,8 @@ export async function fetchBillingSubscriptions(userId: string): Promise<Billing
         medicine?.short_description ??
         pkg?.name ??
         "Personalized treatment plan with ongoing provider support.",
+      variantName,
+      planLabel: pkg ? planTitleFromDuration(pkg.duration_months) : null,
       imageSrc: resolveMedicineImageSrc(medicine?.image_url ?? null),
       nextBillingDate: subscription.current_period_end,
       upcomingCharge: Number(pkg?.price ?? 0),
@@ -194,11 +206,24 @@ export async function fetchBillingPayments(
           .in("stripe_subscription_id", subscriptionIds)
       : Promise.resolve({ data: [] }),
     packageIds.length
-      ? supabaseAdmin.from("packages").select("id, name").in("id", packageIds)
+      ? supabaseAdmin
+          .from("packages")
+          .select("id, name, duration_months, medicine_variants(name)")
+          .in("id", packageIds)
       : Promise.resolve({ data: [] }),
   ]);
 
-  const packageById = new Map((packages ?? []).map((pkg) => [pkg.id, pkg.name]));
+  const packageById = new Map(
+    (packages ?? []).map((pkg) => [
+      pkg.id,
+      {
+        name: pkg.name as string,
+        durationMonths: Number(pkg.duration_months),
+        variantName:
+          (pkg as { medicine_variants?: { name: string } | null }).medicine_variants?.name ?? null,
+      },
+    ]),
+  );
   const subscriptionByStripeId = new Map(
     (subscriptions ?? []).map((sub) => [sub.stripe_subscription_id, sub]),
   );
@@ -209,17 +234,31 @@ export async function fetchBillingPayments(
       : undefined;
     const medicine = (subscription as { medicines?: { name: string } | null } | undefined)
       ?.medicines;
-    const packageName = payment.plan_id ? packageById.get(payment.plan_id) : undefined;
+    const pkg = payment.plan_id ? packageById.get(payment.plan_id) : undefined;
+    // Description = the product (medicine); fall back to the Stripe line / package name.
+    const description =
+      medicine?.name ??
+      pkg?.name ??
+      parsePaymentDescription(
+        payment.raw_event,
+        pkg ? `${pkg.name} renewal` : "Subscription payment",
+      );
     const subscriptionName =
-      medicine?.name ?? packageName ?? (subscription ? "Treatment Subscription" : "—");
-    const fallbackDescription = packageName ? `${packageName} renewal` : "Subscription payment";
+      medicine?.name ?? pkg?.name ?? (subscription ? "Treatment Subscription" : "—");
+    const planLabel = pkg
+      ? planTitleFromDuration(pkg.durationMonths)
+      : subscription
+        ? "Subscription"
+        : "—";
     const { invoiceUrl, invoicePdfUrl } = parseInvoiceUrls(payment.raw_event);
 
     return {
       id: payment.id,
       date: payment.created_at,
-      description: parsePaymentDescription(payment.raw_event, fallbackDescription),
+      description,
       subscriptionName,
+      variantName: pkg?.variantName ?? null,
+      planLabel,
       amount: Number(payment.amount_cents) / 100,
       paymentMethod: formatPaymentMethod(payment.raw_event),
       status: normalizeStatus(payment.status),

@@ -47,6 +47,20 @@ export default function SubscriptionRow({ subscription }: SubscriptionRowProps) 
           />
           <div className="min-w-0">
             <h3 className="text-base font-semibold text-[#2E00AB]">{subscription.medicineName}</h3>
+            {subscription.variantName || subscription.planLabel ? (
+              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                {subscription.variantName ? (
+                  <span className="rounded-full bg-[#EDE7FF] px-2 py-0.5 text-[11px] font-medium text-[#2E00AB]">
+                    {subscription.variantName}
+                  </span>
+                ) : null}
+                {subscription.planLabel ? (
+                  <span className="rounded-full border border-[#D5CAFF] px-2 py-0.5 text-[11px] font-medium text-[#2E00AB]/80">
+                    {subscription.planLabel}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
             <p className="mt-1 text-sm text-[#2E00AB]/70">{subscription.description}</p>
             {subscription.cancelAtPeriodEnd ? (
               <p className="mt-1 text-xs font-medium text-amber-700">

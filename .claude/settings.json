@@ -137,7 +137,13 @@
       "Bash(node /c/Programming/BeezTech/BodyInc/bodyinc-access-hub/node_modules/typescript/bin/tsc --noEmit -p /c/Programming/BeezTech/BodyInc/bodyinc-access-hub)",
       "Bash(ls /c/Programming/BeezTech/BodyInc/bodyinc-access-hub/node_modules/.bin/ 2>/dev/null | grep -i \"^tsc\\\\|typescript\" ; ls /c/Programming/BeezTech/BodyInc/bodyinc-access-hub/node_modules/typescript 2>/dev/null | head -3; grep -n '\"typescript\"' /c/Programming/BeezTech/BodyInc/bodyinc-access-hub/package.json)",
       "Read(//c/Programming/BeezTech/BodyInc/bodyinc-access-hub/node_modules/**)",
-      "Bash(node node_modules/typescript/bin/tsc --noEmit)"
+      "Bash(node node_modules/typescript/bin/tsc --noEmit)",
+      "Bash(npx next *)",
+      "Bash(git --no-pager diff --stat)",
+      "Bash(git --no-pager diff --stat HEAD)",
+      "Bash(git --no-pager diff -- src/lib/pricing.ts src/lib/shop/service-data.ts src/lib/shop/types.ts)",
+      "Bash(git --no-pager diff -- src/lib/intake/types.ts src/lib/actions/intake.ts app/onboarding/_components/MedicationCard.tsx app/onboarding/_components/MedicationDetailsDialog.tsx)",
+      "Bash(git --no-pager diff -- src/lib/billing/service-data.ts src/lib/billing/types.ts app/api/stripe/subscription/route.ts src/lib/stripe/subscriptions.ts app/\\\\\\(authenticated\\\\\\)/billing/_components/SubscriptionRow.tsx)"
     ],
     "additionalDirectories": [
       "c:\\Programming\\BeezTech\\BodyInc\\bodyinc-access-hub\\supabase\\migrations",

@@ -6,7 +6,7 @@ import type {
   ShopCheckoutProductDto,
 } from "@/lib/shop/service-types";
 
-export type CheckoutPlanId = ShopCheckoutPlanDto["code"];
+export type CheckoutPlanId = ShopCheckoutPlanDto["id"];
 export type CheckoutPaymentMethodId = ShopCheckoutPaymentMethodDto["id"];
 export type CheckoutProduct = ShopCheckoutProductDto;
 export type CheckoutPlan = ShopCheckoutPlanDto;

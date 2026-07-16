@@ -42,7 +42,9 @@ export async function createOnboardingSubscription(
 
   const { data: pkg, error: pkgError } = await supabaseAdmin
     .from("packages")
-    .select("id, medicine_id, is_active, stripe_price_id, duration_months, price")
+    .select(
+      "id, medicine_id, variant_id, is_active, stripe_price_id, duration_months, price, medicines(name), medicine_variants(name)",
+    )
     .eq("id", session.selected_plan_id)
     .maybeSingle();
 
@@ -92,9 +94,17 @@ export async function createOnboardingSubscription(
       intakeSessionId: session.id,
     }));
 
+  const medicineName =
+    (pkg as { medicines?: { name: string } | null }).medicines?.name ?? "Treatment";
+  const variantName =
+    (pkg as { medicine_variants?: { name: string } | null }).medicine_variants?.name ?? null;
+  const planLabel =
+    pkg.duration_months === 1 ? "Monthly Plan" : `${pkg.duration_months}-Month Plan`;
+
   const { subscriptionId, clientSecret } = await createSubscriptionForPrice({
     customerId,
     priceId: pkg.stripe_price_id,
+    description: `${medicineName}${variantName ? ` — ${variantName}` : ""} · ${planLabel}`,
     oneTimeFees,
     // First onboarding invoice is medication-only; shipping recurs from the first renewal.
     recurringShippingCents: effectiveShippingCents(settings),
@@ -103,6 +113,8 @@ export async function createOnboardingSubscription(
       intake_session_id: session.id,
       package_id: pkg.id,
       medicine_id: pkg.medicine_id,
+      ...(pkg.variant_id ? { variant_id: pkg.variant_id } : {}),
+      ...(variantName ? { variant_name: variantName } : {}),
     },
   });
 

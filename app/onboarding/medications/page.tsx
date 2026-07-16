@@ -22,8 +22,14 @@ export default function MedicationsPage() {
   const queryClient = useQueryClient();
   const { state, updateState, hydrated } = useOnboarding();
   const [selected, setSelected] = useState(state.medicationId ?? "");
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(state.variantId);
   const [detailsMedicationId, setDetailsMedicationId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  function selectMedication(id: string, variantId: string | null) {
+    setSelected(id);
+    setSelectedVariantId(variantId);
+  }
 
   const {
     data: catalog,
@@ -60,6 +66,7 @@ export default function MedicationsPage() {
 
     const patch = {
       medicationId: selected,
+      variantId: selectedVariantId,
       requiresQuestionnaire: result.data.requiresQuestionnaire,
       questionnaireAnswers: {},
       questionnaireComplete: false,
@@ -68,7 +75,7 @@ export default function MedicationsPage() {
       checkoutConfirmed: false,
     };
     updateState(patch);
-    await prefetchQuestionnaireAndPackages(queryClient, selected);
+    await prefetchQuestionnaireAndPackages(queryClient, selected, selectedVariantId);
     const next = getNextStepPath("/onboarding/medications", { ...state, ...patch });
     if (next) router.push(next);
   }
@@ -139,7 +146,7 @@ export default function MedicationsPage() {
                 key={medication.id}
                 medication={medication}
                 selected={selected === medication.id}
-                onSelect={setSelected}
+                onSelect={selectMedication}
                 onViewDetails={setDetailsMedicationId}
               />
             ))
@@ -148,13 +155,14 @@ export default function MedicationsPage() {
       </OnboardingFrame>
 
       <MedicationDetailsDialog
+        key={detailsMedicationId ?? "none"}
         medication={detailsMedication}
         open={Boolean(detailsMedicationId)}
         onOpenChange={(open) => {
           if (!open) setDetailsMedicationId(null);
         }}
-        onSelect={(id) => {
-          setSelected(id);
+        onSelect={(id, variantId) => {
+          selectMedication(id, variantId);
           setDetailsMedicationId(null);
         }}
       />

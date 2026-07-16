@@ -25,6 +25,7 @@ import type {
   EligibilityResultDto,
   IntakeActionResult,
   IntakeSummaryDto,
+  IntakeVariantOption,
   MedicineDto,
   MedicinesForCategoryDto,
   PackageDto,
@@ -119,7 +120,7 @@ async function buildIntakeSummary(
     session.selected_plan_id
       ? supabaseAdmin
           .from("packages")
-          .select("id, name, duration_months, price")
+          .select("id, name, duration_months, price, medicine_variants(name)")
           .eq("id", session.selected_plan_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -168,6 +169,9 @@ async function buildIntakeSummary(
     requiresQuestionnaire: medicine?.requires_questionnaire ?? false,
     selectedPackageId: session.selected_plan_id,
     packageName: packageData?.name ?? null,
+    variantName:
+      (packageData as { medicine_variants?: { name: string } | null } | null)?.medicine_variants
+        ?.name ?? null,
     packageDurationMonths: packageData?.duration_months ?? null,
     packagePrice: packageData?.price !== undefined ? Number(packageData.price) : null,
     eligibilityResult: eligibility?.result ?? null,
@@ -274,12 +278,29 @@ export async function getMedicinesForCategory(
   const { data: meds, error: medsError } = await supabaseAdmin
     .from("medicines")
     .select(
-      "id, name, short_description, long_description, image_url, price_monthly, important_info, notice_text, requires_questionnaire, is_active, status, sort_order",
+      "id, name, short_description, long_description, image_url, from_price_cents, important_info, notice_text, requires_questionnaire, is_active, status, sort_order",
     )
     .in("id", medicineIds);
 
   if (medsError) {
     return { ok: false, code: "fetch_error", message: medsError.message };
+  }
+
+  const { data: variantRows } = await supabaseAdmin
+    .from("medicine_variants")
+    .select("id, medicine_id, name, from_price_cents")
+    .in("medicine_id", medicineIds)
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true });
+  const variantsByMedicineId = new Map<string, IntakeVariantOption[]>();
+  for (const v of variantRows ?? []) {
+    const list = variantsByMedicineId.get(v.medicine_id) ?? [];
+    list.push({
+      id: v.id,
+      name: v.name,
+      fromPriceCents: v.from_price_cents == null ? null : Number(v.from_price_cents),
+    });
+    variantsByMedicineId.set(v.medicine_id, list);
   }
 
   const medMap = new Map((meds ?? []).map((m) => [m.id, m]));
@@ -298,7 +319,8 @@ export async function getMedicinesForCategory(
       importantInfo: parseImportantInfo(med.important_info),
       notice: med.notice_text ?? "",
       imageSrc: resolveMedicineImageSrc(med.image_url),
-      priceMonthly: Number(med.price_monthly),
+      fromPriceCents: med.from_price_cents == null ? null : Number(med.from_price_cents),
+      variants: variantsByMedicineId.get(med.id) ?? [],
       requiresQuestionnaire: med.requires_questionnaire,
     });
   }
@@ -727,13 +749,17 @@ export async function evaluateMedicineEligibility(
 
 export async function getPackagesForMedicine(
   medicineId: string,
+  variantId?: string | null,
 ): Promise<IntakeActionResult<PackageDto[]>> {
-  const { data, error } = await supabaseAdmin
+  let query = supabaseAdmin
     .from("packages")
     .select("*")
     .eq("medicine_id", medicineId)
     .eq("is_active", true)
     .order("duration_months", { ascending: true });
+  // Packages belong to a variant when one is chosen, otherwise to the medicine directly.
+  query = variantId ? query.eq("variant_id", variantId) : query.is("variant_id", null);
+  const { data, error } = await query;
 
   if (error) {
     return { ok: false, code: "fetch_error", message: error.message };

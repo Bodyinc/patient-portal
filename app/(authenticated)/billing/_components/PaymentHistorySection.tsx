@@ -112,7 +112,10 @@ export default function PaymentHistorySection({
               <TableRow className="border-[#EEE9FF] hover:bg-transparent">
                 <TableHead className="min-w-[100px] text-[#2E00AB]/70">Date</TableHead>
                 <TableHead className="min-w-[160px] text-[#2E00AB]/70">Description</TableHead>
-                <TableHead className="hidden min-w-[140px] text-[#2E00AB]/70 md:table-cell">
+                <TableHead className="hidden min-w-[100px] text-[#2E00AB]/70 sm:table-cell">
+                  Variant
+                </TableHead>
+                <TableHead className="hidden min-w-[130px] text-[#2E00AB]/70 md:table-cell">
                   Subscription
                 </TableHead>
                 <TableHead className="min-w-[90px] text-[#2E00AB]/70">Amount</TableHead>
@@ -131,8 +134,11 @@ export default function PaymentHistorySection({
                     {formatDate(payment.date)}
                   </TableCell>
                   <TableCell className="text-sm text-[#2E00AB]/80">{payment.description}</TableCell>
+                  <TableCell className="hidden text-sm text-[#2E00AB]/80 sm:table-cell">
+                    {payment.variantName ?? "—"}
+                  </TableCell>
                   <TableCell className="hidden text-sm text-[#2E00AB]/80 md:table-cell">
-                    {payment.subscriptionName}
+                    {payment.planLabel}
                   </TableCell>
                   <TableCell className="text-sm font-semibold text-[#2E00AB]">
                     {formatCurrency(payment.amount)}

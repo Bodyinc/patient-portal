@@ -57,7 +57,9 @@ export default function BillingCheckoutPage() {
   }, []);
 
   const packageId = summary?.selectedPackageId ?? null;
-  const medicationName = summary?.medicineName ?? "Selected Medication";
+  const medicationName =
+    (summary?.medicineName ?? "Selected Medication") +
+    (summary?.variantName ? ` — ${summary.variantName}` : "");
   const planLabel = summary?.packageName ?? "Treatment Plan";
   const pricing = useMemo(
     () => calculateCheckoutPricing(summary?.packagePrice, discountAmount, discountLabel),

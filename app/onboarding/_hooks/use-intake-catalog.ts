@@ -53,12 +53,12 @@ export function useQuestionnaire(medicineId: string | null) {
   });
 }
 
-export function usePackages(medicineId: string | null) {
+export function usePackages(medicineId: string | null, variantId?: string | null) {
   return useQuery({
-    queryKey: intakeQueryKeys.packages(medicineId),
+    queryKey: intakeQueryKeys.packages(medicineId, variantId),
     queryFn: async () => {
       if (!medicineId) return [];
-      const result = await getPackagesForMedicine(medicineId);
+      const result = await getPackagesForMedicine(medicineId, variantId ?? null);
       if (!result.ok) throw new Error(result.message);
       return result.data;
     },
