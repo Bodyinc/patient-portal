@@ -32,7 +32,10 @@ export async function POST(request: Request) {
     );
   }
 
-  // Idempotency: stripe_event_id is UNIQUE, so a duplicate delivery is a no-op.
+  // Idempotency: stripe_event_id is UNIQUE, so a duplicate delivery is a no-op. The row is
+  // written as a "claim" BEFORE handling; if handling fails we delete it again so Stripe's
+  // retry re-runs the handler (otherwise the claim would swallow the retry and the event —
+  // e.g. a payment record — would be lost forever).
   const { error: insertError } = await supabaseAdmin.from("stripe_events").insert({
     stripe_event_id: event.id,
     type: event.type,
@@ -49,6 +52,8 @@ export async function POST(request: Request) {
   try {
     await handleStripeEvent(event);
   } catch (error) {
+    // Release the claim so the retry isn't deduped away as a "duplicate".
+    await supabaseAdmin.from("stripe_events").delete().eq("stripe_event_id", event.id);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Handler failed." },
       { status: 500 },

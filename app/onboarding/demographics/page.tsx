@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { saveIntakeDemographics } from "@/lib/actions/intake";
+import { DOB_SCHEMA } from "@/lib/validation";
 
 import OnboardingShell from "../_components/OnboardingShell";
 import OnboardingStepLayout from "../_components/OnboardingStepLayout";
@@ -25,7 +26,7 @@ import { useOnboarding } from "../_lib/onboarding-store";
 const demographicsSchema = z.object({
   state: z.string().min(1, "Select your state"),
   sex: z.enum(["male", "female", "other"]),
-  dob: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date of birth"),
+  dob: DOB_SCHEMA,
 });
 
 export default function DemographicsPage() {
@@ -51,10 +52,6 @@ export default function DemographicsPage() {
     const parsed = demographicsSchema.safeParse(form);
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]?.message ?? "Invalid input");
-      return;
-    }
-    if (new Date(parsed.data.dob) >= new Date()) {
-      toast.error("Date of birth must be in the past");
       return;
     }
 

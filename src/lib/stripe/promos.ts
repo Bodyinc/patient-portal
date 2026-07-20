@@ -70,13 +70,15 @@ export async function resolveCheckoutDiscount(opts: {
 }
 
 export async function incrementPromoRedemption(promoId: string): Promise<void> {
-  const { data } = await supabaseAdmin
-    .from("promo_codes")
-    .select("times_redeemed")
-    .eq("id", promoId)
-    .maybeSingle();
-  await supabaseAdmin
-    .from("promo_codes")
-    .update({ times_redeemed: (data?.times_redeemed ?? 0) + 1 })
-    .eq("id", promoId);
+  // Atomic increment (see migration 20260720120000_promo_atomic_increment) so concurrent
+  // redemptions can't lose an update and over-redeem a capped code.
+  const { error } = await supabaseAdmin.rpc(
+    "increment_promo_redemption" as never,
+    {
+      p_promo_id: promoId,
+    } as never,
+  );
+  if (error) {
+    console.error("[promos] redemption increment failed:", error.message);
+  }
 }

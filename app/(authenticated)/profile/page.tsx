@@ -1,9 +1,12 @@
 import { requirePatientSession } from "@/lib/auth/require-patient";
-import { getMyProfile } from "@/lib/actions/profile";
+import { getMyProfile, healProfileEmail } from "@/lib/actions/profile";
 import ProfileEditor from "./_components/ProfileEditor";
 
 export default async function ProfilePage() {
   await requirePatientSession();
+
+  // Undo any auth/profile email drift left by an abandoned email change before rendering.
+  await healProfileEmail();
 
   const profileResult = await getMyProfile();
   if (!profileResult.ok) {
