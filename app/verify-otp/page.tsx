@@ -22,6 +22,14 @@ function VerifyOTPContent() {
   const [otp, setOtp] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // Checkout/account flows carry a redirect or sync=email and genuinely change the account's
+  // email via /change-email. Plain OTP login carries neither — there a typo just means "send the
+  // code to a different address", so editing re-enters /otp-login instead of changing any account.
+  const isAccountEmailContext = searchParams.get("sync") === "email" || Boolean(redirectTo);
+  const editEmailHref = isAccountEmailContext
+    ? `/change-email${redirectTo ? `?redirect=${encodeURIComponent(redirectTo)}` : ""}`
+    : `/otp-login?email=${encodeURIComponent(email)}`;
+
   async function verify() {
     if (otp.length < OTP_LENGTH) {
       toast.error(`Enter the ${OTP_LENGTH}-digit code`);
@@ -57,7 +65,11 @@ function VerifyOTPContent() {
   }
 
   async function resend() {
-    const { error } = await supabase.auth.signInWithOtp({ email });
+    // By the time we're on this screen the account exists, so never create one on resend.
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: false },
+    });
     if (error) {
       toast.error(error.message);
       return;
@@ -94,10 +106,10 @@ function VerifyOTPContent() {
         </p>
 
         <Link
-          href={`/change-email${redirectTo ? `?redirect=${encodeURIComponent(redirectTo)}` : ""}`}
+          href={editEmailHref}
           className="mt-4 inline-block text-base text-[#2E00AB] underline underline-offset-4 sm:text-[18px]"
         >
-          Change email
+          {isAccountEmailContext ? "Change email" : "Use a different email"}
         </Link>
 
         {/* Changed overflow-x-auto to overflow-visible to prevent any sneaky hidden scrollbar artifacts */}

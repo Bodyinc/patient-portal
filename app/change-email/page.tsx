@@ -62,7 +62,7 @@ function ChangeEmailContent() {
     <AuthPageShell footer={null}>
       <AuthHeading
         title="Edit Email Address"
-        description="Update the email for your order. Your treatment plan and payment stay linked to your account."
+        description="Update your account email. We'll send a code to the new address to verify it — your treatment plan and payment stay linked to your account."
       />
 
       <form onSubmit={onSubmit} className="space-y-6">

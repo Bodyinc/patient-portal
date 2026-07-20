@@ -50,7 +50,7 @@ export default function BmiPage() {
     const inches = Number(heightInches);
     const weight = Number(weightLbs);
 
-    if (!Number.isFinite(feet) || feet < 0) {
+    if (!Number.isFinite(feet) || feet < 1 || feet > 8) {
       toast.error("Enter a valid height in feet");
       return;
     }
@@ -58,7 +58,7 @@ export default function BmiPage() {
       toast.error("Enter inches between 0 and 11");
       return;
     }
-    if (!Number.isFinite(weight) || weight <= 0) {
+    if (!Number.isFinite(weight) || weight <= 0 || weight > 1500) {
       toast.error("Enter a valid weight");
       return;
     }
@@ -117,7 +117,8 @@ export default function BmiPage() {
               <Input
                 id="feet"
                 type="number"
-                min={0}
+                min={1}
+                max={8}
                 inputMode="numeric"
                 value={heightFeet}
                 onChange={(e) => setHeightFeet(e.target.value)}
@@ -151,6 +152,7 @@ export default function BmiPage() {
               id="weight"
               type="number"
               min={1}
+              max={1500}
               inputMode="decimal"
               value={weightLbs}
               onChange={(e) => setWeightLbs(e.target.value)}

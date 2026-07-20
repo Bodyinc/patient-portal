@@ -18,13 +18,7 @@ export const PROTECTED_PATHS = [
  * Guest routes that redirect to /dashboard when already authenticated.
  * Excludes /reset-password and /auth/callback (recovery/code exchange flows).
  */
-export const GUEST_REDIRECT_PATHS = [
-  "/auth",
-  "/signup",
-  "/forgot-password",
-  "/otp-login",
-  "/verify-otp",
-];
+export const GUEST_REDIRECT_PATHS = ["/auth", "/forgot-password", "/otp-login", "/verify-otp"];
 
 /** Routes that must never auto-redirect authenticated users away */
 export const AUTH_FLOW_PATHS = ["/reset-password", "/auth/callback", "/auth/signout"];

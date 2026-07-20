@@ -4,13 +4,16 @@ import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { OPTIONAL_DOB_SCHEMA, OPTIONAL_PHONE_SCHEMA } from "@/lib/validation";
 import type { Tables } from "@/lib/supabase/types";
 
+// NOTE: email is intentionally NOT accepted here. The login (auth) email and profiles.email
+// must stay in sync, and only the OTP-verified change flow (changeCheckoutEmail →
+// reconcileCheckoutEmail) may move it. Editing profiles.email directly would desync the two.
 const profileUpdateSchema = z.object({
   fullName: z.string().trim().min(1).max(120),
-  email: z.string().trim().email().max(255),
-  phone: z.string().trim().max(32).optional().or(z.literal("")),
-  dob: z.string().trim().optional().or(z.literal("")),
+  phone: OPTIONAL_PHONE_SCHEMA,
+  dob: OPTIONAL_DOB_SCHEMA,
   sex: z.enum(["male", "female", "other"]).nullable(),
   stateCode: z.string().trim().max(2).optional().or(z.literal("")),
   streetAddress: z.string().trim().max(255).optional().or(z.literal("")),
@@ -65,6 +68,34 @@ async function requireAuthedUser() {
   return { supabase, user };
 }
 
+// An abandoned email change can leave the auth LOGIN email pointing at an unverified new address
+// while profiles.email still holds the verified one. profiles.email is only ever written after a
+// code is verified (signup / reconcileCheckoutEmail), so it is the source of truth — restore the
+// auth email to it whenever the two drift. Returns the canonical (verified) email.
+export async function healProfileEmail(): Promise<{ email: string } | null> {
+  const auth = await requireAuthedUser();
+  if (!auth) return null;
+
+  const { data: profile } = await auth.supabase
+    .from("profiles")
+    .select("email")
+    .eq("id", auth.user.id)
+    .maybeSingle();
+
+  const profileEmail = (profile as { email: string | null } | null)?.email ?? null;
+  const authEmail = auth.user.email ?? null;
+
+  if (profileEmail && authEmail && profileEmail.toLowerCase() !== authEmail.toLowerCase()) {
+    await supabaseAdmin.auth.admin.updateUserById(auth.user.id, {
+      email: profileEmail,
+      email_confirm: true,
+    });
+    return { email: profileEmail };
+  }
+
+  return { email: profileEmail ?? authEmail ?? "" };
+}
+
 export async function getMyProfile(): Promise<ProfileActionResult<EditableProfileDto>> {
   const auth = await requireAuthedUser();
   if (!auth) {
@@ -105,7 +136,6 @@ export async function updateMyProfile(
 
   const updatePayload: Partial<Tables<"profiles">> = {
     full_name: data.fullName,
-    email: data.email,
     phone: data.phone || null,
     dob: data.dob || null,
     sex: data.sex,

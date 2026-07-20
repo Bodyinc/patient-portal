@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Bell, Search } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -20,6 +21,9 @@ type Field = {
   label: string;
   type?: "text" | "email" | "date";
   kind?: "input" | "select-sex";
+  readOnly?: boolean;
+  hint?: string;
+  action?: { label: string; href: string };
 };
 
 function Section({
@@ -40,7 +44,17 @@ function Section({
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         {fields.map((field) => (
           <div key={field.key} className="space-y-1">
-            <label className="text-xs text-[#2E00AB]/70">{field.label}</label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs text-[#2E00AB]/70">{field.label}</label>
+              {field.action ? (
+                <Link
+                  href={field.action.href}
+                  className="text-[11px] font-semibold text-[#2E00AB] underline underline-offset-2"
+                >
+                  {field.action.label}
+                </Link>
+              ) : null}
+            </div>
             {field.kind === "select-sex" ? (
               <select
                 value={form.sex ?? ""}
@@ -57,9 +71,16 @@ function Section({
                 type={field.type ?? "text"}
                 value={(form[field.key] as string) ?? ""}
                 onChange={(e) => onChange(field.key, e.target.value)}
-                className="w-full rounded-md border border-[#F1ECFF] bg-[#FCFBFF] px-3 py-2 text-sm font-medium text-[#2E00AB] outline-none focus:border-[#2E00AB]/40"
+                readOnly={field.readOnly}
+                disabled={field.readOnly}
+                className={`w-full rounded-md border border-[#F1ECFF] px-3 py-2 text-sm font-medium text-[#2E00AB] outline-none focus:border-[#2E00AB]/40 ${
+                  field.readOnly
+                    ? "cursor-not-allowed bg-[#F3EFFF] text-[#2E00AB]/60"
+                    : "bg-[#FCFBFF]"
+                }`}
               />
             )}
+            {field.hint ? <p className="text-[11px] text-[#2E00AB]/50">{field.hint}</p> : null}
           </div>
         ))}
       </div>
@@ -108,7 +129,6 @@ export default function ProfileEditor({ initialProfile }: { initialProfile: Edit
     startSaveTransition(async () => {
       const result = await updateMyProfile({
         fullName: form.fullName,
-        email: form.email,
         phone: form.phone,
         dob: form.dob,
         sex: form.sex,
@@ -187,7 +207,13 @@ export default function ProfileEditor({ initialProfile }: { initialProfile: Edit
           form={form}
           onChange={updateField}
           fields={[
-            { key: "email", label: "Email Address", type: "email" },
+            {
+              key: "email",
+              label: "Email Address",
+              type: "email",
+              readOnly: true,
+              action: { label: "Change email", href: "/profile/change-email" },
+            },
             { key: "phone", label: "Phone Number" },
           ]}
         />

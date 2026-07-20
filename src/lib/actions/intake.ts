@@ -34,7 +34,9 @@ import type {
 } from "@/lib/intake/types";
 import { normalizeQuestionType } from "@/lib/intake/questionnaire";
 import { resolveMedicineImageSrc } from "@/lib/intake/medicine-image";
+import { classifyPatientEmail } from "@/lib/auth/patient-email";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { DOB_SCHEMA, PHONE_SCHEMA } from "@/lib/validation";
 import type { Json } from "@/lib/supabase/types";
 
 function parseImportantInfo(value: Json): string[] {
@@ -394,7 +396,7 @@ export async function saveIntakeCategory(
 const demographicsSchema = z.object({
   stateCode: z.string().trim().min(2).max(2),
   sex: z.enum(["male", "female", "other"]),
-  dob: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  dob: DOB_SCHEMA,
 });
 
 export async function saveIntakeDemographics(
@@ -405,7 +407,15 @@ export async function saveIntakeDemographics(
     return { ok: false, code: "session_error", message: sessionResult.error };
   }
 
-  const data = demographicsSchema.parse(input);
+  const parsed = demographicsSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      code: "invalid_input",
+      message: parsed.error.issues[0]?.message ?? "Invalid input.",
+    };
+  }
+  const data = parsed.data;
 
   const { error } = await supabaseAdmin
     .from("intake_sessions")
@@ -424,9 +434,9 @@ export async function saveIntakeDemographics(
 }
 
 const bmiSchema = z.object({
-  heightFeet: z.number().min(0),
+  heightFeet: z.number().min(1).max(8),
   heightInches: z.number().min(0).max(11),
-  weightLbs: z.number().positive(),
+  weightLbs: z.number().positive().max(1500),
 });
 
 export async function saveIntakeBmi(
@@ -437,7 +447,15 @@ export async function saveIntakeBmi(
     return { ok: false, code: "session_error", message: sessionResult.error };
   }
 
-  const data = bmiSchema.parse(input);
+  const parsed = bmiSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      code: "invalid_input",
+      message: parsed.error.issues[0]?.message ?? "Invalid measurements.",
+    };
+  }
+  const data = parsed.data;
   const heightCm = toHeightCm(data.heightFeet, data.heightInches);
   const weightKg = toWeightKg(data.weightLbs);
   const bmi = calculateBmiFromMetric(heightCm, weightKg);
@@ -534,7 +552,7 @@ export async function saveIntakeMedicine(
 const contactSchema = z.object({
   fullName: z.string().trim().min(1).max(120),
   email: z.string().trim().email().max(255),
-  phone: z.string().trim().min(7).max(32),
+  phone: PHONE_SCHEMA,
 });
 
 export async function saveIntakeContact(
@@ -545,13 +563,43 @@ export async function saveIntakeContact(
     return { ok: false, code: "session_error", message: sessionResult.error };
   }
 
-  const data = contactSchema.parse(input);
+  const parsed = contactSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      code: "invalid_input",
+      message: parsed.error.issues[0]?.message ?? "Invalid input.",
+    };
+  }
+  const data = parsed.data;
+  const email = data.email.toLowerCase();
+
+  // Onboarding is new-patients-only: reject an email that already has an account so a
+  // client-side bypass can't seed an existing identity into the intake session.
+  const emailCheck = await classifyPatientEmail(email);
+  if (emailCheck.status === "patient") {
+    return {
+      ok: false,
+      code: "email_exists",
+      message: "An account with this email already exists. Please log in instead.",
+    };
+  }
+  if (emailCheck.status === "wrong_portal") {
+    return {
+      ok: false,
+      code: "wrong_portal",
+      message: `An account with this email already exists on the ${emailCheck.role} portal.`,
+    };
+  }
+  if (emailCheck.status === "invalid" || emailCheck.status === "error") {
+    return { ok: false, code: "email_check_failed", message: "Could not verify that email." };
+  }
 
   const { error } = await supabaseAdmin
     .from("intake_sessions")
     .update({
       full_name: data.fullName,
-      email: data.email,
+      email,
       phone: data.phone,
     })
     .eq("id", sessionResult.session.id);
@@ -655,15 +703,26 @@ export async function saveQuestionnaireResponses(
     .eq("session_id", sessionResult.session.id)
     .eq("medicine_id", medicineId);
 
-  const rows = responses.map((response) => ({
-    session_id: sessionResult.session.id,
-    medicine_id: medicineId,
-    question_id: response.questionId,
-    answer_text: response.answerText ?? null,
-    answer_number: response.answerNumber ?? null,
-    answer_boolean: response.answerBoolean ?? null,
-    answer_option_ids: response.optionIds ?? [],
-  }));
+  const MAX_ANSWER_TEXT = 5000;
+  const rows = responses.map((response) => {
+    const answerText =
+      typeof response.answerText === "string"
+        ? response.answerText.slice(0, MAX_ANSWER_TEXT)
+        : null;
+    const answerNumber =
+      typeof response.answerNumber === "number" && Number.isFinite(response.answerNumber)
+        ? response.answerNumber
+        : null;
+    return {
+      session_id: sessionResult.session.id,
+      medicine_id: medicineId,
+      question_id: response.questionId,
+      answer_text: answerText,
+      answer_number: answerNumber,
+      answer_boolean: response.answerBoolean ?? null,
+      answer_option_ids: response.optionIds ?? [],
+    };
+  });
 
   if (rows.length === 0) {
     return { ok: true, data: { saved: 0 } };

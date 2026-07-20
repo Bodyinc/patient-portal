@@ -16,7 +16,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { onLoginSuccess } from "@/lib/auth/on-login-success";
-import { WRONG_PORTAL_GENERIC_MESSAGE } from "@/lib/auth/constants";
+import { WRONG_PORTAL_GENERIC_MESSAGE, wrongPortalMessage } from "@/lib/auth/constants";
+import { checkPatientEmail } from "@/lib/actions/patient-auth";
 import { createClient } from "@/lib/supabase/client";
 
 const loginSchema = z.object({
@@ -46,7 +47,7 @@ function AuthPageContent() {
 
       <LoginForm />
 
-      <div className="mt-5">
+      <div className="mt-5 space-y-3">
         <Button
           type="button"
           variant="outline"
@@ -55,6 +56,17 @@ function AuthPageContent() {
         >
           Login with OTP
         </Button>
+
+        <p className="text-center text-sm text-[#2E00AB]/80">
+          New to Body Inc?{" "}
+          <button
+            type="button"
+            onClick={() => router.push("/onboarding/goal")}
+            className="font-medium text-[#2E00AB] hover:underline"
+          >
+            Get started
+          </button>
+        </p>
       </div>
     </AuthPageShell>
   );
@@ -89,7 +101,19 @@ function LoginForm() {
         password: parsed.data.password,
       });
       if (error) {
-        toast.error(error.message);
+        // Supabase returns the same generic error for a wrong password and a
+        // non-existent email. Classify the email so we can send brand-new visitors
+        // into onboarding instead of showing them a login error.
+        const check = await checkPatientEmail(parsed.data.email);
+        if (check.status === "new") {
+          router.push(`/onboarding/goal?email=${encodeURIComponent(parsed.data.email)}`);
+          return;
+        }
+        if (check.status === "wrong_portal") {
+          toast.error(wrongPortalMessage(check.role), { duration: 8000 });
+          return;
+        }
+        toast.error("Incorrect email or password.");
         return;
       }
 

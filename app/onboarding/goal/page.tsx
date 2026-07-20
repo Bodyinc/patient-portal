@@ -27,6 +27,14 @@ export default function GoalPage() {
     if (state.goalId) setSelected(state.goalId);
   }, [hydrated, state.goalId]);
 
+  // Prefill the email carried over from a login attempt for a not-yet-registered address
+  // (/auth and /otp-login redirect here with ?email=), so the funnel doesn't ask twice.
+  useEffect(() => {
+    if (!hydrated || state.email) return;
+    const emailParam = new URLSearchParams(window.location.search).get("email");
+    if (emailParam) updateState({ email: emailParam });
+  }, [hydrated, state.email, updateState]);
+
   async function handleContinue() {
     if (!selected) {
       toast.error("Please select a goal");
