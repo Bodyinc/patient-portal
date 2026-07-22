@@ -810,11 +810,15 @@ export async function getPackagesForMedicine(
   medicineId: string,
   variantId?: string | null,
 ): Promise<IntakeActionResult<PackageDto[]>> {
+  // A package with no stripe_price_id cannot be charged — checkout rejects it with "This plan is
+  // not available for purchase yet". Exclude it here so the patient never picks a dead plan and
+  // only discovers it after completing the whole intake.
   let query = supabaseAdmin
     .from("packages")
     .select("*")
     .eq("medicine_id", medicineId)
     .eq("is_active", true)
+    .not("stripe_price_id", "is", null)
     .order("duration_months", { ascending: true });
   // Packages belong to a variant when one is chosen, otherwise to the medicine directly.
   query = variantId ? query.eq("variant_id", variantId) : query.is("variant_id", null);
@@ -854,12 +858,20 @@ export async function saveSelectedPlan(
 
   const { data: pkg, error: pkgError } = await supabaseAdmin
     .from("packages")
-    .select("id, is_active, medicine_id")
+    .select("id, is_active, medicine_id, stripe_price_id")
     .eq("id", packageId)
     .maybeSingle();
 
   if (pkgError || !pkg || !pkg.is_active) {
     return { ok: false, code: "not_found", message: "Plan not found" };
+  }
+
+  if (!pkg.stripe_price_id) {
+    return {
+      ok: false,
+      code: "invalid_plan",
+      message: "This plan is not available for purchase yet.",
+    };
   }
 
   if (pkg.medicine_id !== medicineLink.medicine_id) {
@@ -899,12 +911,20 @@ export async function confirmCheckoutStub(): Promise<IntakeActionResult<{ sessio
 
   const { data: pkg } = await supabaseAdmin
     .from("packages")
-    .select("medicine_id, is_active")
+    .select("medicine_id, is_active, stripe_price_id")
     .eq("id", summary.selectedPackageId)
     .maybeSingle();
 
   if (!pkg?.is_active || pkg.medicine_id !== summary.medicineId) {
     return { ok: false, code: "invalid_plan", message: "Selected plan is not valid" };
+  }
+
+  if (!pkg.stripe_price_id) {
+    return {
+      ok: false,
+      code: "invalid_plan",
+      message: "This plan is not available for purchase yet.",
+    };
   }
 
   if (summary.requiresQuestionnaire && summary.eligibilityResult === "ineligible") {

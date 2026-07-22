@@ -1197,6 +1197,10 @@ export type Database = {
         Args: { _user_id: string };
         Returns: Database["public"]["Enums"]["app_role"];
       };
+      has_password: {
+        Args: never;
+        Returns: boolean;
+      };
     };
     Enums: {
       app_role: "admin" | "provider" | "patient";

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { InputOTP, InputOTPSlot } from "@/components/ui/input-otp";
 import { OTP_LENGTH } from "@/lib/auth/constants";
 import { onLoginSuccess } from "@/lib/auth/on-login-success";
-import { reconcileCheckoutEmail } from "@/lib/actions/patient-auth";
+import { hasPassword, reconcileCheckoutEmail } from "@/lib/actions/patient-auth";
 import { createClient } from "@/lib/supabase/client";
 
 function VerifyOTPContent() {
@@ -51,10 +51,20 @@ function VerifyOTPContent() {
         await reconcileCheckoutEmail();
       }
 
-      if (redirectTo && redirectTo.startsWith("/")) {
+      const destination = redirectTo?.startsWith("/") ? redirectTo : null;
+
+      // Accounts created during checkout have no password — they can only ever get back in via
+      // OTP until they set one, so route them through /set-password before their destination.
+      if (!(await hasPassword())) {
+        router.refresh();
+        router.replace(`/set-password?next=${encodeURIComponent(destination ?? "/dashboard")}`);
+        return;
+      }
+
+      if (destination) {
         toast.success("You're signed in. Continuing your order…");
         router.refresh();
-        router.push(redirectTo);
+        router.push(destination);
         return;
       }
 
