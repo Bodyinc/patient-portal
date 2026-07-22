@@ -218,11 +218,14 @@ export async function fetchShopCheckoutBootstrapData(options: {
     };
   }
 
+  // Unpriced packages are not chargeable — leaving them out means the "Pricing coming soon"
+  // path below catches them, instead of the patient failing at the payment step.
   let packagesQuery = supabaseAdmin
     .from("packages")
     .select("id, name, duration_months, price, is_most_popular, is_active")
     .eq("medicine_id", medicine.id)
     .eq("is_active", true)
+    .not("stripe_price_id", "is", null)
     .order("sort_order", { ascending: true });
   packagesQuery = variant
     ? packagesQuery.eq("variant_id", variant.id)

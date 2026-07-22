@@ -12,6 +12,7 @@ export const PROTECTED_PATHS = [
   "/shop",
   "/profile",
   "/settings",
+  "/set-password",
 ];
 
 /**

@@ -101,6 +101,47 @@ async function ensurePatientRoleForUser(userId: string) {
   return { ok: true as const, role: PORTAL_ROLE };
 }
 
+export async function hasPassword(): Promise<boolean> {
+  const auth = await getAuthenticatedClient();
+  if (!auth) return false;
+
+  const { data, error } = await auth.supabase.rpc("has_password");
+  if (error) return false;
+  return data === true;
+}
+
+const passwordSchema = z.string().min(8).max(72);
+
+export type SetInitialPasswordResult = { ok: true } | { ok: false; message: string };
+
+export async function setInitialPassword(rawPassword: string): Promise<SetInitialPasswordResult> {
+  const parsed = passwordSchema.safeParse(rawPassword);
+  if (!parsed.success) {
+    return { ok: false, message: "Password must be at least 8 characters." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, message: "Your session expired. Sign in again." };
+  }
+
+  const { error } = await supabase.auth.updateUser({ password: parsed.data });
+  if (error) {
+    return { ok: false, message: error.message ?? "Could not set your password." };
+  }
+
+  // app_metadata is replaced wholesale by updateUserById — spread the existing object or the
+  // `role` key that requirePatientSession() reads would be wiped.
+  await supabaseAdmin.auth.admin.updateUserById(user.id, {
+    app_metadata: { ...user.app_metadata, password_set: true },
+  });
+
+  return { ok: true };
+}
+
 const changeEmailSchema = z.string().trim().email().max(255);
 
 export type ChangeCheckoutEmailResult =

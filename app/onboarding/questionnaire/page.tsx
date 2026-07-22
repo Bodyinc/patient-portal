@@ -78,13 +78,26 @@ export default function QuestionnairePage() {
     }
   }, [hydrated, router, state.requiresQuestionnaire]);
 
+  // medicines.requires_questionnaire is a standalone flag, so it can be true while no active
+  // questionnaire is linked. Clearing it here is what breaks the redirect loop: the step guard in
+  // onboarding-store recomputes from state, and while the flag stayed set it treated the step as
+  // incomplete and bounced us straight back from /select-plan.
   useEffect(() => {
     if (!hydrated || isLoading) return;
     if (state.requiresQuestionnaire && state.medicationId && questionnaire === null) {
+      updateState({ requiresQuestionnaire: false, questionnaireComplete: true });
       toast.error("No questionnaire is available for this medication.");
       router.replace("/onboarding/select-plan");
     }
-  }, [hydrated, isLoading, questionnaire, router, state.medicationId, state.requiresQuestionnaire]);
+  }, [
+    hydrated,
+    isLoading,
+    questionnaire,
+    router,
+    state.medicationId,
+    state.requiresQuestionnaire,
+    updateState,
+  ]);
 
   function updateAnswer(questionId: string, value: QuestionnaireAnswerValue) {
     setAnswers((prev) => ({ ...prev, [questionId]: value }));

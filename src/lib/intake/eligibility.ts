@@ -5,14 +5,39 @@ import type { IntakeSessionRow } from "@/lib/intake/session";
 import type { EligibilityResultDto } from "@/lib/intake/types";
 import type { Json } from "@/lib/supabase/types";
 
+// `sex` and `bmi_bands` are the keys the admin category form writes; `allowed_sex`, `min_bmi` and
+// `max_bmi` are the portal's older names, kept as a fallback for rules set outside that form.
+// An empty array means "skip this check", matching the admin UI's stated contract.
 export type CategoryEligibilityRules = {
-  min_age?: number;
-  max_age?: number;
-  min_bmi?: number;
-  max_bmi?: number;
-  blocked_state_codes?: string[];
-  allowed_sex?: string[];
+  min_age?: number | null;
+  max_age?: number | null;
+  min_bmi?: number | null;
+  max_bmi?: number | null;
+  bmi_bands?: string[] | null;
+  sex?: string[] | null;
+  blocked_state_codes?: string[] | null;
+  allowed_sex?: string[] | null;
 };
+
+export const BMI_BANDS = ["underweight", "normal", "overweight", "obese"] as const;
+export type BmiBand = (typeof BMI_BANDS)[number];
+
+// Thresholds mirror the admin form's band labels (<18.5 / 18.5–24.9 / 25–29.9 / 30+).
+function bmiBand(bmi: number): BmiBand {
+  if (bmi < 18.5) return "underweight";
+  if (bmi < 25) return "normal";
+  if (bmi < 30) return "overweight";
+  return "obese";
+}
+
+// eligibility_rules is a free-form jsonb column and the admin category form persists explicit
+// nulls for bounds the operator left blank. A null slips past a `!== undefined` guard and then
+// coerces to 0 inside the comparison (`age > null` is `age > 0`), which disqualified every
+// patient. Collapse anything that isn't a real number to null so the guards below mean
+// "no bound configured".
+function bound(value: number | null | undefined): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
 
 type QuestionOptionRow = {
   id: string;
@@ -59,8 +84,9 @@ export function evaluateCategoryRules(
     }
   }
 
-  if (rules.allowed_sex?.length && session.sex) {
-    if (!rules.allowed_sex.includes(session.sex)) {
+  const allowedSex = rules.sex?.length ? rules.sex : rules.allowed_sex;
+  if (allowedSex?.length && session.sex) {
+    if (!allowedSex.includes(session.sex)) {
       return {
         result: "ineligible",
         reason: "This treatment is not available for your selected sex.",
@@ -68,35 +94,48 @@ export function evaluateCategoryRules(
     }
   }
 
-  if (session.dob && (rules.min_age !== undefined || rules.max_age !== undefined)) {
+  const minAge = bound(rules.min_age);
+  const maxAge = bound(rules.max_age);
+
+  if (session.dob && (minAge !== null || maxAge !== null)) {
     const age = calculateAgeFromDob(session.dob);
     if (age !== null) {
-      if (rules.min_age !== undefined && age < rules.min_age) {
-        return { result: "ineligible", reason: `Minimum age is ${rules.min_age}.` };
+      if (minAge !== null && age < minAge) {
+        return { result: "ineligible", reason: `Minimum age is ${minAge}.` };
       }
-      if (rules.max_age !== undefined && age > rules.max_age) {
-        return { result: "ineligible", reason: `Maximum age is ${rules.max_age}.` };
+      if (maxAge !== null && age > maxAge) {
+        return { result: "ineligible", reason: `Maximum age is ${maxAge}.` };
       }
     }
   }
 
+  const minBmi = bound(rules.min_bmi);
+  const maxBmi = bound(rules.max_bmi);
+  const allowedBands = rules.bmi_bands?.length ? rules.bmi_bands : null;
+
   if (
     session.height_cm !== null &&
     session.weight_kg !== null &&
-    (rules.min_bmi !== undefined || rules.max_bmi !== undefined)
+    (minBmi !== null || maxBmi !== null || allowedBands !== null)
   ) {
     const bmi = calculateBmiFromMetric(Number(session.height_cm), Number(session.weight_kg));
     if (bmi !== null) {
-      if (rules.min_bmi !== undefined && bmi < rules.min_bmi) {
+      if (minBmi !== null && bmi < minBmi) {
         return {
           result: "ineligible",
-          reason: `Minimum BMI of ${rules.min_bmi} is required.`,
+          reason: `Minimum BMI of ${minBmi} is required.`,
         };
       }
-      if (rules.max_bmi !== undefined && bmi > rules.max_bmi) {
+      if (maxBmi !== null && bmi > maxBmi) {
         return {
           result: "ineligible",
-          reason: `Maximum BMI of ${rules.max_bmi} is required.`,
+          reason: `Maximum BMI of ${maxBmi} is required.`,
+        };
+      }
+      if (allowedBands && !allowedBands.includes(bmiBand(bmi))) {
+        return {
+          result: "ineligible",
+          reason: `This treatment requires a BMI in the ${allowedBands.join(" or ")} range.`,
         };
       }
     }

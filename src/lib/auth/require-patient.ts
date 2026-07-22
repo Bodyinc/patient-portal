@@ -44,5 +44,19 @@ export const requirePatientSession = cache(async () => {
     redirect("/auth?error=wrong_portal");
   }
 
+  // Checkout creates accounts with no password. Same metadata-cache trick as the role above —
+  // the RPC is the authority, app_metadata is the zero-round-trip fast path. On RPC error fall
+  // through rather than redirect: a transient DB failure must not lock a patient out.
+  if (user.app_metadata?.password_set !== true) {
+    const { data: hasPw, error } = await supabase.rpc("has_password");
+    if (!error && hasPw) {
+      void supabaseAdmin.auth.admin
+        .updateUserById(user.id, { app_metadata: { ...user.app_metadata, password_set: true } })
+        .catch(() => {});
+    } else if (!error && !hasPw) {
+      redirect("/set-password");
+    }
+  }
+
   return { user, supabase, role };
 });
