@@ -8,6 +8,7 @@ export const ONBOARDING_STEPS = [
   { id: "bmi", path: "/onboarding/bmi" },
   { id: "medications", path: "/onboarding/medications" },
   { id: "personal-info", path: "/onboarding/personal-info" },
+  { id: "delivery-address", path: "/onboarding/delivery-address" },
   { id: "questionnaire", path: "/onboarding/questionnaire" },
   { id: "select-plan", path: "/onboarding/select-plan" },
   { id: "billing-checkout", path: "/onboarding/billing-checkout" },
@@ -56,6 +57,12 @@ function isQuestionnaireComplete(state: OnboardingState) {
   return state.questionnaireComplete;
 }
 
+function isAddressComplete(state: OnboardingState) {
+  return Boolean(
+    state.streetAddress && state.apartment && state.city && state.postalCode && state.state,
+  );
+}
+
 function isBmiComplete(state: OnboardingState) {
   if (state.bmi !== null) return true;
   return (
@@ -70,7 +77,7 @@ export function getNextStepPath(currentPath: string, state: OnboardingState): st
   const current = getStepByPath(currentPath);
   if (!current) return null;
 
-  if (current.id === "personal-info") {
+  if (current.id === "delivery-address") {
     return includesQuestionnaire(state) ? "/onboarding/questionnaire" : "/onboarding/select-plan";
   }
 
@@ -84,7 +91,9 @@ export function getPrevStepPath(currentPath: string, state: OnboardingState): st
   if (!current) return null;
 
   if (current.id === "select-plan") {
-    return includesQuestionnaire(state) ? "/onboarding/questionnaire" : "/onboarding/personal-info";
+    return includesQuestionnaire(state)
+      ? "/onboarding/questionnaire"
+      : "/onboarding/delivery-address";
   }
 
   const index = getStepIndex(currentPath);
@@ -98,6 +107,7 @@ export function getEarliestIncompleteStep(state: OnboardingState): string {
   if (!isBmiComplete(state)) return "/onboarding/bmi";
   if (!state.medicationId) return "/onboarding/medications";
   if (!state.fullName || !state.email || !state.phone) return "/onboarding/personal-info";
+  if (!isAddressComplete(state)) return "/onboarding/delivery-address";
 
   if (includesQuestionnaire(state) && !isQuestionnaireComplete(state)) {
     return "/onboarding/questionnaire";

@@ -6,6 +6,243 @@ export type Database = {
   };
   public: {
     Tables: {
+      medication_requests: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          session_id: string | null;
+          subscription_id: string | null;
+          payment_id: string | null;
+          stripe_invoice_id: string | null;
+          medicine_id: string | null;
+          variant_id: string | null;
+          package_id: string | null;
+          provider_id: string | null;
+          kind: string;
+          status: string;
+          requires_consultation: boolean;
+          tracking_number: string | null;
+          billing_period_end: string | null;
+          decision_by: string | null;
+          decision_at: string | null;
+          decision_note: string | null;
+          stripe_refund_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          session_id?: string | null;
+          subscription_id?: string | null;
+          payment_id?: string | null;
+          stripe_invoice_id?: string | null;
+          medicine_id?: string | null;
+          variant_id?: string | null;
+          package_id?: string | null;
+          provider_id?: string | null;
+          kind?: string;
+          status?: string;
+          requires_consultation?: boolean;
+          tracking_number?: string | null;
+          billing_period_end?: string | null;
+          decision_by?: string | null;
+          decision_at?: string | null;
+          decision_note?: string | null;
+          stripe_refund_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string | null;
+          session_id?: string | null;
+          subscription_id?: string | null;
+          payment_id?: string | null;
+          stripe_invoice_id?: string | null;
+          medicine_id?: string | null;
+          variant_id?: string | null;
+          package_id?: string | null;
+          provider_id?: string | null;
+          kind?: string;
+          status?: string;
+          requires_consultation?: boolean;
+          tracking_number?: string | null;
+          billing_period_end?: string | null;
+          decision_by?: string | null;
+          decision_at?: string | null;
+          decision_note?: string | null;
+          stripe_refund_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      medication_request_events: {
+        Row: {
+          id: string;
+          request_id: string;
+          status: string;
+          note: string | null;
+          actor_role: string;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          request_id: string;
+          status: string;
+          note?: string | null;
+          actor_role?: string;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          request_id?: string;
+          status?: string;
+          note?: string | null;
+          actor_role?: string;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      additional_payments: {
+        Row: {
+          id: string;
+          request_id: string;
+          user_id: string | null;
+          amount_cents: number;
+          currency: string;
+          reason: string | null;
+          from_package_id: string | null;
+          to_package_id: string | null;
+          status: string;
+          stripe_payment_intent_id: string | null;
+          stripe_invoice_id: string | null;
+          stripe_checkout_session_id: string | null;
+          paid_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          request_id: string;
+          user_id?: string | null;
+          amount_cents: number;
+          currency?: string;
+          reason?: string | null;
+          from_package_id?: string | null;
+          to_package_id?: string | null;
+          status?: string;
+          stripe_payment_intent_id?: string | null;
+          stripe_invoice_id?: string | null;
+          stripe_checkout_session_id?: string | null;
+          paid_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          request_id?: string;
+          user_id?: string | null;
+          amount_cents?: number;
+          currency?: string;
+          reason?: string | null;
+          from_package_id?: string | null;
+          to_package_id?: string | null;
+          status?: string;
+          stripe_payment_intent_id?: string | null;
+          stripe_invoice_id?: string | null;
+          stripe_checkout_session_id?: string | null;
+          paid_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      prescriptions: {
+        Row: {
+          id: string;
+          request_id: string;
+          user_id: string | null;
+          provider_id: string | null;
+          medicine_id: string | null;
+          variant_id: string | null;
+          package_id: string | null;
+          medicine_name: string;
+          directions: string | null;
+          status: string;
+          document_url: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          request_id: string;
+          user_id?: string | null;
+          provider_id?: string | null;
+          medicine_id?: string | null;
+          variant_id?: string | null;
+          package_id?: string | null;
+          medicine_name: string;
+          directions?: string | null;
+          status?: string;
+          document_url?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          request_id?: string;
+          user_id?: string | null;
+          provider_id?: string | null;
+          medicine_id?: string | null;
+          variant_id?: string | null;
+          package_id?: string | null;
+          medicine_name?: string;
+          directions?: string | null;
+          status?: string;
+          document_url?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      providers: {
+        Row: {
+          id: string;
+          is_active: boolean;
+          state: string | null;
+          license_states: string[];
+          practice_states: string[];
+          specialty: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          is_active?: boolean;
+          state?: string | null;
+          license_states?: string[];
+          practice_states?: string[];
+          specialty?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          is_active?: boolean;
+          state?: string | null;
+          license_states?: string[];
+          practice_states?: string[];
+          specialty?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       intake_session_categories: {
         Row: {
           session_id: string;
@@ -160,6 +397,18 @@ export type Database = {
           full_name: string | null;
           email: string | null;
           phone: string | null;
+          street_address: string | null;
+          apartment: string | null;
+          city: string | null;
+          postal_code: string | null;
+          billing_same_as_shipping: boolean;
+          billing_street_address: string | null;
+          billing_apartment: string | null;
+          billing_city: string | null;
+          billing_state_code: string | null;
+          billing_postal_code: string | null;
+          sms_consent: boolean;
+          marketing_consent: boolean;
           selected_plan_id: string | null;
           status: Database["public"]["Enums"]["intake_session_status"];
           claimed_by_user_id: string | null;
@@ -180,6 +429,18 @@ export type Database = {
           full_name?: string | null;
           email?: string | null;
           phone?: string | null;
+          street_address?: string | null;
+          apartment?: string | null;
+          city?: string | null;
+          postal_code?: string | null;
+          billing_same_as_shipping?: boolean;
+          billing_street_address?: string | null;
+          billing_apartment?: string | null;
+          billing_city?: string | null;
+          billing_state_code?: string | null;
+          billing_postal_code?: string | null;
+          sms_consent?: boolean;
+          marketing_consent?: boolean;
           selected_plan_id?: string | null;
           status?: Database["public"]["Enums"]["intake_session_status"];
           claimed_by_user_id?: string | null;
@@ -200,6 +461,18 @@ export type Database = {
           full_name?: string | null;
           email?: string | null;
           phone?: string | null;
+          street_address?: string | null;
+          apartment?: string | null;
+          city?: string | null;
+          postal_code?: string | null;
+          billing_same_as_shipping?: boolean;
+          billing_street_address?: string | null;
+          billing_apartment?: string | null;
+          billing_city?: string | null;
+          billing_state_code?: string | null;
+          billing_postal_code?: string | null;
+          sms_consent?: boolean;
+          marketing_consent?: boolean;
           selected_plan_id?: string | null;
           status?: Database["public"]["Enums"]["intake_session_status"];
           claimed_by_user_id?: string | null;
@@ -320,6 +593,8 @@ export type Database = {
           created_at: string;
           updated_at: string;
           requires_questionnaire: boolean;
+          requires_consultation: boolean;
+          requires_followup: boolean;
           stripe_product_id: string | null;
         };
         Insert: {
@@ -337,6 +612,8 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           requires_questionnaire?: boolean;
+          requires_consultation?: boolean;
+          requires_followup?: boolean;
           stripe_product_id?: string | null;
         };
         Update: {
@@ -354,6 +631,8 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           requires_questionnaire?: boolean;
+          requires_consultation?: boolean;
+          requires_followup?: boolean;
           stripe_product_id?: string | null;
         };
         Relationships: [];
@@ -874,10 +1153,13 @@ export type Database = {
           email: string;
           avatar_url: string | null;
           street_address: string | null;
+          apartment: string | null;
           city: string | null;
           state_code: string | null;
           postal_code: string | null;
           country: string | null;
+          sms_consent: boolean;
+          marketing_consent: boolean;
           sex: Database["public"]["Enums"]["sex_type"] | null;
           created_at: string;
           updated_at: string;
@@ -892,10 +1174,13 @@ export type Database = {
           email: string;
           avatar_url?: string | null;
           street_address?: string | null;
+          apartment?: string | null;
           city?: string | null;
           state_code?: string | null;
           postal_code?: string | null;
           country?: string | null;
+          sms_consent?: boolean;
+          marketing_consent?: boolean;
           sex?: Database["public"]["Enums"]["sex_type"] | null;
           created_at?: string;
           updated_at?: string;
@@ -910,10 +1195,13 @@ export type Database = {
           email?: string;
           avatar_url?: string | null;
           street_address?: string | null;
+          apartment?: string | null;
           city?: string | null;
           state_code?: string | null;
           postal_code?: string | null;
           country?: string | null;
+          sms_consent?: boolean;
+          marketing_consent?: boolean;
           sex?: Database["public"]["Enums"]["sex_type"] | null;
           created_at?: string;
           updated_at?: string;
@@ -958,20 +1246,20 @@ export type Database = {
         };
         Relationships: [];
       };
-      questionnaire_medicines: {
+      questionnaire_categories: {
         Row: {
           questionnaire_id: string;
-          medicine_id: string;
+          category_id: string;
           created_at: string;
         };
         Insert: {
           questionnaire_id: string;
-          medicine_id: string;
+          category_id: string;
           created_at?: string;
         };
         Update: {
           questionnaire_id?: string;
-          medicine_id?: string;
+          category_id?: string;
           created_at?: string;
         };
         Relationships: [];

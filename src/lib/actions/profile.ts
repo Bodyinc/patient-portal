@@ -17,6 +17,7 @@ const profileUpdateSchema = z.object({
   sex: z.enum(["male", "female", "other"]).nullable(),
   stateCode: z.string().trim().max(2).optional().or(z.literal("")),
   streetAddress: z.string().trim().max(255).optional().or(z.literal("")),
+  apartment: z.string().trim().max(60).optional().or(z.literal("")),
   city: z.string().trim().max(120).optional().or(z.literal("")),
   postalCode: z.string().trim().max(20).optional().or(z.literal("")),
   country: z.string().trim().max(120).optional().or(z.literal("")),
@@ -35,6 +36,7 @@ export type EditableProfileDto = {
   sex: "male" | "female" | "other" | null;
   stateCode: string;
   streetAddress: string;
+  apartment: string;
   city: string;
   postalCode: string;
   country: string;
@@ -51,6 +53,7 @@ function mapProfile(profile: Tables<"profiles">): EditableProfileDto {
     sex: profile.sex ?? null,
     stateCode: profile.state_code ?? "",
     streetAddress: profile.street_address ?? "",
+    apartment: profile.apartment ?? "",
     city: profile.city ?? "",
     postalCode: profile.postal_code ?? "",
     country: profile.country ?? "",
@@ -141,6 +144,7 @@ export async function updateMyProfile(
     sex: data.sex,
     state_code: data.stateCode || null,
     street_address: data.streetAddress || null,
+    apartment: data.apartment || null,
     city: data.city || null,
     postal_code: data.postalCode || null,
     country: data.country || null,

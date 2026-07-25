@@ -2,6 +2,7 @@ import "server-only";
 
 import { resolveMedicineImageSrc } from "@/lib/intake/medicine-image";
 import { planTitleFromDuration } from "@/lib/pricing";
+import { getPlatformSettings, effectiveShippingCents } from "@/lib/settings/platform-settings";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { Json } from "@/lib/supabase/types";
 import type {
@@ -147,10 +148,15 @@ export async function fetchBillingSubscriptions(userId: string): Promise<Billing
   if (error) throw new Error(error.message);
   if (!subscriptions?.length) return [];
 
+  // Shipping is a separate recurring item on the Stripe subscription; include it so the shown
+  // upcoming charge matches what the patient is actually billed (plan + shipping).
+  const shippingDollars = effectiveShippingCents(await getPlatformSettings()) / 100;
+
   return subscriptions.map((subscription) => {
     const medicine = (subscription as { medicines?: EmbeddedMedicine | null }).medicines ?? null;
     const pkg = (subscription as { packages?: EmbeddedPackage | null }).packages ?? null;
     const variantName = pkg?.medicine_variants?.name ?? null;
+    const planDollars = Number(pkg?.price ?? 0);
 
     return {
       id: subscription.id,
@@ -164,7 +170,7 @@ export async function fetchBillingSubscriptions(userId: string): Promise<Billing
       planLabel: pkg ? planTitleFromDuration(pkg.duration_months) : null,
       imageSrc: resolveMedicineImageSrc(medicine?.image_url ?? null),
       nextBillingDate: subscription.current_period_end,
-      upcomingCharge: Number(pkg?.price ?? 0),
+      upcomingCharge: pkg ? planDollars + shippingDollars : planDollars,
       status: subscription.status,
       cancelAtPeriodEnd: subscription.cancel_at_period_end,
     };

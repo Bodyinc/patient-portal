@@ -134,6 +134,7 @@ export default function ProfileEditor({ initialProfile }: { initialProfile: Edit
         sex: form.sex,
         stateCode: form.stateCode,
         streetAddress: form.streetAddress,
+        apartment: form.apartment,
         city: form.city,
         postalCode: form.postalCode,
         country: form.country,
@@ -224,6 +225,7 @@ export default function ProfileEditor({ initialProfile }: { initialProfile: Edit
           onChange={updateField}
           fields={[
             { key: "streetAddress", label: "Street Address" },
+            { key: "apartment", label: "Apartment Number" },
             { key: "city", label: "City" },
             { key: "stateCode", label: "State" },
             { key: "postalCode", label: "ZIP Code" },

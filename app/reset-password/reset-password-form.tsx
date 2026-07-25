@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { onLoginSuccess } from "@/lib/auth/on-login-success";
+import { markPasswordSet } from "@/lib/actions/patient-auth";
 import { createClient } from "@/lib/supabase/client";
 
 type PageState = "loading" | "ready" | "invalid";
@@ -99,6 +100,7 @@ export function ResetPasswordForm({ recovery, error }: ResetPasswordFormProps) {
         toast.error(updateError.message);
         return;
       }
+      await markPasswordSet();
       await onLoginSuccess(router, "Password updated successfully");
     } finally {
       setBusy(false);

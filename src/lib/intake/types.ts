@@ -88,6 +88,18 @@ export type IntakeSummaryDto = {
   fullName: string | null;
   email: string | null;
   phone: string | null;
+  streetAddress: string | null;
+  apartment: string | null;
+  city: string | null;
+  postalCode: string | null;
+  billingSameAsShipping: boolean;
+  billingStreetAddress: string | null;
+  billingApartment: string | null;
+  billingCity: string | null;
+  billingStateCode: string | null;
+  billingPostalCode: string | null;
+  smsConsent: boolean;
+  marketingConsent: boolean;
   medicineId: string | null;
   medicineName: string | null;
   requiresQuestionnaire: boolean;

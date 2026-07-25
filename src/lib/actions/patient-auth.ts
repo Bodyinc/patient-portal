@@ -11,6 +11,7 @@ import { claimIntakeSession } from "@/lib/actions/intake";
 import { requireIntakeSession } from "@/lib/intake/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { userHasSetPassword } from "@/lib/auth/password-state";
 import { stripe } from "@/lib/stripe/server";
 
 export type { CheckEmailResult };
@@ -102,12 +103,28 @@ async function ensurePatientRoleForUser(userId: string) {
 }
 
 export async function hasPassword(): Promise<boolean> {
-  const auth = await getAuthenticatedClient();
-  if (!auth) return false;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return false;
+  return userHasSetPassword(user, supabase);
+}
 
-  const { data, error } = await auth.supabase.rpc("has_password");
-  if (error) return false;
-  return data === true;
+// Called after a patient sets a password outside the setInitialPassword action (e.g. the
+// forgot-password / reset flow), so the password_set authority stays accurate and they aren't
+// re-prompted to set one.
+export async function markPasswordSet(): Promise<{ ok: boolean }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false };
+
+  await supabaseAdmin.auth.admin.updateUserById(user.id, {
+    app_metadata: { ...user.app_metadata, password_set: true },
+  });
+  return { ok: true };
 }
 
 const passwordSchema = z.string().min(8).max(72);
@@ -288,7 +305,9 @@ export async function preparePostCheckoutAccount(): Promise<PostCheckoutAccountR
   const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
     email,
     email_confirm: true,
-    app_metadata: { role: PORTAL_ROLE },
+    // No password is set here, but GoTrue still writes a placeholder hash — so mark the account
+    // explicitly as password-less. userHasSetPassword() trusts this flag over the has_password RPC.
+    app_metadata: { role: PORTAL_ROLE, password_set: false },
     user_metadata: {
       full_name: fullName,
       phone: session.phone ?? null,

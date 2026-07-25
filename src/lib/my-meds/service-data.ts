@@ -2,6 +2,7 @@ import "server-only";
 
 import { resolveMedicineImageSrc } from "@/lib/intake/medicine-image";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { fetchPatientOrders } from "@/lib/orders/service-data";
 import type { Json } from "@/lib/supabase/types";
 import type {
   MyMedsCurrentMedicationDto,
@@ -56,11 +57,9 @@ function parseDosage(importantInfo: Json | null): string {
 function matchesRequestQuery(request: MyMedsMedicationRequestDto, query: string): boolean {
   const haystack = [
     request.medicationName,
-    request.dosage,
-    request.supplyDuration,
-    request.status,
+    request.planName ?? "",
+    request.statusLabel,
     request.trackingNumber ?? "",
-    request.requestDate,
   ]
     .join(" ")
     .toLowerCase();
@@ -112,14 +111,35 @@ export async function fetchCurrentMedication(
 }
 
 export async function fetchMedicationRequests(
-  _userId: string,
+  userId: string,
   options: { page?: number; pageSize?: number; query?: string } = {},
 ): Promise<MyMedsMedicationRequestsListDto> {
   const page = Math.max(1, options.page ?? 1);
   const pageSize = Math.max(1, Math.min(50, options.pageSize ?? 10));
   const query = (options.query ?? "").trim();
 
-  const allItems: MyMedsMedicationRequestDto[] = [];
+  const orders = await fetchPatientOrders(userId);
+  const allItems: MyMedsMedicationRequestDto[] = orders.map((o) => ({
+    id: o.id,
+    medicationName: o.medicineName,
+    planName: o.planName,
+    status: o.status,
+    statusLabel: o.statusLabel,
+    isRejected: o.isRejected,
+    requestDate: o.createdAt,
+    trackingNumber: o.trackingNumber,
+    pendingPaymentCents: o.pendingPayment?.amountCents ?? null,
+    prescription: o.prescription
+      ? {
+          id: o.prescription.id,
+          medicineName: o.prescription.medicineName,
+          directions: o.prescription.directions,
+          documentUrl: o.prescription.documentUrl,
+        }
+      : null,
+    timeline: o.timeline,
+  }));
+
   const filtered = query
     ? allItems.filter((request) => matchesRequestQuery(request, query))
     : allItems;
