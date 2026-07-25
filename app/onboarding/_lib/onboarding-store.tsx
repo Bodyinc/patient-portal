@@ -39,6 +39,18 @@ export type OnboardingState = {
   fullName: string;
   email: string;
   phone: string;
+  streetAddress: string;
+  apartment: string;
+  city: string;
+  postalCode: string;
+  billingSameAsShipping: boolean;
+  billingStreetAddress: string;
+  billingApartment: string;
+  billingCity: string;
+  billingStateCode: string;
+  billingPostalCode: string;
+  smsConsent: boolean;
+  marketingConsent: boolean;
   questionnaireAnswers: Record<string, QuestionnaireAnswerValue>;
   questionnaireComplete: boolean;
   selectedPackageId: string | null;
@@ -63,6 +75,18 @@ export const initialOnboardingState: OnboardingState = {
   fullName: "",
   email: "",
   phone: "",
+  streetAddress: "",
+  apartment: "",
+  city: "",
+  postalCode: "",
+  billingSameAsShipping: true,
+  billingStreetAddress: "",
+  billingApartment: "",
+  billingCity: "",
+  billingStateCode: "",
+  billingPostalCode: "",
+  smsConsent: false,
+  marketingConsent: false,
   questionnaireAnswers: {},
   questionnaireComplete: false,
   selectedPackageId: null,
@@ -133,6 +157,18 @@ function summaryToState(summary: IntakeSummaryDto, prev: OnboardingState): Onboa
     fullName: summary.fullName ?? base.fullName,
     email: summary.email ?? base.email,
     phone: summary.phone ?? base.phone,
+    streetAddress: summary.streetAddress ?? base.streetAddress,
+    apartment: summary.apartment ?? base.apartment,
+    city: summary.city ?? base.city,
+    postalCode: summary.postalCode ?? base.postalCode,
+    billingSameAsShipping: summary.billingSameAsShipping ?? base.billingSameAsShipping,
+    billingStreetAddress: summary.billingStreetAddress ?? base.billingStreetAddress,
+    billingApartment: summary.billingApartment ?? base.billingApartment,
+    billingCity: summary.billingCity ?? base.billingCity,
+    billingStateCode: summary.billingStateCode ?? base.billingStateCode,
+    billingPostalCode: summary.billingPostalCode ?? base.billingPostalCode,
+    smsConsent: summary.smsConsent ?? base.smsConsent,
+    marketingConsent: summary.marketingConsent ?? base.marketingConsent,
     selectedPackageId: summary.selectedPackageId ?? base.selectedPackageId,
     eligibilityResult: summary.eligibilityResult ?? base.eligibilityResult,
     questionnaireComplete: questionnaireComplete || base.questionnaireComplete,

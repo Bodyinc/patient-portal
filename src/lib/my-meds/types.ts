@@ -9,14 +9,30 @@ export type MyMedsCurrentMedicationDto = {
   imageSrc: string;
 };
 
+export type MyMedsTimelineStepDto = {
+  key: string;
+  label: string;
+  state: "done" | "current" | "upcoming";
+  at: string | null;
+};
+
 export type MyMedsMedicationRequestDto = {
   id: string;
   medicationName: string;
-  dosage: string;
-  supplyDuration: string;
-  requestDate: string;
+  planName: string | null;
   status: string;
+  statusLabel: string;
+  isRejected: boolean;
+  requestDate: string;
   trackingNumber: string | null;
+  pendingPaymentCents: number | null;
+  prescription: {
+    id: string;
+    medicineName: string;
+    directions: string | null;
+    documentUrl: string | null;
+  } | null;
+  timeline: MyMedsTimelineStepDto[];
 };
 
 export type MyMedsMedicationRequestsListDto = {

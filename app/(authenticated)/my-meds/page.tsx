@@ -3,7 +3,7 @@ import { fetchMyMedsPageData } from "@/lib/my-meds/service-data";
 import { buildReferralLink, getReferralSummary } from "@/lib/referrals";
 import MyMedsPageClient from "./_components/MyMedsPageClient";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 5;
 
 function toPatientId(userId: string) {
   const compact = userId.replace(/-/g, "").toUpperCase();

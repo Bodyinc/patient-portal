@@ -125,7 +125,7 @@ async function handleInvoicePaid(
 
   const { data: subRow } = await supabaseAdmin
     .from("subscriptions")
-    .select("user_id, session_id, package_id")
+    .select("id, user_id, session_id, package_id, medicine_id")
     .eq("stripe_subscription_id", subId)
     .maybeSingle();
 
@@ -184,6 +184,9 @@ async function handleInvoicePaid(
       .update({ status: "completed" })
       .eq("id", subRow.session_id);
   }
+
+  // Order creation is handled by the DB trigger trg_create_medication_order on payments insert
+  // (see migration 20260725110000 / 20260725120000), so it is not duplicated here.
 }
 
 async function handleInvoiceFailed(invoice: Stripe.Invoice): Promise<void> {
@@ -301,6 +304,91 @@ async function handleChargeRefunded(charge: Stripe.Charge): Promise<void> {
     .eq("status", "pending");
 }
 
+// Workflow C: a patient paid the price difference for a changed medicine. Mark the additional
+// payment paid and, once nothing is outstanding, move the order from awaiting_additional_payment
+// to approved so the prescription can be generated. Non-additional-payment PaymentIntents (e.g.
+// subscription invoices) match nothing here and no-op.
+async function handleAdditionalPaymentSucceeded(pi: Stripe.PaymentIntent): Promise<void> {
+  const metaId = (pi.metadata as Record<string, string> | undefined)?.additional_payment_id;
+
+  type AddPayRow = {
+    id: string;
+    request_id: string;
+    amount_cents: number;
+    currency: string;
+    user_id: string | null;
+    reason: string | null;
+  };
+  const cols = "id, request_id, amount_cents, currency, user_id, reason";
+  let row: AddPayRow | null = null;
+  const { data: byPi } = await supabaseAdmin
+    .from("additional_payments")
+    .select(cols)
+    .eq("stripe_payment_intent_id", pi.id)
+    .eq("status", "pending")
+    .maybeSingle();
+  row = byPi ?? null;
+  if (!row && metaId) {
+    const { data: byMeta } = await supabaseAdmin
+      .from("additional_payments")
+      .select(cols)
+      .eq("id", metaId)
+      .eq("status", "pending")
+      .maybeSingle();
+    row = byMeta ?? null;
+  }
+  if (!row) return;
+
+  await supabaseAdmin
+    .from("additional_payments")
+    .update({
+      status: "paid",
+      paid_at: new Date().toISOString(),
+      stripe_payment_intent_id: pi.id,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", row.id);
+
+  // Record the extra charge in payments so it appears in the patient's + admin's billing history.
+  // stripe_subscription_id stays null, so the order-creation trigger ignores this insert.
+  const description = row.reason ?? "Additional payment";
+  await recordPayment({
+    user_id: row.user_id,
+    stripe_payment_intent_id: pi.id,
+    stripe_customer_id: customerId(pi),
+    amount_cents: row.amount_cents,
+    currency: row.currency ?? "usd",
+    status: "succeeded",
+    raw_event: { lines: { data: [{ description }] } } as unknown as Json,
+  });
+
+  const { data: stillPending } = await supabaseAdmin
+    .from("additional_payments")
+    .select("id")
+    .eq("request_id", row.request_id)
+    .eq("status", "pending")
+    .maybeSingle();
+  if (stillPending) return;
+
+  const { data: req } = await supabaseAdmin
+    .from("medication_requests")
+    .select("id, status")
+    .eq("id", row.request_id)
+    .maybeSingle();
+  if (req?.status !== "awaiting_additional_payment") return;
+
+  await supabaseAdmin
+    .from("medication_requests")
+    .update({ status: "approved", updated_at: new Date().toISOString() })
+    .eq("id", row.request_id);
+  await supabaseAdmin.from("medication_request_events").insert({
+    request_id: row.request_id,
+    status: "approved",
+    actor_role: "system",
+    note: "Additional payment received.",
+  });
+}
+
 export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
   switch (event.type) {
     case "customer.subscription.created":
@@ -321,6 +409,9 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
       break;
     case "charge.refunded":
       await handleChargeRefunded(event.data.object as Stripe.Charge);
+      break;
+    case "payment_intent.succeeded":
+      await handleAdditionalPaymentSucceeded(event.data.object as Stripe.PaymentIntent);
       break;
     default:
       break;

@@ -166,6 +166,18 @@ async function buildIntakeSummary(
     fullName: session.full_name,
     email: session.email,
     phone: session.phone,
+    streetAddress: session.street_address,
+    apartment: session.apartment,
+    city: session.city,
+    postalCode: session.postal_code,
+    billingSameAsShipping: session.billing_same_as_shipping,
+    billingStreetAddress: session.billing_street_address,
+    billingApartment: session.billing_apartment,
+    billingCity: session.billing_city,
+    billingStateCode: session.billing_state_code,
+    billingPostalCode: session.billing_postal_code,
+    smsConsent: session.sms_consent,
+    marketingConsent: session.marketing_consent,
     medicineId: medicine?.id ?? null,
     medicineName: medicine?.name ?? null,
     requiresQuestionnaire: medicine?.requires_questionnaire ?? false,
@@ -611,35 +623,135 @@ export async function saveIntakeContact(
   return { ok: true, data: { sessionId: sessionResult.session.id } };
 }
 
+const addressSchema = z
+  .object({
+    streetAddress: z.string().trim().min(1, "Enter your address").max(255),
+    apartment: z.string().trim().min(1, "Enter your apartment number").max(60),
+    city: z.string().trim().min(1, "Enter your city").max(120),
+    postalCode: z.string().trim().min(3, "Enter your ZIP code").max(20),
+    phone: PHONE_SCHEMA,
+    billingSameAsShipping: z.boolean(),
+    billingStreetAddress: z.string().trim().max(255).optional().or(z.literal("")),
+    billingApartment: z.string().trim().max(60).optional().or(z.literal("")),
+    billingCity: z.string().trim().max(120).optional().or(z.literal("")),
+    billingStateCode: z.string().trim().max(2).optional().or(z.literal("")),
+    billingPostalCode: z.string().trim().max(20).optional().or(z.literal("")),
+    smsConsent: z.boolean(),
+    marketingConsent: z.boolean(),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.smsConsent) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["smsConsent"],
+        message: "SMS consent is required to continue.",
+      });
+    }
+    if (data.billingSameAsShipping) return;
+    const required: [keyof typeof data, string][] = [
+      ["billingStreetAddress", "Enter your billing address"],
+      ["billingCity", "Enter your billing city"],
+      ["billingStateCode", "Select your billing state"],
+      ["billingPostalCode", "Enter your billing ZIP code"],
+    ];
+    for (const [key, message] of required) {
+      if (!String(data[key] ?? "").trim()) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: [key], message });
+      }
+    }
+  });
+
+export async function saveIntakeAddress(
+  input: z.infer<typeof addressSchema>,
+): Promise<IntakeActionResult<{ sessionId: string }>> {
+  const sessionResult = await requireIntakeSession();
+  if ("error" in sessionResult) {
+    return { ok: false, code: "session_error", message: sessionResult.error };
+  }
+
+  const parsed = addressSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      code: "invalid_input",
+      message: parsed.error.issues[0]?.message ?? "Invalid input.",
+    };
+  }
+  const data = parsed.data;
+  const same = data.billingSameAsShipping;
+
+  const { error } = await supabaseAdmin
+    .from("intake_sessions")
+    .update({
+      street_address: data.streetAddress,
+      apartment: data.apartment,
+      city: data.city,
+      postal_code: data.postalCode,
+      phone: data.phone,
+      billing_same_as_shipping: same,
+      billing_street_address: same ? null : data.billingStreetAddress || null,
+      billing_apartment: same ? null : data.billingApartment || null,
+      billing_city: same ? null : data.billingCity || null,
+      billing_state_code: same ? null : data.billingStateCode || null,
+      billing_postal_code: same ? null : data.billingPostalCode || null,
+      sms_consent: data.smsConsent,
+      marketing_consent: data.marketingConsent,
+    })
+    .eq("id", sessionResult.session.id);
+
+  if (error) {
+    return { ok: false, code: "save_error", message: error.message };
+  }
+
+  return { ok: true, data: { sessionId: sessionResult.session.id } };
+}
+
 export async function getQuestionnaireForMedicine(
   medicineId: string,
 ): Promise<IntakeActionResult<QuestionnaireDto | null>> {
-  const { data: link, error: linkError } = await supabaseAdmin
-    .from("questionnaire_medicines")
-    .select("questionnaire_id")
-    .eq("medicine_id", medicineId)
-    .limit(1)
-    .maybeSingle();
+  // Questionnaires attach to categories (questionnaire_categories), not medicines directly.
+  // Resolve the medicine's categories, then find an active questionnaire linked to any of them.
+  const { data: categoryLinks, error: categoryLinkError } = await supabaseAdmin
+    .from("medication_category_medicines")
+    .select("category_id")
+    .eq("medicine_id", medicineId);
 
-  if (linkError) {
-    return { ok: false, code: "fetch_error", message: linkError.message };
+  if (categoryLinkError) {
+    return { ok: false, code: "fetch_error", message: categoryLinkError.message };
   }
 
-  if (!link?.questionnaire_id) {
+  const categoryIds = (categoryLinks ?? []).map((l) => l.category_id);
+  if (categoryIds.length === 0) {
     return { ok: true, data: null };
   }
 
-  const { data: questionnaire, error: questionnaireError } = await supabaseAdmin
+  const { data: questionnaireLinks, error: questionnaireLinkError } = await supabaseAdmin
+    .from("questionnaire_categories")
+    .select("questionnaire_id")
+    .in("category_id", categoryIds);
+
+  if (questionnaireLinkError) {
+    return { ok: false, code: "fetch_error", message: questionnaireLinkError.message };
+  }
+
+  const questionnaireIds = (questionnaireLinks ?? []).map((l) => l.questionnaire_id);
+  if (questionnaireIds.length === 0) {
+    return { ok: true, data: null };
+  }
+
+  const { data: activeQuestionnaires, error: questionnaireError } = await supabaseAdmin
     .from("questionnaires")
     .select("id, name, description, is_active")
-    .eq("id", link.questionnaire_id)
-    .maybeSingle();
+    .in("id", questionnaireIds)
+    .eq("is_active", true)
+    .limit(1);
 
   if (questionnaireError) {
     return { ok: false, code: "fetch_error", message: questionnaireError.message };
   }
 
-  if (!questionnaire || !questionnaire.is_active) {
+  const questionnaire = activeQuestionnaires?.[0];
+  if (!questionnaire) {
     return { ok: true, data: null };
   }
 
@@ -1007,8 +1119,23 @@ export async function claimIntakeSession(userId: string): Promise<void> {
       dob: session.dob,
       state_code: session.state_code,
       sex: session.sex,
+      street_address: session.street_address,
+      apartment: session.apartment,
+      city: session.city,
+      postal_code: session.postal_code,
+      country: "US",
+      sms_consent: session.sms_consent,
+      marketing_consent: session.marketing_consent,
     })
     .eq("id", userId);
+
+  // Link guest onboarding orders (created at payment, before the account existed) to the
+  // new patient so they appear in the patient's order tracking.
+  await supabaseAdmin
+    .from("medication_requests")
+    .update({ user_id: userId })
+    .eq("session_id", session.id)
+    .is("user_id", null);
 
   if (session.stripe_customer_id) {
     await linkOnboardingStripeToUser({
