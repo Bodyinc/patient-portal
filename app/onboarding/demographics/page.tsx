@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import { saveIntakeDemographics } from "@/lib/actions/intake";
 import { DOB_SCHEMA } from "@/lib/validation";
 
@@ -28,6 +29,14 @@ const demographicsSchema = z.object({
   sex: z.enum(["male", "female", "other"]),
   dob: DOB_SCHEMA,
 });
+
+const fieldLabelClass = "text-[14px] font-normal leading-none text-[#152A51]";
+
+const fieldControlClass =
+  "h-[45px] rounded-[14px] border-0 bg-[#E8EEED] px-4 text-[14px] font-normal leading-none text-[#152A51] shadow-none " +
+  "placeholder:text-[#152A51]/40 data-[placeholder]:text-[#152A51]/40 " +
+  "focus:border-0 focus:ring-0 focus-visible:border-0 focus-visible:ring-0 " +
+  "focus-visible:outline-none";
 
 export default function DemographicsPage() {
   const router = useRouter();
@@ -87,18 +96,21 @@ export default function DemographicsPage() {
         onBack={handleBack}
         onContinue={handleContinue}
         continueDisabled={saving}
-        maxWidth="2xl"
+        continueLabel="Continue"
+        maxWidth="form"
+        variant="bare"
+        align="center"
       >
-        <div className="space-y-5">
-          <div className="space-y-2">
-            <Label htmlFor="state" className="text-[#2E00AB]">
+        <div className="space-y-6">
+          <div className="space-y-2.5">
+            <Label htmlFor="state" className={fieldLabelClass}>
               State
             </Label>
             <Select
               value={form.state}
               onValueChange={(value) => setForm((f) => ({ ...f, state: value }))}
             >
-              <SelectTrigger id="state" className="border-[#2E00AB]/20">
+              <SelectTrigger id="state" className={cn(fieldControlClass, "w-full")}>
                 <SelectValue placeholder="Select your state" />
               </SelectTrigger>
               <SelectContent>
@@ -111,19 +123,20 @@ export default function DemographicsPage() {
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label className="text-[#2E00AB]">Sex</Label>
+          <div className="space-y-2.5">
+            <Label className={fieldLabelClass}>Sex</Label>
             <div className="grid gap-2 sm:grid-cols-3">
               {SEX_OPTIONS.map((option) => (
                 <button
                   key={option.id}
                   type="button"
                   onClick={() => setForm((f) => ({ ...f, sex: option.id }))}
-                  className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition ${
+                  className={cn(
+                    "h-[45px] rounded-[14px] px-3 text-[14px] font-normal leading-none transition",
                     form.sex === option.id
-                      ? "border-[#2E00AB] bg-[#2E00AB]/5 text-[#2E00AB]"
-                      : "border-[#2E00AB]/20 text-[#2E00AB]/80"
-                  }`}
+                      ? "bg-[#E8EEED] text-[#152A51] ring-1 ring-[#152A51]"
+                      : "bg-[#E8EEED] text-[#152A51]/80",
+                  )}
                 >
                   {option.label}
                 </button>
@@ -131,8 +144,8 @@ export default function DemographicsPage() {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="dob" className="text-[#2E00AB]">
+          <div className="space-y-2.5">
+            <Label htmlFor="dob" className={fieldLabelClass}>
               Date of birth
             </Label>
             <Input
@@ -140,7 +153,7 @@ export default function DemographicsPage() {
               type="date"
               value={form.dob}
               onChange={(e) => setForm((f) => ({ ...f, dob: e.target.value }))}
-              className="border-[#2E00AB]/20"
+              className={fieldControlClass}
             />
           </div>
         </div>

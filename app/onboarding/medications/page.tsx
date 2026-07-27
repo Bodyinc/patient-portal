@@ -93,23 +93,24 @@ export default function MedicationsPage() {
             onBack={handleBack}
             onContinue={handleContinue}
             continueDisabled={!selected || saving || isLoading || !categoryEligible}
+            variant="figma"
           />
         }
       >
-        <div className="mb-2 shrink-0 text-center sm:mb-3">
-          <h1 className="text-xl font-semibold text-[#2E00AB] sm:text-2xl">
+        <div className="mx-auto mb-4 w-full max-w-[980px] shrink-0 text-center onboarding-font sm:mb-6">
+          <h1 className="text-[28px] font-medium leading-none tracking-[-0.5px] text-[#152A51] sm:text-[32px]">
             Choose your medication
           </h1>
-          <p className="mt-1 text-sm text-[#2E00AB]/80 sm:text-base">
+          <p className="mx-auto mt-3.5 max-w-2xl text-[14px] font-normal leading-snug text-[#152A51]/80">
             {state.goalName
               ? `Recommended options for ${state.goalName}.`
               : "Select the treatment that fits your goals."}
           </p>
         </div>
 
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mx-auto grid min-h-0 w-full max-w-[980px] flex-1 grid-cols-1 gap-4 overflow-y-auto scrollbar-hide pb-2 sm:grid-cols-2 xl:grid-cols-3 xl:gap-5">
           {isLoading ? (
-            <p className="col-span-full text-center text-sm text-[#2E00AB]/70">
+            <p className="col-span-full text-center text-sm text-[#152A51]/70">
               Loading medications…
             </p>
           ) : isError ? (
@@ -120,13 +121,13 @@ export default function MedicationsPage() {
               <button
                 type="button"
                 onClick={() => void refetch()}
-                className="mt-2 text-sm font-medium text-[#2E00AB] underline"
+                className="mt-2 text-sm font-medium text-[#152A51] underline"
               >
                 Try again
               </button>
             </div>
           ) : !categoryEligible ? (
-            <div className="col-span-full rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-center">
+            <div className="col-span-full rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-4 text-center">
               <p className="text-sm font-medium text-amber-900">
                 {ineligibleReason ??
                   "Based on your profile, no medications are available for this goal."}
@@ -136,7 +137,7 @@ export default function MedicationsPage() {
               </p>
             </div>
           ) : medications.length === 0 ? (
-            <p className="col-span-full text-center text-sm text-[#2E00AB]/70">
+            <p className="col-span-full text-center text-sm text-[#152A51]/70">
               No medications are available for this goal right now. Try going back and selecting a
               different goal.
             </p>

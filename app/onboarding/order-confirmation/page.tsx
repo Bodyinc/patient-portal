@@ -24,7 +24,7 @@ export default function OrderConfirmationPage() {
 
   return (
     <OnboardingShell>
-      <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-6 overflow-y-auto py-4">
+      <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-6 overflow-y-auto scrollbar-hide py-4">
         <ConfirmationHeader />
 
         {/* Flex layout with items-start forces columns to maintain their natural content height */}

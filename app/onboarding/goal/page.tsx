@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { saveIntakeCategory } from "@/lib/actions/intake";
 
+import GoalOptionCard from "../_components/GoalOptionCard";
 import OnboardingShell from "../_components/OnboardingShell";
 import OnboardingStepLayout from "../_components/OnboardingStepLayout";
 import { useIntakeCategories } from "../_hooks/use-intake-catalog";
@@ -26,6 +27,16 @@ export default function GoalPage() {
     if (!hydrated) return;
     if (state.goalId) setSelected(state.goalId);
   }, [hydrated, state.goalId]);
+
+  // Only blur others after a real, known selection — never while empty/stale.
+  const hasValidSelection = Boolean(selected) && categories.some((goal) => goal.slug === selected);
+
+  useEffect(() => {
+    if (isLoading || !selected) return;
+    if (!categories.some((goal) => goal.slug === selected)) {
+      setSelected("");
+    }
+  }, [categories, isLoading, selected]);
 
   // Prefill the email carried over from a login attempt for a not-yet-registered address
   // (/auth and /otp-login redirect here with ?email=), so the funnel doesn't ask twice.
@@ -70,29 +81,26 @@ export default function GoalPage() {
   return (
     <OnboardingShell>
       <OnboardingStepLayout
-        title="What do you want to achieve?"
-        description="Choose the primary goal for your treatment plan."
+        title="Choose your health goal."
+        description=""
         onContinue={handleContinue}
         continueDisabled={!selected || saving || isLoading}
+        continueLabel="Continue"
         showBack={false}
+        variant="bare"
+        align="center"
+        maxWidth="4xl"
+        layout="fill"
       >
-        <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
+        <div className="mx-auto grid w-full grid-cols-2 justify-items-center gap-x-4 gap-y-6 sm:grid-cols-3 sm:gap-x-5 sm:gap-y-8">
           {categories.map((goal) => (
-            <button
+            <GoalOptionCard
               key={goal.slug}
-              type="button"
+              goal={goal}
+              selected={hasValidSelection && selected === goal.slug}
+              dimmed={hasValidSelection && selected !== goal.slug}
               onClick={() => setSelected(goal.slug)}
-              className={`rounded-xl border px-3 py-3 text-left transition-all sm:px-4 sm:py-3.5 ${
-                selected === goal.slug
-                  ? "border-[#2E00AB] bg-[#2E00AB]/5"
-                  : "border-[#2E00AB]/20 hover:border-[#2E00AB]"
-              }`}
-            >
-              <span className="block text-base font-semibold text-[#2E00AB]">{goal.name}</span>
-              <span className="mt-1 block text-sm text-[#2E00AB]/80">
-                {goal.tagline ?? goal.description ?? ""}
-              </span>
-            </button>
+            />
           ))}
         </div>
       </OnboardingStepLayout>

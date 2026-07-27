@@ -55,8 +55,8 @@ export default async function ShopPage({
     ]);
 
     return (
-      <main className="min-w-0 flex-1 bg-[#FAF8FF] p-3 sm:p-4">
-        <div className="space-y-3">
+      <main className="min-w-0 flex-1 overflow-x-hidden p-3 sm:p-4">
+        <div className="space-y-4">
           <ShopCatalogClient
             categories={categories}
             initialList={list}
@@ -66,9 +66,11 @@ export default async function ShopPage({
             avatarUrl={(user.user_metadata?.avatar_url as string | null | undefined) ?? null}
             topContent={
               <>
-                <section className="space-y-1 px-1 pt-1">
-                  <h1 className="text-2xl font-semibold text-[#2E00AB]">Shop</h1>
-                  <p className="text-sm text-[#2E00AB]/70">
+                <section className="space-y-1 px-1">
+                  <h1 className="text-xl font-medium tracking-[-0.5px] text-[#152A51] sm:text-2xl lg:text-[28px]">
+                    Shop
+                  </h1>
+                  <p className="text-sm text-[#152A51]/80 sm:text-[15px]">
                     Browse medications and healthcare products available for your treatment journey.
                   </p>
                 </section>
@@ -86,8 +88,8 @@ export default async function ShopPage({
     );
   } catch (error) {
     return (
-      <main className="min-w-0 flex-1 bg-[#FAF8FF] p-4">
-        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+      <main className="min-w-0 flex-1 p-4">
+        <div className="rounded-[16px] border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {error instanceof Error ? error.message : "Unable to load shop data."}
         </div>
       </main>

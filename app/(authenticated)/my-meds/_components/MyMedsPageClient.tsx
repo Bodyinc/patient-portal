@@ -55,7 +55,7 @@ export default function MyMedsPageClient({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <MyMedsHeader
         fullName={fullName}
         patientId={patientId}
@@ -66,9 +66,11 @@ export default function MyMedsPageClient({
         onSearchSubmit={() => updateParams({ q: searchQuery })}
       />
 
-      <section className="space-y-1 px-1 pt-1">
-        <h1 className="text-2xl font-semibold text-[#2E00AB]">My Meds</h1>
-        <p className="text-sm text-[#2E00AB]/70">
+      <section className="space-y-1 px-1">
+        <h1 className="text-xl font-medium tracking-[-0.5px] text-[#152A51] sm:text-2xl lg:text-[28px]">
+          My Meds
+        </h1>
+        <p className="text-sm text-[#152A51]/80 sm:text-[15px]">
           Manage your medications, refill requests, and track your treatment progress.
         </p>
       </section>

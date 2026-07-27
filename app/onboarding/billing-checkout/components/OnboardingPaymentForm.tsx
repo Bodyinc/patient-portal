@@ -40,14 +40,14 @@ function PaymentFields({ returnUrl, onPaid }: { returnUrl: string; onPaid: () =>
     <form onSubmit={handleSubmit} className="space-y-3">
       <PaymentElement />
       {error ? (
-        <p className="rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-700">
+        <p className="rounded-[14px] border border-red-200 bg-red-50 p-2 text-[12px] text-red-700">
           {error}
         </p>
       ) : null}
       <Button
         type="submit"
         disabled={!stripe || submitting}
-        className="h-11 w-full bg-[#2E00AB] text-white hover:bg-[#2E00AB]/90"
+        className="h-[46px] w-full rounded-full bg-[#E3E084] text-[14px] font-medium text-[#152A51] hover:bg-[#D9D674]"
       >
         {submitting ? "Processing…" : "Pay & Start Treatment"}
       </Button>
@@ -65,14 +65,18 @@ export default function OnboardingPaymentForm({
   onPaid: () => void;
 }) {
   return (
-    <div className="rounded-[12px] border border-[#2E00AB]/20 bg-white p-3">
-      <div className="mb-2 flex items-center justify-between border-b border-[#2E00AB]/10 pb-1.5">
-        <h2 className="text-sm font-semibold text-[#2E00AB] sm:text-base">Payment Details</h2>
-        <Lock size={16} className="text-[#2E00AB]" />
+    <div className="rounded-[14px] border border-[#E8E8E8] bg-white p-4 onboarding-font">
+      <div className="mb-3 flex items-center justify-between border-b border-[#E8E8E8] pb-2">
+        <h2 className="text-[15px] font-medium text-[#152A51] sm:text-[16px]">Payment Details</h2>
+        <Lock size={16} className="text-[#152A51]" />
       </div>
       <Elements stripe={getStripeJs()} options={{ clientSecret, appearance: { theme: "stripe" } }}>
         <PaymentFields returnUrl={returnUrl} onPaid={onPaid} />
       </Elements>
+      <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-[11px] text-[#152A51]/70">
+        <Lock className="h-3 w-3" aria-hidden />
+        Secure payment powered by Stripe
+      </p>
     </div>
   );
 }

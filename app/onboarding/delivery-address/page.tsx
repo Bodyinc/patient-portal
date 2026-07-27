@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import { saveIntakeAddress } from "@/lib/actions/intake";
 import { PHONE_SCHEMA } from "@/lib/validation";
 
@@ -23,6 +24,7 @@ import OnboardingStepLayout from "../_components/OnboardingStepLayout";
 import { US_STATES } from "../_lib/onboarding-config";
 import { getNextStepPath, getPrevStepPath } from "../_lib/onboarding-navigation";
 import { useOnboarding } from "../_lib/onboarding-store";
+import { fieldControlClass, fieldLabelClass } from "../_lib/onboarding-theme";
 
 const addressSchema = z
   .object({
@@ -155,16 +157,18 @@ export default function DeliveryAddressPage() {
         description="If your treatment is approved by a licensed provider, we'll securely ship it to this address."
         onBack={handleBack}
         onContinue={handleContinue}
-        continueLabel="Find your treatment →"
+        continueLabel="Find your treatment"
         continueDisabled={saving}
-        maxWidth="2xl"
+        maxWidth="form"
+        variant="bare"
+        align="center"
         layout="fill"
       >
-        <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="streetAddress" className="text-[#2E00AB]">
-                Address <span className="text-[#2E00AB]/50">*</span>
+        <div className="space-y-6 text-left">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-3">
+            <div className="space-y-2.5 sm:col-span-2">
+              <Label htmlFor="streetAddress" className={fieldLabelClass}>
+                Address <span className="text-[#152A51]/50">*</span>
               </Label>
               <Input
                 id="streetAddress"
@@ -172,12 +176,12 @@ export default function DeliveryAddressPage() {
                 value={form.streetAddress}
                 onChange={(e) => setField("streetAddress", e.target.value)}
                 placeholder="123, Main Street"
-                className="border-[#2E00AB]/20"
+                className={fieldControlClass}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="apartment" className="text-[#2E00AB]">
-                Apartment number <span className="text-[#2E00AB]/50">*</span>
+            <div className="space-y-2.5">
+              <Label htmlFor="apartment" className={fieldLabelClass}>
+                Apartment number <span className="text-[#152A51]/50">*</span>
               </Label>
               <Input
                 id="apartment"
@@ -185,15 +189,15 @@ export default function DeliveryAddressPage() {
                 value={form.apartment}
                 onChange={(e) => setField("apartment", e.target.value)}
                 placeholder="1A"
-                className="border-[#2E00AB]/20"
+                className={fieldControlClass}
               />
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-2">
-              <Label htmlFor="postalCode" className="text-[#2E00AB]">
-                Zip code <span className="text-[#2E00AB]/50">*</span>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-3">
+            <div className="space-y-2.5">
+              <Label htmlFor="postalCode" className={fieldLabelClass}>
+                Zip code <span className="text-[#152A51]/50">*</span>
               </Label>
               <Input
                 id="postalCode"
@@ -201,12 +205,12 @@ export default function DeliveryAddressPage() {
                 value={form.postalCode}
                 onChange={(e) => setField("postalCode", e.target.value)}
                 placeholder="12345"
-                className="border-[#2E00AB]/20"
+                className={fieldControlClass}
               />
             </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="city" className="text-[#2E00AB]">
-                City <span className="text-[#2E00AB]/50">*</span>
+            <div className="space-y-2.5 sm:col-span-2">
+              <Label htmlFor="city" className={fieldLabelClass}>
+                City <span className="text-[#152A51]/50">*</span>
               </Label>
               <Input
                 id="city"
@@ -214,37 +218,38 @@ export default function DeliveryAddressPage() {
                 value={form.city}
                 onChange={(e) => setField("city", e.target.value)}
                 placeholder="Phoenix"
-                className="border-[#2E00AB]/20"
+                className={fieldControlClass}
               />
             </div>
           </div>
 
-          <label className="flex cursor-pointer items-center gap-2.5 text-sm text-[#2E00AB]">
+          <label className="flex cursor-pointer items-center gap-2.5 text-[14px] text-[#152A51]">
             <Checkbox
               checked={form.billingSameAsShipping}
               onCheckedChange={(checked) => setField("billingSameAsShipping", checked === true)}
+              className="border-[#152A51]/30 data-[state=checked]:border-[#152A51] data-[state=checked]:bg-[#152A51]"
             />
             Billing address is the same as shipping
           </label>
 
           {!form.billingSameAsShipping && (
-            <div className="space-y-4 rounded-xl border border-[#2E00AB]/15 bg-[#2E00AB]/[0.03] p-4">
-              <p className="text-sm font-medium text-[#2E00AB]">Billing address</p>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="billingStreetAddress" className="text-[#2E00AB]">
-                    Address <span className="text-[#2E00AB]/50">*</span>
+            <div className="space-y-4 rounded-[14px] border border-[#E8E8E8] bg-[#F7F8FA] p-4">
+              <p className="text-[14px] font-medium text-[#152A51]">Billing address</p>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-3">
+                <div className="space-y-2.5 sm:col-span-2">
+                  <Label htmlFor="billingStreetAddress" className={fieldLabelClass}>
+                    Address <span className="text-[#152A51]/50">*</span>
                   </Label>
                   <Input
                     id="billingStreetAddress"
                     value={form.billingStreetAddress}
                     onChange={(e) => setField("billingStreetAddress", e.target.value)}
                     placeholder="123, Main Street"
-                    className="border-[#2E00AB]/20"
+                    className={fieldControlClass}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="billingApartment" className="text-[#2E00AB]">
+                <div className="space-y-2.5">
+                  <Label htmlFor="billingApartment" className={fieldLabelClass}>
                     Apartment number
                   </Label>
                   <Input
@@ -252,44 +257,47 @@ export default function DeliveryAddressPage() {
                     value={form.billingApartment}
                     onChange={(e) => setField("billingApartment", e.target.value)}
                     placeholder="1A"
-                    className="border-[#2E00AB]/20"
+                    className={fieldControlClass}
                   />
                 </div>
               </div>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div className="space-y-2">
-                  <Label htmlFor="billingPostalCode" className="text-[#2E00AB]">
-                    Zip code <span className="text-[#2E00AB]/50">*</span>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-3">
+                <div className="space-y-2.5">
+                  <Label htmlFor="billingPostalCode" className={fieldLabelClass}>
+                    Zip code <span className="text-[#152A51]/50">*</span>
                   </Label>
                   <Input
                     id="billingPostalCode"
                     value={form.billingPostalCode}
                     onChange={(e) => setField("billingPostalCode", e.target.value)}
                     placeholder="12345"
-                    className="border-[#2E00AB]/20"
+                    className={fieldControlClass}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="billingCity" className="text-[#2E00AB]">
-                    City <span className="text-[#2E00AB]/50">*</span>
+                <div className="space-y-2.5">
+                  <Label htmlFor="billingCity" className={fieldLabelClass}>
+                    City <span className="text-[#152A51]/50">*</span>
                   </Label>
                   <Input
                     id="billingCity"
                     value={form.billingCity}
                     onChange={(e) => setField("billingCity", e.target.value)}
                     placeholder="Phoenix"
-                    className="border-[#2E00AB]/20"
+                    className={fieldControlClass}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="billingStateCode" className="text-[#2E00AB]">
-                    State <span className="text-[#2E00AB]/50">*</span>
+                <div className="space-y-2.5">
+                  <Label htmlFor="billingStateCode" className={fieldLabelClass}>
+                    State <span className="text-[#152A51]/50">*</span>
                   </Label>
                   <Select
                     value={form.billingStateCode}
                     onValueChange={(value) => setField("billingStateCode", value)}
                   >
-                    <SelectTrigger id="billingStateCode" className="border-[#2E00AB]/20">
+                    <SelectTrigger
+                      id="billingStateCode"
+                      className={cn(fieldControlClass, "w-full")}
+                    >
                       <SelectValue placeholder="Select state" />
                     </SelectTrigger>
                     <SelectContent>
@@ -305,12 +313,12 @@ export default function DeliveryAddressPage() {
             </div>
           )}
 
-          <div className="space-y-2">
-            <Label htmlFor="phone" className="text-[#2E00AB]">
-              Phone number <span className="text-[#2E00AB]/50">*</span>
+          <div className="space-y-2.5">
+            <Label htmlFor="phone" className={fieldLabelClass}>
+              Phone number <span className="text-[#152A51]/50">*</span>
             </Label>
-            <div className="flex items-stretch overflow-hidden rounded-md border border-[#2E00AB]/20 focus-within:border-[#2E00AB]/40">
-              <span className="flex items-center bg-[#2E00AB]/5 px-3 text-sm font-medium text-[#2E00AB]/80">
+            <div className="flex h-[45px] items-stretch overflow-hidden rounded-[14px] bg-[#E8EEED]">
+              <span className="flex items-center px-3 text-[14px] font-medium text-[#152A51]/70">
                 +1
               </span>
               <input
@@ -320,19 +328,19 @@ export default function DeliveryAddressPage() {
                 value={form.phone}
                 onChange={(e) => setField("phone", e.target.value)}
                 placeholder="1234567890"
-                className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm text-[#2E00AB] outline-none placeholder:text-[#2E00AB]/40"
+                className="min-w-0 flex-1 bg-transparent px-3 text-[14px] text-[#152A51] outline-none placeholder:text-[#152A51]/40"
               />
             </div>
-            <p className="text-xs text-[#2E00AB]/70">
+            <p className="text-[12px] leading-snug text-[#152A51]/70">
               We&apos;ll only use your number to text order updates and important information about
               your treatments.
             </p>
           </div>
 
           <div className="space-y-3">
-            <label className="flex cursor-pointer items-start gap-2.5 text-xs leading-relaxed text-[#2E00AB]/80">
+            <label className="flex cursor-pointer items-start gap-2.5 text-[12px] leading-relaxed text-[#152A51]/80">
               <Checkbox
-                className="mt-0.5 rounded-full"
+                className="mt-0.5 rounded-full border-[#152A51]/30 data-[state=checked]:border-[#152A51] data-[state=checked]:bg-[#152A51]"
                 checked={form.smsConsent}
                 onCheckedChange={(checked) => setField("smsConsent", checked === true)}
               />
@@ -348,9 +356,9 @@ export default function DeliveryAddressPage() {
               </span>
             </label>
 
-            <label className="flex cursor-pointer items-start gap-2.5 text-xs leading-relaxed text-[#2E00AB]/80">
+            <label className="flex cursor-pointer items-start gap-2.5 text-[12px] leading-relaxed text-[#152A51]/80">
               <Checkbox
-                className="mt-0.5 rounded-full"
+                className="mt-0.5 rounded-full border-[#152A51]/30 data-[state=checked]:border-[#152A51] data-[state=checked]:bg-[#152A51]"
                 checked={form.marketingConsent}
                 onCheckedChange={(checked) => setField("marketingConsent", checked === true)}
               />
@@ -361,7 +369,7 @@ export default function DeliveryAddressPage() {
             </label>
           </div>
 
-          <p className="text-[11px] leading-relaxed text-[#2E00AB]/50">
+          <p className="text-[11px] leading-relaxed text-[#152A51]/50">
             By checking the option &quot;I&apos;d also like to receive occasional promotions via
             text message. Opt out anytime.&quot;, I agree to receive marketing text messages from
             Fridays Health at the number provided above. Messages &amp; calls may use an automatic

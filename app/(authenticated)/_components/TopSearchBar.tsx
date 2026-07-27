@@ -39,8 +39,8 @@ export default function TopSearchBar({
       onSubmit={handleSubmit}
       className="w-full sm:max-w-[520px]"
     >
-      <div className="flex items-center gap-2 rounded-lg border border-[#EEE9FF] bg-[#FCFBFF] px-3 py-2">
-        <Search className="h-4 w-4 text-[#7C66D8]" />
+      <div className="flex h-[45px] items-center gap-2 rounded-[14px] bg-[#E8EEED] px-3">
+        <Search className="h-4 w-4 text-[#152A51]/60" />
         <input
           type="search"
           name={inputName}
@@ -48,21 +48,21 @@ export default function TopSearchBar({
           value={value}
           onChange={(event) => onValueChange?.(event.target.value)}
           placeholder={placeholder}
-          className="w-full bg-transparent text-sm text-[#2E00AB] placeholder:text-[#7C66D8]/80 focus:outline-none"
+          className="w-full bg-transparent text-sm text-[#152A51] placeholder:text-[#152A51]/40 focus:outline-none"
           aria-label={placeholder}
         />
         <button
           type="submit"
           disabled={isPending}
-          className="rounded-md bg-[#2E00AB] px-3 py-1.5 text-xs font-medium text-white"
+          className="rounded-full bg-[#152A51] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
         >
           {isPending ? "..." : "Search"}
         </button>
       </div>
 
-      {Object.entries(hiddenParams ?? {}).map(([key, value]) => {
-        if (value === null || value === undefined || value === "") return null;
-        return <input key={key} type="hidden" name={key} value={String(value)} />;
+      {Object.entries(hiddenParams ?? {}).map(([key, paramValue]) => {
+        if (paramValue === null || paramValue === undefined || paramValue === "") return null;
+        return <input key={key} type="hidden" name={key} value={String(paramValue)} />;
       })}
       <input type="hidden" name="page" value="1" />
     </form>

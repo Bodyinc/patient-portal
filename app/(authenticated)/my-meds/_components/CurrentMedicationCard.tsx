@@ -1,13 +1,28 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
+import {
+  DEFAULT_MEDICINE_IMAGE,
+  isExternalMedicineImage,
+  resolveMedicineImageSrc,
+} from "@/lib/intake/medicine-image";
+import { cn } from "@/lib/utils";
+
 import type { MyMedsCurrentMedicationDto } from "./types";
+import {
+  medicineImageFrameClass,
+  medicineImageFitClass,
+} from "../../../onboarding/_lib/onboarding-theme";
 
 type CurrentMedicationCardProps = {
   medication: MyMedsCurrentMedicationDto | null;
 };
+
+/** Figma treatment image: 339 × 354.6 — used as aspect; scales down responsively */
+const IMAGE_ASPECT = "339 / 354.6";
 
 function formatDate(value: string | null): string {
   if (!value) return "—";
@@ -18,6 +33,12 @@ function formatDate(value: string | null): string {
   }).format(new Date(value));
 }
 
+function toDbImageSrc(imageSrc: string | null | undefined): string | null {
+  const resolved = resolveMedicineImageSrc(imageSrc);
+  if (!resolved || resolved === DEFAULT_MEDICINE_IMAGE) return null;
+  return resolved;
+}
+
 export default function CurrentMedicationCard({ medication }: CurrentMedicationCardProps) {
   function handleRefillRequest() {
     window.alert("Refill requests are coming soon.");
@@ -25,13 +46,15 @@ export default function CurrentMedicationCard({ medication }: CurrentMedicationC
 
   if (!medication) {
     return (
-      <section className="rounded-md border border-[#E6DEFF] bg-white p-4">
-        <h2 className="mb-4 text-xl font-semibold text-[#2E00AB]">Current Medication Requests</h2>
-        <div className="rounded-md border border-dashed border-[#E6DEFF] bg-[#FAF8FF] px-4 py-8 text-center">
-          <p className="text-sm text-[#2E00AB]/70">No active medication requests.</p>
+      <section className="rounded-[24px] border border-[#E8EEED] bg-white p-4 sm:p-6">
+        <h2 className="mb-4 text-lg font-medium tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
+          Current Medication Requests
+        </h2>
+        <div className="rounded-[16px] border border-dashed border-[#E8EEED] bg-[#F3F6F6] px-4 py-8 text-center">
+          <p className="text-sm text-[#152A51]/70">No active medication requests.</p>
           <Link
             href="/shop"
-            className="mt-3 inline-flex rounded-md bg-[#2E00AB] px-4 py-2 text-sm font-medium text-white hover:bg-[#2E00AB]/90"
+            className="mt-4 inline-flex h-[46px] items-center rounded-full bg-[#E3E084] px-6 text-sm font-medium text-[#152A51] hover:bg-[#D9D674]"
           >
             Browse Shop
           </Link>
@@ -40,40 +63,72 @@ export default function CurrentMedicationCard({ medication }: CurrentMedicationC
     );
   }
 
-  return (
-    <section className="rounded-md border border-[#E6DEFF] bg-white p-4">
-      <h2 className="mb-4 text-xl font-semibold text-[#2E00AB]">Current Medication Requests</h2>
+  const imageSrc = toDbImageSrc(medication.imageSrc);
+  const external = imageSrc ? isExternalMedicineImage(imageSrc) : false;
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="grid flex-1 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <p className="text-xs text-[#2E00AB]/60">Medication Name</p>
-            <p className="mt-1 text-sm font-medium text-[#2E00AB]">{medication.medicationName}</p>
-          </div>
-          <div>
-            <p className="text-xs text-[#2E00AB]/60">Current Plan</p>
-            <p className="mt-1 text-sm font-medium text-[#2E00AB]">{medication.currentPlan}</p>
-          </div>
-          <div>
-            <p className="text-xs text-[#2E00AB]/60">Quantity / Supply</p>
-            <p className="mt-1 text-sm font-medium text-[#2E00AB]">{medication.quantitySupply}</p>
-          </div>
-          <div>
-            <p className="text-xs text-[#2E00AB]/60">Next Refill Date</p>
-            <p className="mt-1 text-sm font-medium text-[#2E00AB]">
-              {formatDate(medication.nextRefillDate)}
-            </p>
-          </div>
+  return (
+    <section className="rounded-[24px] border border-[#E8EEED] bg-white p-4 sm:p-6">
+      <h2 className="mb-4 text-lg font-medium tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
+        Current Medication Requests
+      </h2>
+
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-stretch lg:gap-6">
+        <div
+          className={cn(
+            "mx-auto w-full max-w-[280px] shrink-0 sm:mx-0 sm:max-w-[300px] lg:w-[38%] lg:max-w-[339px]",
+            medicineImageFrameClass,
+          )}
+          style={{ aspectRatio: IMAGE_ASPECT }}
+        >
+          {imageSrc ? (
+            <Image
+              src={imageSrc}
+              alt={medication.medicationName}
+              fill
+              sizes="(max-width: 1024px) 260px, 339px"
+              unoptimized={external}
+              className={medicineImageFitClass}
+            />
+          ) : null}
         </div>
 
-        <button
-          type="button"
-          onClick={handleRefillRequest}
-          className="flex w-full items-center justify-center gap-2 rounded-md border border-[#2E00AB] px-4 py-2 text-sm font-medium text-[#2E00AB] hover:bg-[#F6F3FF] sm:w-auto"
-        >
-          New Refill Request
-          <ArrowRight className="h-4 w-4" />
-        </button>
+        <div className="flex min-w-0 flex-1 flex-col justify-between gap-5">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <p className="text-xs text-[#152A51]/60 sm:text-sm">Medication Name</p>
+              <p className="mt-1 text-sm font-medium text-[#152A51] sm:text-[15px]">
+                {medication.medicationName}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-[#152A51]/60 sm:text-sm">Current Plan</p>
+              <p className="mt-1 text-sm font-medium text-[#152A51] sm:text-[15px]">
+                {medication.currentPlan}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-[#152A51]/60 sm:text-sm">Quantity / Supply</p>
+              <p className="mt-1 text-sm font-medium text-[#152A51] sm:text-[15px]">
+                {medication.quantitySupply}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-[#152A51]/60 sm:text-sm">Next Refill Date</p>
+              <p className="mt-1 text-sm font-medium text-[#152A51] sm:text-[15px]">
+                {formatDate(medication.nextRefillDate)}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleRefillRequest}
+            className="inline-flex h-[46px] w-full items-center justify-center gap-2 rounded-full border border-[#152A51] px-5 text-sm font-medium text-[#152A51] hover:bg-[#F3F6F6] sm:w-fit"
+          >
+            New Refill Request
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </section>
   );

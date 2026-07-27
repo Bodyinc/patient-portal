@@ -11,8 +11,8 @@ export default async function ProfilePage() {
   const profileResult = await getMyProfile();
   if (!profileResult.ok) {
     return (
-      <main className="min-w-0 flex-1 bg-[#FAF8FF] p-4">
-        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+      <main className="min-w-0 flex-1 p-4">
+        <div className="rounded-[16px] border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {profileResult.message}
         </div>
       </main>

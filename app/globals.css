@@ -129,3 +129,15 @@
     color: var(--color-foreground);
   }
 }
+
+/* Hide scrollbars while keeping overflow scroll (onboarding + portal scroll regions). */
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}

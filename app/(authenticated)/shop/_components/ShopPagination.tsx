@@ -24,8 +24,8 @@ export default function ShopPagination({
   const end = Math.min(page * pageSize, total);
 
   return (
-    <div className="mt-3 flex items-center justify-between">
-      <p className="text-sm text-[#2E00AB]/70">
+    <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm text-[#152A51]/70">
         Showing {start}-{end} of {total} Medicines
       </p>
 
@@ -35,12 +35,12 @@ export default function ShopPagination({
             type="button"
             disabled={isPending}
             onClick={() => onChangePage(page - 1)}
-            className="rounded-md border border-[#D5CAFF] px-3 py-1.5 text-sm text-[#2E00AB] disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-full border border-[#E8EEED] px-4 py-1.5 text-sm text-[#152A51] disabled:cursor-not-allowed disabled:opacity-60"
           >
             Previous
           </button>
         ) : (
-          <span className="rounded-md border border-[#EEE9FF] px-3 py-1.5 text-sm text-[#2E00AB]/40">
+          <span className="rounded-full border border-[#E8EEED] px-4 py-1.5 text-sm text-[#152A51]/40">
             Previous
           </span>
         )}
@@ -50,12 +50,12 @@ export default function ShopPagination({
             type="button"
             disabled={isPending}
             onClick={() => onChangePage(page + 1)}
-            className="rounded-md border border-[#2E00AB] bg-[#2E00AB] px-3 py-1.5 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-full bg-[#152A51] px-4 py-1.5 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60"
           >
             Next
           </button>
         ) : (
-          <span className="rounded-md border border-[#EEE9FF] px-3 py-1.5 text-sm text-[#2E00AB]/40">
+          <span className="rounded-full border border-[#E8EEED] px-4 py-1.5 text-sm text-[#152A51]/40">
             Next
           </span>
         )}

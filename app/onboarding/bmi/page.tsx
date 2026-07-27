@@ -3,16 +3,26 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { Ruler, Weight } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import { saveIntakeBmi } from "@/lib/actions/intake";
 
+import BmiGauge from "../_components/BmiGauge";
 import OnboardingShell from "../_components/OnboardingShell";
 import OnboardingStepLayout from "../_components/OnboardingStepLayout";
 import { calculateBmi, getBmiCategory } from "../_lib/bmi";
 import { getNextStepPath, getPrevStepPath } from "../_lib/onboarding-navigation";
 import { useOnboarding } from "../_lib/onboarding-store";
+
+const fieldLabelClass = "text-[14px] font-normal leading-none text-[#152A51]";
+
+const fieldControlClass =
+  "h-[45px] rounded-[14px] border-0 bg-[#E8EEED] px-4 text-[14px] font-normal leading-none text-[#152A51] shadow-none " +
+  "placeholder:text-[#152A51]/40 " +
+  "focus:border-0 focus:ring-0 focus-visible:border-0 focus-visible:ring-0 focus-visible:outline-none";
 
 export default function BmiPage() {
   const router = useRouter();
@@ -106,68 +116,87 @@ export default function BmiPage() {
         onBack={handleBack}
         onContinue={handleContinue}
         continueDisabled={saving}
-        maxWidth="2xl"
+        continueLabel="Continue"
+        maxWidth="form"
+        variant="bare"
+        align="center"
       >
-        <div className="space-y-5">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="feet" className="text-[#2E00AB]">
-                Height (feet)
-              </Label>
+        <div className="space-y-6">
+          <div className="space-y-2.5 text-left">
+            <Label className={fieldLabelClass}>Height</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="relative">
+                <Ruler
+                  className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-[#152A51]/40"
+                  aria-hidden
+                />
+                <Input
+                  id="feet"
+                  type="number"
+                  min={1}
+                  max={8}
+                  inputMode="numeric"
+                  value={heightFeet}
+                  onChange={(e) => setHeightFeet(e.target.value)}
+                  placeholder="Feet"
+                  aria-label="Height (feet)"
+                  className={cn(fieldControlClass, "pl-9 pr-12")}
+                />
+                <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-[12px] text-[#152A51]/40">
+                  ft
+                </span>
+              </div>
+              <div className="relative">
+                <Ruler
+                  className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-[#152A51]/40"
+                  aria-hidden
+                />
+                <Input
+                  id="inches"
+                  type="number"
+                  min={0}
+                  max={11}
+                  inputMode="numeric"
+                  value={heightInches}
+                  onChange={(e) => setHeightInches(e.target.value)}
+                  placeholder="Inches"
+                  aria-label="Height (inches)"
+                  className={cn(fieldControlClass, "pl-9 pr-12")}
+                />
+                <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-[12px] text-[#152A51]/40">
+                  in
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2.5 text-left">
+            <Label htmlFor="weight" className={fieldLabelClass}>
+              Current weight
+            </Label>
+            <div className="relative">
+              <Weight
+                className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-[#152A51]/40"
+                aria-hidden
+              />
               <Input
-                id="feet"
+                id="weight"
                 type="number"
                 min={1}
-                max={8}
-                inputMode="numeric"
-                value={heightFeet}
-                onChange={(e) => setHeightFeet(e.target.value)}
-                placeholder="5"
-                className="border-[#2E00AB]/20"
+                max={1500}
+                inputMode="decimal"
+                value={weightLbs}
+                onChange={(e) => setWeightLbs(e.target.value)}
+                placeholder="Weight"
+                className={cn(fieldControlClass, "pl-9 pr-12")}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="inches" className="text-[#2E00AB]">
-                Height (inches)
-              </Label>
-              <Input
-                id="inches"
-                type="number"
-                min={0}
-                max={11}
-                inputMode="numeric"
-                value={heightInches}
-                onChange={(e) => setHeightInches(e.target.value)}
-                placeholder="8"
-                className="border-[#2E00AB]/20"
-              />
+              <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-[12px] text-[#152A51]/40">
+                lbs
+              </span>
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="weight" className="text-[#2E00AB]">
-              Weight (lbs)
-            </Label>
-            <Input
-              id="weight"
-              type="number"
-              min={1}
-              max={1500}
-              inputMode="decimal"
-              value={weightLbs}
-              onChange={(e) => setWeightLbs(e.target.value)}
-              placeholder="165"
-              className="border-[#2E00AB]/20"
-            />
-          </div>
-
-          {bmi !== null ? (
-            <div className="rounded-xl border border-[#2E00AB]/20 bg-[#F8F4FF] px-4 py-4 text-center">
-              <p className="text-sm text-[#2E00AB]/80">Your BMI</p>
-              <p className="mt-1 text-3xl font-bold text-[#2E00AB]">{bmi}</p>
-              <p className="mt-1 text-sm font-medium text-[#2E00AB]">{bmiCategory}</p>
-            </div>
-          ) : null}
+          {bmi !== null ? <BmiGauge bmi={bmi} category={bmiCategory} /> : null}
         </div>
       </OnboardingStepLayout>
     </OnboardingShell>
