@@ -1,0 +1,32 @@
+---
+description: Onboarding Figma restyle conventions for patient-portal
+globs: app/onboarding/**/*
+alwaysApply: false
+---
+
+# Onboarding UI (Figma)
+
+When restyling onboarding pages:
+
+- **Style only** — do not change selection, validation, save, or navigation behavior.
+- **Keep responsive** — preserve mobile/desktop breakpoints; use fluid widths with max-widths (e.g. `max-w-[649px]`).
+- **Do not change copy** unless the user asks; restyle existing labels/titles.
+- **No hardcoded images** — use DB URLs (`icon`, `image_url`, medicine `imageSrc`). Gray placeholder if missing. Never invent stock photos.
+- **Logo** — centered; body cone color `#152A51` (same as Figma navy).
+- **No Call us / EN** in the header unless the user asks for them.
+
+## Theme tokens
+
+- Navy text: `#152A51` (muted `opacity-80` / `opacity-40` for placeholders)
+- CTA: `#E3E084` pill (`h-[46px]`, `rounded-full`, navy text)
+- Inputs: `#E8EEED` fill, `h-[45px]`, `rounded-[14px]`, no heavy border
+- Labels: `14px` regular, ~`10px` (`space-y-2.5`) above inputs
+- Titles: ~`32px` medium, `tracking-[-0.5px]`, Google Sans Flex via `.onboarding-font`
+- Accent/check: `#6A9B9C`
+- Save badge: bg `#E0FAE8`, text `#34845F`, `12px` medium uppercase
+- Promo chip: text `#786C46` when from DB data only
+
+## Goal cards
+
+- Image ~203×231, radius ~12px
+- All sharp until a valid selection; then non-selected get ~15px blur; selected stays clear

@@ -1,12 +1,22 @@
 "use client";
 
+import Image from "next/image";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { getDbMedicineImageSrc, isExternalMedicineImage } from "@/lib/intake/medicine-image";
 import type { ShopMedicineCardDto } from "@/lib/shop/types";
 import { formatFromPrice } from "@/lib/pricing";
+import { cn } from "@/lib/utils";
+
+import {
+  medicineImageFrameClass,
+  medicineImageFitClass,
+} from "../../../onboarding/_lib/onboarding-theme";
+
+const IMAGE_ASPECT = "339 / 354.6";
 
 export default function ShopProductCard({ item }: { item: ShopMedicineCardDto }) {
   const [open, setOpen] = useState(false);
@@ -29,6 +39,9 @@ export default function ShopProductCard({ item }: { item: ShopMedicineCardDto })
     : item.fromPriceCents;
   const available = displayFromPriceCents != null;
 
+  const imageSrc = getDbMedicineImageSrc(item.imageSrc);
+  const external = imageSrc ? isExternalMedicineImage(imageSrc) : false;
+
   function handleContinue() {
     if (!available) return;
     const params = new URLSearchParams({
@@ -36,7 +49,7 @@ export default function ShopProductCard({ item }: { item: ShopMedicineCardDto })
       name: item.name,
       category: item.categoryName,
       description: item.description,
-      image: item.imageSrc,
+      image: imageSrc ?? "",
     });
     if (selectedVariant) params.set("variant", selectedVariant.id);
     setOpen(false);
@@ -44,12 +57,12 @@ export default function ShopProductCard({ item }: { item: ShopMedicineCardDto })
   }
 
   const variantSelect = hasVariants ? (
-    <div className="space-y-1">
-      <label className="text-xs font-semibold text-[#2E00AB]/70">Select option</label>
+    <div className="space-y-2.5">
+      <label className="text-[14px] font-normal text-[#152A51]">Select option</label>
       <select
         value={selectedVariantId ?? ""}
         onChange={(e) => setSelectedVariantId(e.target.value)}
-        className="w-full rounded-xl border border-[#DCD2FF] bg-white px-3 py-2.5 text-sm font-medium text-[#2E00AB] focus:outline-none focus:ring-2 focus:ring-[#2E00AB]/30"
+        className="h-[45px] w-full rounded-[14px] border-0 bg-[#E8EEED] px-4 text-[14px] font-normal text-[#152A51] shadow-none focus:outline-none focus:ring-0"
       >
         {item.variants.map((v) => (
           <option key={v.id} value={v.id}>
@@ -61,41 +74,46 @@ export default function ShopProductCard({ item }: { item: ShopMedicineCardDto })
     </div>
   ) : null;
 
+  const imageBlock = (
+    <div className={cn("w-full", medicineImageFrameClass)} style={{ aspectRatio: IMAGE_ASPECT }}>
+      {imageSrc ? (
+        <Image
+          src={imageSrc}
+          alt={item.name}
+          fill
+          sizes="(max-width: 1024px) 100vw, 339px"
+          unoptimized={external}
+          className={medicineImageFitClass}
+        />
+      ) : null}
+    </div>
+  );
+
   return (
     <>
-      <article className="flex h-full flex-col overflow-hidden rounded-[32px] border border-[#DCD2FF] bg-white p-3 shadow-sm">
-        <div className="relative flex min-h-[190px] items-center justify-center overflow-hidden rounded-[24px] bg-[#F3EEFF] p-4">
-          <img
-            src="/curve-line.svg"
-            alt=""
-            className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-70"
-          />
-          <img
-            src={item.imageSrc}
-            alt={item.name}
-            className="relative z-10 h-28 w-auto object-contain"
-          />
-        </div>
+      <article className="flex h-full flex-col overflow-hidden rounded-[24px] border border-[#E8EEED] bg-white p-3 sm:p-4">
+        {imageBlock}
 
-        {/* Content Area */}
-        <div className="flex flex-1 flex-col space-y-3 px-2 py-4">
+        <div className="flex flex-1 flex-col gap-2 pt-3 sm:gap-2.5 sm:pt-4">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="text-xl font-semibold text-[#2E00AB]">{item.name}</h3>
-            <span className="shrink-0 rounded-full border border-[#2E00AB]/20 bg-[#F8F4FF] px-3 py-0.5 text-[11px] text-[#2E00AB]">
+            <h3 className="text-[16px] font-medium leading-snug tracking-[-0.25px] text-[#152A51] sm:text-[18px]">
+              {item.name}
+            </h3>
+            <span className="shrink-0 rounded-full bg-[#F3F6F6] px-2.5 py-1 text-[11px] font-medium text-[#152A51]">
               {item.categoryName}
             </span>
           </div>
-          <p className="line-clamp-2 min-h-[40px] text-sm text-[#2E00AB]/70">{item.description}</p>
-          {/* Price + button pinned to the bottom so buttons align across all cards. Variant
-              selection lives in the details dialog. */}
-          <div className="mt-auto space-y-3">
-            <p className="text-3xl font-bold leading-none text-[#2E00AB]">
+          <p className="line-clamp-2 text-[13px] leading-snug text-[#152A51]/80 sm:text-[14px]">
+            {item.description}
+          </p>
+          <div className="mt-auto space-y-2.5 pt-3">
+            <p className="text-[20px] font-medium leading-none tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
               {formatFromPrice(item.fromPriceCents)}
             </p>
             <button
               type="button"
               onClick={() => setOpen(true)}
-              className="w-full rounded-xl bg-[#2E00AB] py-3 text-sm font-semibold text-white transition hover:bg-[#2E00AB]/90"
+              className="h-[42px] w-full rounded-full bg-[#152A51] text-[13px] font-medium text-white transition hover:bg-[#152A51]/90 sm:h-[46px] sm:text-[14px]"
             >
               View Details
             </button>
@@ -104,43 +122,28 @@ export default function ShopProductCard({ item }: { item: ShopMedicineCardDto })
       </article>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[95vh] max-w-4xl gap-0 overflow-y-auto p-6 sm:rounded-[32px]">
-          {/* Main 2-Column Grid spanning the entire height */}
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[380px_1fr]">
-            {/* LEFT SIDE: Unified Card spanning full vertical height */}
-            <div className="flex flex-col rounded-[24px] border border-[#DCD2FF] bg-[#F8F4FF]/20 p-3 h-full justify-between">
-              {/* Bottle Box: Stretches dynamically to consume maximum vertical area */}
-              <div className="relative flex flex-1 min-h-[360px] items-center justify-center overflow-hidden rounded-[20px] bg-[#F3EEFF] p-6">
-                <img
-                  src="/curve-line.svg"
-                  alt=""
-                  className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-70"
-                />
-                <img
-                  src={item.imageSrc}
-                  alt={item.name}
-                  className="relative z-10 h-full max-h-[320px] w-auto object-contain drop-shadow-sm"
-                />
-              </div>
-
-              {/* Anchored text at the bottom edge of the left card boundary */}
-              <p className="mt-4 px-1 text-xl font-bold text-[#2E00AB]">
+        <DialogContent className="max-h-[95vh] max-w-4xl gap-0 overflow-y-auto scrollbar-hide rounded-[24px] border-[#E8EEED] p-4 sm:rounded-[24px] sm:p-6">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,339px)_1fr]">
+            <div className="flex h-full flex-col justify-between rounded-[24px] border border-[#E8EEED] bg-white p-3">
+              {imageBlock}
+              <p className="mt-4 px-1 text-[22px] font-medium tracking-[-0.3px] text-[#152A51]">
                 {formatFromPrice(displayFromPriceCents)}
               </p>
             </div>
 
-            {/* RIGHT SIDE: Details and Buttons nested together */}
-            <div className="flex flex-col justify-between min-w-0 py-1">
+            <div className="flex min-w-0 flex-col justify-between py-1">
               <div>
-                <DialogTitle className="text-3xl font-bold text-[#2E00AB]">{item.name}</DialogTitle>
+                <DialogTitle className="text-[28px] font-medium leading-tight tracking-[-0.5px] text-[#152A51] sm:text-[32px]">
+                  {item.name}
+                </DialogTitle>
                 <DialogDescription className="sr-only">
                   Detailed information about {item.name}
                 </DialogDescription>
 
-                <p className="mt-3 text-base text-[#2E00AB]/90 leading-relaxed">
+                <p className="mt-4 text-[15px] leading-relaxed text-[#152A51]">
                   {item.description}
                 </p>
-                <p className="mt-3 text-sm leading-relaxed text-[#2E00AB]/80">
+                <p className="mt-3 text-[14px] leading-relaxed text-[#152A51]/80">
                   This treatment plan is personalized based on your health assessment and clinician
                   recommendations for safe and sustainable progress.
                 </p>
@@ -148,39 +151,38 @@ export default function ShopProductCard({ item }: { item: ShopMedicineCardDto })
                 {hasVariants ? <div className="mt-5 max-w-xs">{variantSelect}</div> : null}
 
                 <div className="mt-6">
-                  <h3 className="text-base font-bold text-[#2E00AB]">Important Information</h3>
+                  <h3 className="text-[15px] font-medium text-[#152A51]">Important Information</h3>
                   <ul className="mt-3 space-y-2.5">
-                    <li className="border-l-[3px] border-[#2E00AB] pl-3 text-sm text-[#2E00AB]/90">
+                    <li className="border-l-[3px] border-[#6A9B9C] pl-3 text-[14px] text-[#152A51]">
                       Prescription required following clinical approval.
                     </li>
-                    <li className="border-l-[3px] border-[#2E00AB] pl-3 text-sm text-[#2E00AB]/90">
+                    <li className="border-l-[3px] border-[#6A9B9C] pl-3 text-[14px] text-[#152A51]">
                       Contact your provider if you experience unexpected side effects.
                     </li>
-                    <li className="border-l-[3px] border-[#2E00AB] pl-3 text-sm text-[#2E00AB]/90">
+                    <li className="border-l-[3px] border-[#6A9B9C] pl-3 text-[14px] text-[#152A51]">
                       Individual results may vary based on medical history and lifestyle.
                     </li>
-                    <li className="border-l-[3px] border-[#2E00AB] pl-3 text-sm text-[#2E00AB]/90">
+                    <li className="border-l-[3px] border-[#6A9B9C] pl-3 text-[14px] text-[#152A51]">
                       Use only as directed by your care team.
                     </li>
                   </ul>
                 </div>
 
-                <div className="mt-6 rounded-2xl border border-[#2E00AB]/10 bg-[#F8F4FF]/60 p-4">
-                  <h4 className="font-bold text-[#2E00AB] text-sm">Notice</h4>
-                  <p className="mt-1 text-xs text-[#2E00AB]/80 leading-normal">
+                <div className="mt-6 rounded-[16px] border border-[#E8EEED] bg-[#F3F6F6] p-4">
+                  <h4 className="text-[13px] font-medium text-[#152A51]">Notice</h4>
+                  <p className="mt-1 text-[12px] leading-normal text-[#152A51]/80">
                     * Prescription required. Professional medical consultation necessary before
                     fulfillment.
                   </p>
                 </div>
               </div>
 
-              {/* Action Buttons: Positioned directly inside the right column flow */}
-              <div className="flex flex-col-reverse gap-3 mt-6 sm:flex-row sm:justify-end">
+              <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setOpen(false)}
-                  className="w-full border-[#2E00AB]/30 text-[#2E00AB]  font-semibold sm:w-auto px-6 py-5"
+                  className="h-[46px] w-full rounded-full border-[#152A51]/30 bg-transparent px-6 text-[14px] font-medium text-[#152A51] shadow-none hover:bg-[#152A51]/5 sm:w-auto"
                 >
                   Explore More
                 </Button>
@@ -188,7 +190,12 @@ export default function ShopProductCard({ item }: { item: ShopMedicineCardDto })
                   type="button"
                   onClick={handleContinue}
                   disabled={!available}
-                  className="w-full bg-[#2E00AB] hover:bg-[#2E00AB]/90 text-white  font-semibold sm:w-auto px-6 py-5 disabled:opacity-50 disabled:hover:bg-[#2E00AB]"
+                  className={cn(
+                    "h-[46px] w-full rounded-full px-6 text-[14px] font-medium shadow-none sm:w-auto",
+                    available
+                      ? "bg-[#E3E084] text-[#152A51] hover:bg-[#D9D674]"
+                      : "bg-[#E8EEED] text-[#152A51]/50",
+                  )}
                 >
                   {available ? "Continue" : "Pricing coming soon"}
                 </Button>

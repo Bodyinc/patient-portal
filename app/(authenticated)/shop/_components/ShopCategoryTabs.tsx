@@ -1,4 +1,5 @@
 import type { ShopCategoryDto, ShopSortOption } from "@/lib/shop/types";
+import { cn } from "@/lib/utils";
 
 type ShopCategoryTabsProps = {
   categories: ShopCategoryDto[];
@@ -16,7 +17,7 @@ export default function ShopCategoryTabs({
   onSelectCategory,
 }: ShopCategoryTabsProps) {
   const baseClass =
-    "rounded-md border px-3 py-2 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm";
+    "rounded-full border px-3 py-2 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm";
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -24,11 +25,12 @@ export default function ShopCategoryTabs({
         type="button"
         disabled={isPending}
         onClick={() => onSelectCategory(null)}
-        className={`${baseClass} ${
+        className={cn(
+          baseClass,
           !currentCategorySlug
-            ? "border-[#2E00AB] bg-[#2E00AB] text-white"
-            : "border-[#D5CAFF] bg-white text-[#2E00AB]"
-        }`}
+            ? "border-[#152A51] bg-[#152A51] text-white"
+            : "border-[#E8EEED] bg-white text-[#152A51] hover:bg-[#F3F6F6]",
+        )}
       >
         All Medicines
       </button>
@@ -39,11 +41,12 @@ export default function ShopCategoryTabs({
           disabled={isPending}
           onClick={() => onSelectCategory(category.slug)}
           key={category.id}
-          className={`${baseClass} ${
+          className={cn(
+            baseClass,
             currentCategorySlug === category.slug
-              ? "border-[#2E00AB] bg-[#2E00AB] text-white"
-              : "border-[#D5CAFF] bg-white text-[#2E00AB]"
-          }`}
+              ? "border-[#152A51] bg-[#152A51] text-white"
+              : "border-[#E8EEED] bg-white text-[#152A51] hover:bg-[#F3F6F6]",
+          )}
         >
           {category.name}
         </button>

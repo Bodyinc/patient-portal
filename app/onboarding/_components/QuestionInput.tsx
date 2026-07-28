@@ -5,9 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import type { QuestionDto, QuestionnaireAnswerValue } from "@/lib/intake/types";
 
 import { getQuestionnaireGridClass } from "../_lib/onboarding-ui";
+import { fieldControlClass, fieldTextareaClass } from "../_lib/onboarding-theme";
 
 type QuestionInputProps = {
   question: QuestionDto;
@@ -16,9 +18,12 @@ type QuestionInputProps = {
 };
 
 const optionButtonClass = (selected: boolean) =>
-  `flex w-full cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition ${
-    selected ? "border-[#2E00AB] bg-[#2E00AB]/5" : "border-[#2E00AB]/20 hover:border-[#2E00AB]/40"
-  }`;
+  cn(
+    "flex w-full cursor-pointer items-center gap-3 rounded-[14px] border px-3 py-3 transition",
+    selected
+      ? "border-[#152A51] bg-[#E8EEED]"
+      : "border-[#E8E8E8] bg-white hover:border-[#152A51]/30",
+  );
 
 export default function QuestionInput({ question, value, onChange }: QuestionInputProps) {
   switch (question.questionType) {
@@ -29,7 +34,7 @@ export default function QuestionInput({ question, value, onChange }: QuestionInp
           onChange={(e) => onChange({ text: e.target.value })}
           placeholder="Type your answer"
           rows={3}
-          className="min-h-[80px] resize-none border-[#2E00AB]/20 bg-white"
+          className={fieldTextareaClass}
         />
       );
 
@@ -46,7 +51,7 @@ export default function QuestionInput({ question, value, onChange }: QuestionInp
             });
           }}
           placeholder="Enter a number"
-          className="border-[#2E00AB]/20 bg-white"
+          className={cn(fieldControlClass, "max-w-full sm:max-w-md")}
         />
       );
 
@@ -63,7 +68,7 @@ export default function QuestionInput({ question, value, onChange }: QuestionInp
               onClick={() => onChange({ boolean: option.val })}
               className={optionButtonClass(value?.boolean === option.val)}
             >
-              <span className="text-sm font-medium text-[#2E00AB]">{option.label}</span>
+              <span className="text-[14px] font-medium text-[#152A51]">{option.label}</span>
             </button>
           ))}
         </div>
@@ -85,9 +90,9 @@ export default function QuestionInput({ question, value, onChange }: QuestionInp
               <RadioGroupItem
                 value={option.id}
                 id={`${question.id}-${option.id}`}
-                className="border-[#2E00AB] text-[#2E00AB]"
+                className="border-[#152A51] text-[#152A51]"
               />
-              <span className="text-sm text-[#2E00AB]">{option.label}</span>
+              <span className="text-[14px] text-[#152A51]">{option.label}</span>
             </Label>
           ))}
         </RadioGroup>
@@ -111,8 +116,9 @@ export default function QuestionInput({ question, value, onChange }: QuestionInp
                       onChange({ optionIds: current.filter((id) => id !== option.id) });
                     }
                   }}
+                  className="border-[#152A51]/30 data-[state=checked]:border-[#152A51] data-[state=checked]:bg-[#152A51]"
                 />
-                <span className="text-sm text-[#2E00AB]">{option.label}</span>
+                <span className="text-[14px] text-[#152A51]">{option.label}</span>
               </label>
             );
           })}

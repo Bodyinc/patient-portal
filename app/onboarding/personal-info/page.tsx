@@ -27,6 +27,13 @@ const personalInfoSchema = z.object({
   phone: PHONE_SCHEMA,
 });
 
+const fieldLabelClass = "text-[14px] font-normal leading-none text-[#152A51]";
+
+const fieldControlClass =
+  "h-[45px] rounded-[14px] border-0 bg-[#E8EEED] px-4 text-[14px] font-normal leading-none text-[#152A51] shadow-none " +
+  "placeholder:text-[#152A51]/40 " +
+  "focus:border-0 focus:ring-0 focus-visible:border-0 focus-visible:ring-0 focus-visible:outline-none";
+
 export default function PersonalInfoPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -118,11 +125,14 @@ export default function PersonalInfoPage() {
         onBack={handleBack}
         onContinue={handleContinue}
         continueDisabled={saving}
-        maxWidth="2xl"
+        continueLabel="Continue"
+        maxWidth="form"
+        variant="bare"
+        align="center"
       >
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="fullName" className="text-[#2E00AB]">
+        <div className="space-y-6 text-left">
+          <div className="space-y-2.5">
+            <Label htmlFor="fullName" className={fieldLabelClass}>
               Full name
             </Label>
             <Input
@@ -130,43 +140,45 @@ export default function PersonalInfoPage() {
               value={form.fullName}
               onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
               placeholder="John Doe"
-              className="border-[#2E00AB]/20"
+              className={fieldControlClass}
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="email" className="text-[#2E00AB]">
-              Email address
-            </Label>
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              value={form.email}
-              onChange={(e) => {
-                setEmailError(null);
-                setForm((f) => ({ ...f, email: e.target.value }));
-              }}
-              placeholder="name@company.com"
-              className="border-[#2E00AB]/20"
-              aria-invalid={emailError ? true : undefined}
-            />
-            {emailError ? <p className="text-sm text-red-600">{emailError}</p> : null}
-          </div>
+          <div className="grid gap-6 sm:grid-cols-2 sm:gap-4">
+            <div className="space-y-2.5">
+              <Label htmlFor="email" className={fieldLabelClass}>
+                Email address
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                autoComplete="email"
+                value={form.email}
+                onChange={(e) => {
+                  setEmailError(null);
+                  setForm((f) => ({ ...f, email: e.target.value }));
+                }}
+                placeholder="name@company.com"
+                className={fieldControlClass}
+                aria-invalid={emailError ? true : undefined}
+              />
+              {emailError ? <p className="text-sm text-red-600">{emailError}</p> : null}
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="phone" className="text-[#2E00AB]">
-              Phone number
-            </Label>
-            <Input
-              id="phone"
-              type="tel"
-              autoComplete="tel"
-              value={form.phone}
-              onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-              placeholder="(555) 000-0000"
-              className="border-[#2E00AB]/20"
-            />
+            <div className="space-y-2.5">
+              <Label htmlFor="phone" className={fieldLabelClass}>
+                Phone number
+              </Label>
+              <Input
+                id="phone"
+                type="tel"
+                autoComplete="tel"
+                value={form.phone}
+                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                placeholder="(555) 000-0000"
+                className={fieldControlClass}
+              />
+            </div>
           </div>
         </div>
       </OnboardingStepLayout>

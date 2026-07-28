@@ -7,6 +7,7 @@ import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
+import "../dashboard.css";
 import DashboardSidebar from "./DashboardSidebar";
 
 type DashboardShellProps = {
@@ -17,30 +18,28 @@ export default function DashboardShell({ children }: DashboardShellProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   return (
-    <div className="flex min-h-screen flex-col bg-white lg:flex-row">
-      <div className="flex items-center justify-between border-b border-[#DDD4FF] bg-[#F3EFFF] px-4 py-2.5 lg:hidden">
+    <div className="dashboard-font flex min-h-screen flex-col overflow-x-hidden bg-white lg:flex-row">
+      <div className="flex items-center justify-between border-b border-[#E5E7EB] bg-white px-4 py-2.5 lg:hidden">
         <Image src="/logo.svg" alt="BodyInc" width={96} height={30} priority />
         <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="text-[#2E00AB]">
+            <Button variant="ghost" size="icon" className="text-[#152A51]">
               <Menu className="h-5 w-5" />
               <span className="sr-only">Open menu</span>
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-[224px] bg-[#F3EFFF] p-0">
-            <DashboardSidebar
-              className="h-full rounded-none"
-              onNavigate={() => setMobileNavOpen(false)}
-            />
+          <SheetContent side="left" className="w-[260px] border-r border-[#E5E7EB] bg-white p-0">
+            <DashboardSidebar className="h-full" onNavigate={() => setMobileNavOpen(false)} />
           </SheetContent>
         </Sheet>
       </div>
 
-      <aside className="hidden shrink-0 lg:block lg:w-[224px] xl:w-[256px]">
-        <DashboardSidebar className="sticky top-0 m-2 h-[calc(100vh-1rem)] rounded-[12px]" />
+      {/* Figma sidebar: fixed 260px, white, right border only — no rounded inset */}
+      <aside className="hidden lg:flex lg:w-[260px] lg:min-w-[260px] lg:max-w-[260px] lg:shrink-0">
+        <DashboardSidebar className="sticky top-0 h-dvh w-full" />
       </aside>
 
-      <div className="min-w-0 flex-1">{children}</div>
+      <div className="min-w-0 flex-1 overflow-x-hidden">{children}</div>
     </div>
   );
 }

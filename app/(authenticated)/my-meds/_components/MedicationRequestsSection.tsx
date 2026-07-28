@@ -36,14 +36,14 @@ function money(cents: number) {
 function statusBadgeClass(status: string): string {
   switch (status) {
     case "delivered":
-      return "bg-emerald-50 text-emerald-700";
+      return "bg-[#E0FAE8] text-[#34845F]";
     case "awaiting_additional_payment":
-      return "bg-amber-50 text-amber-700";
+      return "bg-[#FFF6D6] text-[#786C46]";
     case "rejected":
     case "cancelled":
       return "bg-red-50 text-red-700";
     default:
-      return "bg-[#EDE7FF] text-[#2E00AB]";
+      return "bg-[#E8EEED] text-[#152A51]";
   }
 }
 
@@ -59,14 +59,16 @@ export default function MedicationRequestsSection({
   const [active, setActive] = useState<MyMedsMedicationRequestDto | null>(null);
 
   return (
-    <section className="rounded-md border border-[#E6DEFF] bg-white p-4">
+    <section className="rounded-[24px] border border-[#E8EEED] bg-white p-4 sm:p-6">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-xl font-semibold text-[#2E00AB]">Medication Requests</h2>
+        <h2 className="text-lg font-medium tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
+          Medication Requests
+        </h2>
       </div>
 
       {items.length === 0 ? (
-        <div className="rounded-md border border-dashed border-[#E6DEFF] bg-[#FAF8FF] px-4 py-8 text-center">
-          <p className="text-sm text-[#2E00AB]/70">
+        <div className="rounded-[16px] border border-dashed border-[#E8EEED] bg-[#F3F6F6] px-4 py-8 text-center">
+          <p className="text-sm text-[#152A51]/70">
             {requests.query ? "No requests match your search." : "No medication requests yet."}
           </p>
         </div>
@@ -74,22 +76,22 @@ export default function MedicationRequestsSection({
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow className="border-[#EEE9FF] hover:bg-transparent">
-                <TableHead className="min-w-[160px] text-[#2E00AB]/70">Medicine</TableHead>
-                <TableHead className="min-w-[140px] text-[#2E00AB]/70">Plan</TableHead>
-                <TableHead className="min-w-[130px] text-[#2E00AB]/70">Status</TableHead>
-                <TableHead className="min-w-[120px] text-right text-[#2E00AB]/70">
+              <TableRow className="border-[#E8EEED] hover:bg-transparent">
+                <TableHead className="min-w-[160px] text-[#152A51]/70">Medicine</TableHead>
+                <TableHead className="min-w-[140px] text-[#152A51]/70">Plan</TableHead>
+                <TableHead className="min-w-[130px] text-[#152A51]/70">Status</TableHead>
+                <TableHead className="min-w-[120px] text-right text-[#152A51]/70">
                   Actions
                 </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {items.map((request) => (
-                <TableRow key={request.id} className="border-[#EEE9FF] hover:bg-[#FAF8FF]/60">
-                  <TableCell className="text-sm font-medium text-[#2E00AB]">
+                <TableRow key={request.id} className="border-[#E8EEED] hover:bg-[#F3F6F6]/60">
+                  <TableCell className="text-sm font-medium text-[#152A51]">
                     {request.medicationName}
                   </TableCell>
-                  <TableCell className="text-sm text-[#2E00AB]/80">
+                  <TableCell className="text-sm text-[#152A51]/80">
                     {request.planName ?? "—"}
                   </TableCell>
                   <TableCell>
@@ -105,7 +107,7 @@ export default function MedicationRequestsSection({
                     <button
                       type="button"
                       onClick={() => setActive(request)}
-                      className="rounded-md border border-[#2E00AB] px-3 py-1.5 text-sm font-medium text-[#2E00AB] hover:bg-[#F6F3FF]"
+                      className="rounded-full border border-[#152A51] px-3 py-1.5 text-sm font-medium text-[#152A51] hover:bg-[#F3F6F6]"
                     >
                       Track request
                     </button>
@@ -118,8 +120,8 @@ export default function MedicationRequestsSection({
       )}
 
       {total > 0 ? (
-        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-[#2E00AB]/70">
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-[#152A51]/70">
             Showing {start}-{end} of {total} request{total === 1 ? "" : "s"}
           </p>
 
@@ -129,12 +131,12 @@ export default function MedicationRequestsSection({
                 type="button"
                 disabled={isPending}
                 onClick={() => onChangePage(page - 1)}
-                className="rounded-md border border-[#D5CAFF] px-3 py-1.5 text-sm text-[#2E00AB] disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-full border border-[#E8EEED] px-4 py-1.5 text-sm text-[#152A51] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Previous
               </button>
             ) : (
-              <span className="rounded-md border border-[#EEE9FF] px-3 py-1.5 text-sm text-[#2E00AB]/40">
+              <span className="rounded-full border border-[#E8EEED] px-4 py-1.5 text-sm text-[#152A51]/40">
                 Previous
               </span>
             )}
@@ -144,12 +146,12 @@ export default function MedicationRequestsSection({
                 type="button"
                 disabled={isPending}
                 onClick={() => onChangePage(page + 1)}
-                className="rounded-md border border-[#2E00AB] bg-[#2E00AB] px-3 py-1.5 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-full bg-[#152A51] px-4 py-1.5 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Next
               </button>
             ) : (
-              <span className="rounded-md border border-[#EEE9FF] px-3 py-1.5 text-sm text-[#2E00AB]/40">
+              <span className="rounded-full border border-[#E8EEED] px-4 py-1.5 text-sm text-[#152A51]/40">
                 Next
               </span>
             )}
@@ -160,10 +162,10 @@ export default function MedicationRequestsSection({
       <Dialog open={!!active} onOpenChange={(o) => !o && setActive(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-[#2E00AB]">
+            <DialogTitle className="text-[#152A51]">
               {active?.medicationName}
               {active?.planName ? (
-                <span className="block text-sm font-normal text-[#2E00AB]/60">
+                <span className="block text-sm font-normal text-[#152A51]/60">
                   {active.planName}
                 </span>
               ) : null}
@@ -172,19 +174,19 @@ export default function MedicationRequestsSection({
 
           {active ? (
             active.isRejected ? (
-              <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">
+              <p className="rounded-[14px] bg-red-50 p-3 text-sm text-red-700">
                 This order was rejected and the payment refunded.
               </p>
             ) : (
               <div className="pt-1">
                 {active.pendingPaymentCents ? (
-                  <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
-                    <span className="text-sm text-amber-800">
+                  <div className="mb-4 flex items-center justify-between gap-3 rounded-[14px] border border-[#E8EEED] bg-[#FFF6D6] p-3">
+                    <span className="text-sm text-[#786C46]">
                       {money(active.pendingPaymentCents)} due to continue
                     </span>
                     <Link
                       href={`/orders/${active.id}/pay`}
-                      className="rounded-md bg-[#2E00AB] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[#2E00AB]/90"
+                      className="rounded-full bg-[#152A51] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#152A51]/90"
                     >
                       Pay now
                     </Link>
@@ -200,16 +202,16 @@ export default function MedicationRequestsSection({
                           <span
                             className={`mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 ${
                               step.state === "done"
-                                ? "border-[#2E00AB] bg-[#2E00AB]"
+                                ? "border-[#6A9B9C] bg-[#6A9B9C]"
                                 : step.state === "current"
-                                  ? "border-[#2E00AB] bg-white ring-4 ring-[#2E00AB]/15"
-                                  : "border-[#D9CEFF] bg-white"
+                                  ? "border-[#152A51] bg-white ring-4 ring-[#152A51]/15"
+                                  : "border-[#E8EEED] bg-white"
                             }`}
                           />
                           {!isLast ? (
                             <span
                               className={`w-0.5 grow ${
-                                step.state === "done" ? "bg-[#2E00AB]" : "bg-[#E6DEFF]"
+                                step.state === "done" ? "bg-[#6A9B9C]" : "bg-[#E8EEED]"
                               }`}
                               style={{ minHeight: "28px" }}
                             />
@@ -219,14 +221,14 @@ export default function MedicationRequestsSection({
                           <div
                             className={`text-sm ${
                               step.state === "upcoming"
-                                ? "text-[#2E00AB]/40"
-                                : "font-medium text-[#2E00AB]"
+                                ? "text-[#152A51]/40"
+                                : "font-medium text-[#152A51]"
                             }`}
                           >
                             {step.label}
                           </div>
                           {step.at ? (
-                            <div className="text-xs text-[#2E00AB]/50">{formatDate(step.at)}</div>
+                            <div className="text-xs text-[#152A51]/50">{formatDate(step.at)}</div>
                           ) : null}
                         </div>
                       </li>
@@ -235,19 +237,19 @@ export default function MedicationRequestsSection({
                 </ol>
 
                 {active.trackingNumber ? (
-                  <p className="mt-1 text-sm text-[#2E00AB]">
-                    <span className="text-[#2E00AB]/60">Tracking #:</span> {active.trackingNumber}
+                  <p className="mt-1 text-sm text-[#152A51]">
+                    <span className="text-[#152A51]/60">Tracking #:</span> {active.trackingNumber}
                   </p>
                 ) : null}
 
                 {active.prescription ? (
-                  <div className="mt-3 rounded-lg border border-[#E6DEFF] bg-[#FAF8FF] p-3">
-                    <div className="text-sm font-semibold text-[#2E00AB]">Prescription</div>
-                    <div className="text-sm text-[#2E00AB]/80">
+                  <div className="mt-3 rounded-[14px] border border-[#E8EEED] bg-[#F3F6F6] p-3">
+                    <div className="text-sm font-medium text-[#152A51]">Prescription</div>
+                    <div className="text-sm text-[#152A51]/80">
                       {active.prescription.medicineName}
                     </div>
                     {active.prescription.directions ? (
-                      <div className="text-xs text-[#2E00AB]/70">
+                      <div className="text-xs text-[#152A51]/70">
                         {active.prescription.directions}
                       </div>
                     ) : null}
@@ -255,14 +257,14 @@ export default function MedicationRequestsSection({
                       <Link
                         href={`/prescriptions/${active.prescription.id}`}
                         target="_blank"
-                        className="rounded-md border border-[#2E00AB] px-3 py-1.5 text-sm font-medium text-[#2E00AB] hover:bg-[#F6F3FF]"
+                        className="rounded-full border border-[#152A51] px-3 py-1.5 text-sm font-medium text-[#152A51] hover:bg-white"
                       >
                         View
                       </Link>
                       <Link
                         href={`/prescriptions/${active.prescription.id}?download=1`}
                         target="_blank"
-                        className="rounded-md bg-[#2E00AB] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[#2E00AB]/90"
+                        className="rounded-full bg-[#152A51] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#152A51]/90"
                       >
                         Download
                       </Link>

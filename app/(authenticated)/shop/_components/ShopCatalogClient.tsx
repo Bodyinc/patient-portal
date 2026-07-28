@@ -112,7 +112,7 @@ export default function ShopCatalogClient({
   const isPending = catalogQuery.isFetching;
 
   return (
-    <section className="space-y-3">
+    <section className="space-y-4">
       <ShopHeader
         fullName={fullName}
         patientId={patientId}
@@ -133,8 +133,10 @@ export default function ShopCatalogClient({
 
       {topContent}
 
-      <section className="space-y-3 rounded-md border border-[#E6DEFF] bg-white p-4">
-        <h2 className="text-xl font-semibold text-[#2E00AB]">Shop Catalog</h2>
+      <section className="space-y-4 rounded-[24px] border border-[#E8EEED] bg-white p-4 sm:p-6">
+        <h2 className="text-lg font-medium tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
+          Shop Catalog
+        </h2>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <ShopCategoryTabs
             categories={categories}
@@ -155,23 +157,23 @@ export default function ShopCatalogClient({
           />
         </div>
         {isPending ? (
-          <div className="rounded-md border border-[#E6DEFF] bg-[#F8F4FF] px-3 py-2 text-xs text-[#2E00AB]/80">
+          <div className="rounded-[14px] border border-[#E8EEED] bg-[#F3F6F6] px-3 py-2 text-xs text-[#152A51]/80">
             Updating results...
           </div>
         ) : null}
 
         {catalogQuery.isError ? (
-          <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          <div className="rounded-[16px] border border-red-200 bg-red-50 p-4 text-sm text-red-700">
             {catalogQuery.error instanceof Error
               ? catalogQuery.error.message
               : "Unable to load shop catalog."}
           </div>
         ) : list.items.length === 0 ? (
-          <div className="rounded-md border border-[#EEE9FF] bg-[#FCFBFF] p-6 text-center text-sm text-[#2E00AB]/70">
+          <div className="rounded-[16px] border border-[#E8EEED] bg-[#F3F6F6] p-6 text-center text-sm text-[#152A51]/70">
             No medicines found for this category.
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-5">
             {list.items.map((item) => (
               <ShopProductCard key={item.id} item={item} />
             ))}

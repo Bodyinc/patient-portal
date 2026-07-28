@@ -1,15 +1,33 @@
+import Image from "next/image";
+
+import { getDbMedicineImageSrc, isExternalMedicineImage } from "@/lib/intake/medicine-image";
+
 import type { CheckoutProduct } from "./types";
 
 export default function SelectedProductCard({ product }: { product: CheckoutProduct }) {
+  const imageSrc = getDbMedicineImageSrc(product.imageSrc);
+  const external = imageSrc ? isExternalMedicineImage(imageSrc) : false;
+
   return (
-    <section className="rounded-md border border-[#E6DEFF] bg-white p-4">
-      <div className="flex items-center gap-3">
-        <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-[#F3EEFF]">
-          <img src={product.imageSrc} alt={product.name} className="h-10 w-auto object-contain" />
+    <section className="rounded-[24px] border border-[#E8EEED] bg-white p-4 sm:p-5">
+      <div className="flex items-center gap-3 sm:gap-4">
+        <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-[14px] bg-[#5D7293]">
+          {imageSrc ? (
+            <Image
+              src={imageSrc}
+              alt={product.name}
+              fill
+              sizes="56px"
+              unoptimized={external}
+              className="object-contain p-2"
+            />
+          ) : null}
         </div>
         <div className="min-w-0">
-          <p className="truncate text-xl font-semibold text-[#2E00AB]">{product.name}</p>
-          <p className="truncate text-sm text-[#2E00AB]/75">{product.description}</p>
+          <p className="truncate text-lg font-medium tracking-[-0.3px] text-[#152A51] sm:text-[20px]">
+            {product.name}
+          </p>
+          <p className="truncate text-sm text-[#152A51]/75">{product.description}</p>
         </div>
       </div>
     </section>

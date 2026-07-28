@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import {
   DEFAULT_MEDICINE_IMAGE,
+  getDbMedicineImageSrc,
   isExternalMedicineImage,
   resolveMedicineImageSrc,
 } from "@/lib/intake/medicine-image";
@@ -16,6 +17,8 @@ type MedicineImageProps = {
   height: number;
   className?: string;
   fill?: boolean;
+  /** When true, never show `/syrup.svg` — render nothing if DB image is missing. */
+  dbOnly?: boolean;
 };
 
 export default function MedicineImage({
@@ -25,9 +28,13 @@ export default function MedicineImage({
   height,
   className,
   fill,
+  dbOnly = false,
 }: MedicineImageProps) {
-  const [imgSrc, setImgSrc] = useState(() => resolveMedicineImageSrc(src));
-  const external = isExternalMedicineImage(imgSrc);
+  const initial = dbOnly ? getDbMedicineImageSrc(src) : resolveMedicineImageSrc(src);
+  const [imgSrc, setImgSrc] = useState<string | null>(initial);
+  const external = imgSrc ? isExternalMedicineImage(imgSrc) : false;
+
+  if (!imgSrc) return null;
 
   if (fill) {
     return (
@@ -37,7 +44,7 @@ export default function MedicineImage({
         fill
         unoptimized={external}
         className={className}
-        onError={() => setImgSrc(DEFAULT_MEDICINE_IMAGE)}
+        onError={() => setImgSrc(dbOnly ? null : DEFAULT_MEDICINE_IMAGE)}
       />
     );
   }
@@ -50,7 +57,7 @@ export default function MedicineImage({
       height={height}
       unoptimized={external}
       className={className}
-      onError={() => setImgSrc(DEFAULT_MEDICINE_IMAGE)}
+      onError={() => setImgSrc(dbOnly ? null : DEFAULT_MEDICINE_IMAGE)}
     />
   );
 }

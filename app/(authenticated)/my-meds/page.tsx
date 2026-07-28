@@ -34,7 +34,7 @@ export default async function MyMedsPage({
     ]);
 
     return (
-      <main className="min-w-0 flex-1 bg-[#FAF8FF] p-3 sm:p-4">
+      <main className="mx-auto w-full max-w-[1440px] flex-1 overflow-x-hidden px-4 py-4 sm:px-6 lg:px-1">
         <MyMedsPageClient
           data={data}
           fullName={user.user_metadata?.full_name ?? "Patient"}
@@ -48,8 +48,8 @@ export default async function MyMedsPage({
     );
   } catch (error) {
     return (
-      <main className="min-w-0 flex-1 bg-[#FAF8FF] p-4">
-        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+      <main className="min-w-0 flex-1 p-4">
+        <div className="rounded-[16px] border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {error instanceof Error ? error.message : "Unable to load medication data."}
         </div>
       </main>

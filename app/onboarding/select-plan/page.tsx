@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -13,7 +13,8 @@ import OnboardingFrame from "../_components/OnboardingFrame";
 import PageHeader from "./components/PageHeader";
 import PlanToggle from "./components/PlanToggle";
 import PricingCard from "./components/PricingCard";
-import { usePackages } from "../_hooks/use-intake-catalog";
+import TreatmentSummary from "./components/TreatmentSummary";
+import { useMedicinesForCategory, usePackages } from "../_hooks/use-intake-catalog";
 import { invalidateIntakeSummary, prefetchIntakeSummary } from "../_lib/intake-query";
 import { getNextStepPath, getPrevStepPath } from "../_lib/onboarding-navigation";
 import { useOnboarding } from "../_lib/onboarding-store";
@@ -23,10 +24,16 @@ export default function SelectPlanPage() {
   const queryClient = useQueryClient();
   const { state, updateState, hydrated } = useOnboarding();
   const { data: packages = [], isLoading } = usePackages(state.medicationId, state.variantId);
+  const { data: catalog } = useMedicinesForCategory(state.goalId);
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(
     state.selectedPackageId,
   );
   const [saving, setSaving] = useState(false);
+
+  const selectedMedicine = useMemo(() => {
+    if (!state.medicationId) return null;
+    return catalog?.medicines.find((m) => m.id === state.medicationId) ?? null;
+  }, [catalog?.medicines, state.medicationId]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -41,6 +48,9 @@ export default function SelectPlanPage() {
   }, [packages, selectedPackageId]);
 
   const selectedPackage = packages.find((p) => p.id === selectedPackageId) ?? null;
+  const clinicalNote =
+    selectedPackage?.clinicalNote?.trim() ||
+    "*Clinical data suggests patients on 3+ month programs see 24% better outcomes on average compared to shorter duration.";
 
   async function handleContinue() {
     if (!selectedPackageId) {
@@ -79,14 +89,18 @@ export default function SelectPlanPage() {
           <OnboardingFooter
             onBack={handleBack}
             onContinue={handleContinue}
+            continueLabel="Continue"
             continueDisabled={!selectedPackageId || saving || isLoading}
+            variant="figma"
           />
         }
       >
-        <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col overflow-y-auto px-1 pb-4 scrollbar-thin">
+        <div className="mx-auto flex min-h-0 w-full max-w-[649px] flex-1 flex-col overflow-y-auto scrollbar-hide px-1 pb-4">
           <PageHeader />
 
-          <div className="flex flex-1 flex-col items-center justify-start gap-4 pt-2 sm:gap-6 md:justify-center md:pt-0">
+          <div className="flex flex-1 flex-col gap-6 sm:gap-8">
+            <TreatmentSummary medicine={selectedMedicine} goalName={state.goalName} />
+
             <PlanToggle
               packages={packages}
               selectedPackageId={selectedPackageId}
@@ -95,9 +109,8 @@ export default function SelectPlanPage() {
 
             <PricingCard pkg={selectedPackage} />
 
-            <p className="mt-2 max-w-xl text-center text-xs text-[#2E00AB]/80 sm:text-sm">
-              *Clinical data suggests patients on 3+ month programs see 24% better outcomes on
-              average compared to shorter duration.
+            <p className="text-center text-[12px] font-normal italic leading-snug text-[#152A51]/70 onboarding-font sm:text-[13px]">
+              {clinicalNote}
             </p>
           </div>
         </div>

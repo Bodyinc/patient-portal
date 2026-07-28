@@ -8,6 +8,8 @@ export type CategoryDto = {
   tagline: string | null;
   description: string | null;
   icon: string | null;
+  /** Category image URL from DB (`icon` if URL, else first linked medicine `image_url`). */
+  imageSrc: string | null;
 };
 
 export type IntakeVariantOption = {

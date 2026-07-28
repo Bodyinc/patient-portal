@@ -32,35 +32,37 @@ export default function MyMedsReferralCard({
   };
 
   return (
-    <section className="rounded-md border border-[#E6DEFF] bg-white p-4">
+    <section className="rounded-[24px] border border-[#E8EEED] bg-white p-4 sm:p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-2xl font-semibold text-[#2E00AB]">Referral Program</p>
-          <p className="mt-1 max-w-xl text-sm text-[#2E00AB]/80">
+        <div className="min-w-0">
+          <p className="text-lg font-medium tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
+            Referral Program
+          </p>
+          <p className="mt-2 max-w-xl text-sm leading-relaxed text-[#152A51]/80 sm:text-[15px]">
             Share your wellness journey with friends and family. Earn credits towards your next
             prescription for every successful referral.
           </p>
-          <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-[#2E00AB]">
-            <Gift className="h-4 w-4" />
+          <p className="mt-3 flex items-center gap-2 text-sm font-medium text-[#152A51]">
+            <Gift className="h-4 w-4 text-[#6A9B9C]" />
             {formatUsd(rewardCents)} Reward Credit per referral
           </p>
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-          <span className="rounded-md border border-dashed border-[#D5CAFF] bg-[#F7F4FF] px-3 py-2 text-xs font-medium text-[#2E00AB]">
+          <span className="rounded-full border border-dashed border-[#E8EEED] bg-[#F3F6F6] px-4 py-2 text-xs font-medium text-[#152A51]">
             {referralCode}
           </span>
           <button
             type="button"
             onClick={() => handleCopy(referralCode, "code")}
-            className="rounded-md border border-[#D5CAFF] bg-white px-3 py-2 text-xs text-[#2E00AB]"
+            className="h-10 rounded-full border border-[#E8EEED] bg-white px-4 text-xs font-medium text-[#152A51] hover:bg-[#F3F6F6]"
           >
             {copied === "code" ? "Copied" : copied === "error" ? "Copy failed" : "Copy Code"}
           </button>
           <button
             type="button"
             onClick={() => handleCopy(referralLink, "link")}
-            className="rounded-md bg-[#2E00AB] px-4 py-2 text-center text-xs font-medium text-white hover:bg-[#2E00AB]/90"
+            className="h-10 rounded-full bg-[#152A51] px-5 text-center text-xs font-medium text-white hover:bg-[#152A51]/90"
           >
             {copied === "link" ? "Link Copied ✓" : "Copy Invite Link"}
           </button>

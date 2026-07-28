@@ -213,6 +213,24 @@ export async function ensureIntakeSession(): Promise<IntakeActionResult<{ sessio
   return { ok: true, data: { sessionId: created.session.id } };
 }
 
+function resolveCategoryImageSrc(
+  icon: string | null | undefined,
+  medicineImageUrl: string | null | undefined,
+): string | null {
+  const iconTrimmed = icon?.trim();
+  if (
+    iconTrimmed &&
+    (iconTrimmed.startsWith("http://") ||
+      iconTrimmed.startsWith("https://") ||
+      iconTrimmed.startsWith("/"))
+  ) {
+    return iconTrimmed;
+  }
+
+  const medicineTrimmed = medicineImageUrl?.trim();
+  return medicineTrimmed || null;
+}
+
 export async function getActiveCategories(): Promise<IntakeActionResult<CategoryDto[]>> {
   const { data, error } = await supabaseAdmin
     .from("medication_categories")
@@ -224,15 +242,51 @@ export async function getActiveCategories(): Promise<IntakeActionResult<Category
     return { ok: false, code: "fetch_error", message: error.message };
   }
 
+  const categories = data ?? [];
+  const categoryIds = categories.map((c) => c.id);
+
+  const firstMedicineImageByCategory = new Map<string, string | null>();
+
+  if (categoryIds.length > 0) {
+    const { data: links } = await supabaseAdmin
+      .from("medication_category_medicines")
+      .select("category_id, medicine_id, sort_order")
+      .in("category_id", categoryIds)
+      .order("sort_order", { ascending: true });
+
+    const medicineIds = [...new Set((links ?? []).map((l) => l.medicine_id))];
+    const imageByMedicineId = new Map<string, string | null>();
+
+    if (medicineIds.length > 0) {
+      const { data: medicines } = await supabaseAdmin
+        .from("medicines")
+        .select("id, image_url")
+        .in("id", medicineIds);
+
+      for (const med of medicines ?? []) {
+        imageByMedicineId.set(med.id, med.image_url);
+      }
+    }
+
+    for (const link of links ?? []) {
+      if (firstMedicineImageByCategory.has(link.category_id)) continue;
+      firstMedicineImageByCategory.set(
+        link.category_id,
+        imageByMedicineId.get(link.medicine_id) ?? null,
+      );
+    }
+  }
+
   return {
     ok: true,
-    data: (data ?? []).map((row) => ({
+    data: categories.map((row) => ({
       id: row.id,
       slug: row.slug,
       name: row.name,
       tagline: row.tagline,
       description: row.description,
       icon: row.icon,
+      imageSrc: resolveCategoryImageSrc(row.icon, firstMedicineImageByCategory.get(row.id)),
     })),
   };
 }

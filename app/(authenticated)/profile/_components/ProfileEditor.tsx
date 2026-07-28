@@ -1,7 +1,7 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { Bell, Search } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
@@ -10,6 +10,8 @@ import {
   uploadProfileAvatar,
   type EditableProfileDto,
 } from "@/lib/actions/profile";
+import { isExternalMedicineImage } from "@/lib/intake/medicine-image";
+import { fieldControlClass, fieldLabelClass } from "../../../onboarding/_lib/onboarding-theme";
 
 function toPatientId(userId: string) {
   const compact = userId.replace(/-/g, "").toUpperCase();
@@ -38,18 +40,20 @@ function Section({
   onChange: (key: Exclude<keyof EditableProfileDto, "id" | "avatarUrl">, value: string) => void;
 }) {
   return (
-    <section className="rounded-xl border border-[#E6DEFF] bg-white p-4 sm:p-6">
-      <h2 className="text-lg font-semibold text-[#2E00AB]">{title}</h2>
-      <div className="mt-3 h-px bg-[#EEE9FF]" />
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <section className="rounded-[24px] border border-[#E8EEED] bg-white p-4 sm:p-6">
+      <h2 className="text-lg font-medium tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
+        {title}
+      </h2>
+      <div className="mt-3 h-px bg-[#E8EEED]" />
+      <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6">
         {fields.map((field) => (
-          <div key={field.key} className="space-y-1">
-            <div className="flex items-center justify-between">
-              <label className="text-xs text-[#2E00AB]/70">{field.label}</label>
+          <div key={field.key} className="space-y-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <label className={fieldLabelClass}>{field.label}</label>
               {field.action ? (
                 <Link
                   href={field.action.href}
-                  className="text-[11px] font-semibold text-[#2E00AB] underline underline-offset-2"
+                  className="text-[12px] font-medium text-[#152A51] underline underline-offset-2"
                 >
                   {field.action.label}
                 </Link>
@@ -59,7 +63,7 @@ function Section({
               <select
                 value={form.sex ?? ""}
                 onChange={(e) => onChange("sex", e.target.value)}
-                className="w-full rounded-md border border-[#F1ECFF] bg-[#FCFBFF] px-3 py-2 text-sm font-medium text-[#2E00AB] outline-none focus:border-[#2E00AB]/40"
+                className={`w-full ${fieldControlClass}`}
               >
                 <option value="">Select gender</option>
                 <option value="male">Male</option>
@@ -73,19 +77,24 @@ function Section({
                 onChange={(e) => onChange(field.key, e.target.value)}
                 readOnly={field.readOnly}
                 disabled={field.readOnly}
-                className={`w-full rounded-md border border-[#F1ECFF] px-3 py-2 text-sm font-medium text-[#2E00AB] outline-none focus:border-[#2E00AB]/40 ${
-                  field.readOnly
-                    ? "cursor-not-allowed bg-[#F3EFFF] text-[#2E00AB]/60"
-                    : "bg-[#FCFBFF]"
+                className={`w-full ${fieldControlClass} ${
+                  field.readOnly ? "cursor-not-allowed opacity-60" : ""
                 }`}
               />
             )}
-            {field.hint ? <p className="text-[11px] text-[#2E00AB]/50">{field.hint}</p> : null}
+            {field.hint ? <p className="text-[12px] text-[#152A51]/50">{field.hint}</p> : null}
           </div>
         ))}
       </div>
     </section>
   );
+}
+
+function initialsFromName(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "P";
+  if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
+  return `${parts[0].slice(0, 1)}${parts[parts.length - 1].slice(0, 1)}`.toUpperCase();
 }
 
 export default function ProfileEditor({ initialProfile }: { initialProfile: EditableProfileDto }) {
@@ -96,6 +105,7 @@ export default function ProfileEditor({ initialProfile }: { initialProfile: Edit
 
   const patientId = useMemo(() => toPatientId(form.id), [form.id]);
   const fullName = form.fullName.trim() || "—";
+  const external = avatarPreview ? isExternalMedicineImage(avatarPreview) : false;
 
   function updateField(key: Exclude<keyof EditableProfileDto, "id" | "avatarUrl">, value: string) {
     setForm((prev) => ({
@@ -153,33 +163,44 @@ export default function ProfileEditor({ initialProfile }: { initialProfile: Edit
   }
 
   return (
-    <main className="min-w-0 flex-1 bg-[#FAF8FF] p-3 sm:p-4">
-      <div className="space-y-3">
-        <section className="space-y-1 px-1 pt-1">
-          <h1 className="text-2xl font-semibold text-[#2E00AB]">Profile Information</h1>
-          <p className="text-sm text-[#2E00AB]/70">Manage your personal and contact information.</p>
+    <main className="mx-auto w-full max-w-[1440px] flex-1 overflow-x-hidden px-4 py-4 sm:px-6 lg:px-8">
+      <div className="flex w-full flex-col gap-6">
+        <section className="space-y-2">
+          <h1 className="text-xl font-medium tracking-[-0.5px] text-[#152A51] sm:text-2xl lg:text-[28px]">
+            Profile Information
+          </h1>
+          <p className="text-sm text-[#152A51]/80 sm:text-[15px]">
+            Manage your personal and contact information.
+          </p>
         </section>
 
-        <section className="rounded-md border border-[#E6DEFF] bg-white p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
+        <section className="rounded-[24px] border border-[#E8EEED] bg-white p-4 sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3 sm:gap-4">
               {avatarPreview ? (
-                <img
-                  src={avatarPreview}
-                  alt={fullName}
-                  className="h-14 w-14 rounded-md object-cover"
-                />
+                <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full">
+                  <Image
+                    src={avatarPreview}
+                    alt={fullName}
+                    fill
+                    sizes="56px"
+                    unoptimized={external || avatarPreview.startsWith("blob:")}
+                    className="object-cover"
+                  />
+                </div>
               ) : (
-                <div className="flex h-14 w-14 items-center justify-center rounded-md bg-[#EDE7FF] text-base font-semibold text-[#2E00AB]">
-                  {fullName !== "—" ? fullName.charAt(0).toUpperCase() : "P"}
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#E8EEED] text-base font-medium text-[#152A51]">
+                  {fullName !== "—" ? initialsFromName(fullName) : "P"}
                 </div>
               )}
-              <div>
-                <p className="text-xl font-semibold text-[#2E00AB]">{fullName}</p>
-                <p className="text-sm text-[#2E00AB]/70">Patient ID: {patientId}</p>
+              <div className="min-w-0">
+                <p className="truncate text-lg font-medium tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
+                  {fullName}
+                </p>
+                <p className="text-sm text-[#152A51]/60">Patient ID: {patientId}</p>
               </div>
             </div>
-            <label className="cursor-pointer text-sm font-medium text-[#2E00AB] underline underline-offset-2">
+            <label className="cursor-pointer text-sm font-medium text-[#152A51] underline underline-offset-2">
               {uploadingAvatar ? "Uploading..." : "Change Avatar"}
               <input
                 type="file"
@@ -238,7 +259,7 @@ export default function ProfileEditor({ initialProfile }: { initialProfile: Edit
             type="button"
             onClick={onSave}
             disabled={saving || uploadingAvatar}
-            className="rounded-md bg-[#2E00AB] px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+            className="h-[46px] w-full rounded-full bg-[#E3E084] px-6 text-sm font-medium text-[#152A51] hover:bg-[#D9D674] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
           >
             {saving ? "Saving..." : "Save Changes"}
           </button>

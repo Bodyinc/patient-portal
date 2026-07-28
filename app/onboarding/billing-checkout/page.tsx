@@ -167,16 +167,14 @@ export default function BillingCheckoutPage() {
     <OnboardingShell>
       <OnboardingFrame
         showProgress={false}
-        footer={<OnboardingFooter onBack={handleBack} showContinue={false} />}
+        footer={<OnboardingFooter onBack={handleBack} showContinue={false} variant="figma" />}
       >
         {/* Changed wrapper overflow to auto so layout adapts gracefully when zoomed */}
-        <div className="flex h-full w-full flex-col gap-2 overflow-y-auto lg:gap-3 lg:overflow-hidden">
+        <div className="flex h-full w-full flex-col gap-2 overflow-y-auto scrollbar-hide lg:gap-3 lg:overflow-hidden">
           <PageHeader />
 
-          {/* Grid changes: Allowed height flexibility and scroll behaviors under heavy zoom */}
-          <div className="grid min-h-0 flex-1 grid-cols-1 items-start gap-3 overflow-y-auto pb-4 lg:grid-cols-[1.65fr_1fr] lg:gap-4 lg:overflow-hidden lg:pb-0">
-            {/* Left column becomes internally scrollable on larger layouts to contain forms nicely */}
-            <div className="flex flex-col gap-3 lg:h-full lg:overflow-y-auto lg:pr-2 scrollbar-thin">
+          <div className="grid min-h-0 flex-1 grid-cols-1 items-start gap-3 overflow-y-auto scrollbar-hide pb-4 lg:grid-cols-[1.65fr_1fr] lg:gap-4 lg:overflow-hidden lg:pb-0">
+            <div className="flex flex-col gap-3 lg:h-full lg:overflow-y-auto lg:pr-0 scrollbar-hide">
               <div className="grid shrink-0 grid-cols-1 gap-2 sm:grid-cols-2">
                 <InfoCard
                   title="Patient Information"
@@ -226,7 +224,7 @@ export default function BillingCheckoutPage() {
             </div>
 
             {/* Right column handles order summary layout constraint */}
-            <div className="lg:h-full lg:overflow-y-auto">
+            <div className="w-full lg:h-full lg:overflow-y-auto scrollbar-hide">
               <OrderSummary
                 medicationName={medicationName}
                 planLabel={planLabel}

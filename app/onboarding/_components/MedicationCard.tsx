@@ -1,11 +1,16 @@
 "use client";
 
-import Image from "next/image";
 import { useMemo, useState } from "react";
 
 import MedicineImage from "./MedicineImage";
 import type { MedicineDto } from "@/lib/intake/types";
 import { formatFromPrice } from "@/lib/pricing";
+import { cn } from "@/lib/utils";
+import {
+  fieldControlClass,
+  medicineImageFrameClass,
+  medicineImageFitClass,
+} from "../_lib/onboarding-theme";
 
 type MedicationCardProps = {
   medication: MedicineDto;
@@ -13,6 +18,9 @@ type MedicationCardProps = {
   onSelect?: (id: string, variantId: string | null) => void;
   onViewDetails?: (id: string) => void;
 };
+
+/** Figma treatment image aspect (~339 × 354.6) */
+const IMAGE_ASPECT = "339 / 354.6";
 
 export default function MedicationCard({
   medication,
@@ -49,61 +57,61 @@ export default function MedicationCard({
           onSelect?.(medication.id, variantId);
         }
       }}
-      // FIXED: Added max-h-[480px] to prevent desktop zoom stretch, kept h-full for row alignment
-      className={`flex h-full max-h-[450px] sm:max-h-[480px] w-full cursor-pointer flex-col overflow-hidden rounded-2xl border bg-white p-1.5 shadow-none transition-all ${
+      className={cn(
+        // h-auto + self-start (via grid items-start): hug content so zoom won't stretch/clip
+        "flex h-auto w-full max-w-full cursor-pointer flex-col rounded-[24px] border bg-white p-3 shadow-none transition-all onboarding-font sm:p-4",
         selected
-          ? "border-[#2E00AB] ring-2 ring-[#2E00AB]/20"
-          : "border-[#2E00AB]/20 hover:border-[#2E00AB]/50"
-      }`}
+          ? "border-[#152A51] ring-2 ring-[#152A51]/15"
+          : "border-[#E8EEED] hover:border-[#152A51]/30",
+      )}
     >
-      {/* Top visual image section */}
-      <div className="relative flex h-36 w-full shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#F3EEFF] sm:h-44">
-        <Image
-          src="/curve-line.svg"
-          alt=""
-          fill
-          priority
-          className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-70 select-none"
-        />
-
+      <div
+        className={cn("w-full shrink-0", medicineImageFrameClass)}
+        style={{ aspectRatio: IMAGE_ASPECT }}
+      >
         <MedicineImage
           src={medication.imageSrc}
           alt={medication.name}
-          width={200}
-          height={200}
-          className="relative z-10 h-auto max-h-[80%] w-auto object-contain"
+          width={339}
+          height={355}
+          fill
+          dbOnly
+          className={medicineImageFitClass}
         />
 
         <div
-          className={`absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full border-2 ${
-            selected ? "border-[#2E00AB] bg-[#2E00AB]" : "border-[#2E00AB]/25 bg-white"
-          }`}
+          className={cn(
+            "absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full border-2",
+            selected ? "border-[#152A51] bg-[#152A51]" : "border-[#152A51]/25 bg-white",
+          )}
         >
-          {selected && <div className="h-2.5 w-2.5 rounded-full bg-white" />}
+          {selected ? <div className="h-2.5 w-2.5 rounded-full bg-white" /> : null}
         </div>
       </div>
 
-      {/* Text area that expands evenly */}
-      <div className="flex flex-1 flex-col gap-1.5 p-3 sm:gap-2">
+      <div className="flex flex-col gap-2 pt-3 sm:gap-2.5 sm:pt-4">
         <div className="flex items-start justify-between gap-2">
-          <h2 className="text-base font-medium text-[#2E00AB] sm:text-lg">{medication.name}</h2>
-          <span className="shrink-0 rounded-md border border-[#2E00AB]/15 bg-[#F8F4FF] px-2 py-0.5 text-[11px] font-medium text-[#2E00AB] sm:text-xs">
-            {medication.tag}
-          </span>
+          <h2 className="min-w-0 flex-1 text-[16px] font-medium leading-snug tracking-[-0.25px] text-[#152A51] sm:text-[18px]">
+            {medication.name}
+          </h2>
+          {medication.tag ? (
+            <span className="shrink-0 rounded-full bg-[#F3F6F6] px-2.5 py-1 text-[11px] font-medium text-[#152A51] sm:text-xs">
+              {medication.tag}
+            </span>
+          ) : null}
         </div>
 
         {medication.requiresQuestionnaire ? (
-          <span className="w-fit rounded-md bg-[#2E00AB]/10 px-2 py-0.5 text-[11px] font-medium text-[#2E00AB]">
+          <span className="w-fit rounded-full bg-[#E8EEED] px-2.5 py-1 text-[11px] font-medium text-[#152A51]">
             Screening required
           </span>
         ) : null}
 
-        <p className="line-clamp-2 text-xs leading-snug text-[#2E00AB]/80 sm:text-sm">
+        <p className="text-[13px] leading-snug text-[#152A51]/80 sm:text-[14px]">
           {medication.description}
         </p>
 
-        {/* Bottom price and action area stays aligned */}
-        <div className="mt-auto space-y-2 pt-3">
+        <div className="space-y-2.5 pt-3">
           {hasVariants ? (
             <select
               value={variantId ?? ""}
@@ -112,10 +120,9 @@ export default function MedicationCard({
                 e.stopPropagation();
                 const next = e.target.value;
                 setVariantId(next);
-                // Choosing a variant also selects this medicine.
                 onSelect?.(medication.id, next);
               }}
-              className="w-full rounded-md border border-[#2E00AB]/30 bg-white px-2.5 py-1.5 text-xs font-medium text-[#2E00AB] focus:outline-none focus:ring-2 focus:ring-[#2E00AB]/30"
+              className={cn("w-full text-[13px]", fieldControlClass)}
             >
               {medication.variants.map((v) => (
                 <option key={v.id} value={v.id}>
@@ -125,7 +132,8 @@ export default function MedicationCard({
               ))}
             </select>
           ) : null}
-          <h3 className="text-lg font-semibold leading-none text-[#2E00AB] sm:text-xl">
+
+          <h3 className="text-[20px] font-medium leading-none tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
             {formatFromPrice(displayFromPriceCents)}
           </h3>
 
@@ -135,7 +143,7 @@ export default function MedicationCard({
               e.stopPropagation();
               onViewDetails?.(medication.id);
             }}
-            className="w-full rounded-md border border-[#2E00AB]/30 bg-white py-2 text-xs font-medium text-[#2E00AB] transition-all hover:bg-[#F8F4FF] sm:text-sm"
+            className="h-[42px] w-full rounded-full border border-[#152A51]/30 bg-white text-[13px] font-medium text-[#152A51] transition hover:bg-[#F3F6F6] sm:h-[46px] sm:text-[14px]"
           >
             View Details
           </button>

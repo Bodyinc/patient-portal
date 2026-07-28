@@ -165,8 +165,8 @@ export default function QuestionnairePage() {
   if (!hydrated || isLoading) {
     return (
       <OnboardingShell>
-        <div className="flex flex-1 items-center justify-center">
-          <p className="text-sm text-[#2E00AB]/70">Loading questionnaire…</p>
+        <div className="flex flex-1 items-center justify-center px-4">
+          <p className="text-[14px] text-[#152A51]/70 onboarding-font">Loading questionnaire…</p>
         </div>
       </OnboardingShell>
     );
@@ -175,14 +175,14 @@ export default function QuestionnairePage() {
   if (isError) {
     return (
       <OnboardingShell>
-        <div className="flex flex-1 flex-col items-center justify-center gap-2">
-          <p className="text-sm text-red-600">
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4">
+          <p className="text-center text-[14px] text-red-600 onboarding-font">
             {error instanceof Error ? error.message : "Could not load questionnaire."}
           </p>
           <button
             type="button"
             onClick={() => void refetch()}
-            className="text-sm font-medium text-[#2E00AB] underline"
+            className="text-[14px] font-medium text-[#152A51] underline onboarding-font"
           >
             Try again
           </button>
@@ -194,8 +194,8 @@ export default function QuestionnairePage() {
   if (!questionnaire || !state.medicationId) {
     return (
       <OnboardingShell>
-        <div className="flex flex-1 items-center justify-center">
-          <p className="text-sm text-[#2E00AB]/70">Redirecting…</p>
+        <div className="flex flex-1 items-center justify-center px-4">
+          <p className="text-[14px] text-[#152A51]/70 onboarding-font">Redirecting…</p>
         </div>
       </OnboardingShell>
     );
@@ -208,19 +208,22 @@ export default function QuestionnairePage() {
         description="A short screening is required for your selected medication. Answer each question below."
         onBack={handleBack}
         onContinue={handleContinue}
+        continueLabel="Continue"
         continueDisabled={saving}
-        maxWidth="4xl"
+        maxWidth="2xl"
+        variant="bare"
+        align="center"
         layout="fill"
       >
-        <div className="space-y-5 pb-2">
+        <div className="space-y-6 pb-2 text-left sm:space-y-7">
           {questionnaire.questions.map((question, index) => (
-            <div key={question.id} className="space-y-3">
-              <p className="text-sm font-medium text-[#2E00AB] sm:text-base">
+            <div key={question.id} className="space-y-2.5">
+              <p className="text-[15px] font-medium leading-snug text-[#152A51] sm:text-[16px]">
                 {index + 1}. {question.text}
                 {question.isRequired ? <span className="text-red-500"> *</span> : null}
               </p>
               {question.description ? (
-                <p className="text-sm text-[#2E00AB]/70">{question.description}</p>
+                <p className="text-[13px] leading-snug text-[#152A51]/70">{question.description}</p>
               ) : null}
               <QuestionInput
                 question={question}
