@@ -29,7 +29,7 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
   const treatmentExternal = treatmentImage ? isExternalMedicineImage(treatmentImage) : false;
 
   return (
-    <main className="min-w-0 flex-1 overflow-x-hidden p-3 sm:p-4">
+    <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-4 sm:px-6 lg:px-6 xl:px-8">
       <DashboardHeader
         fullName={data.fullName}
         patientId={data.patientId}
@@ -74,11 +74,11 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
           </section>
 
           {data.treatment ? (
-            <section className="overflow-hidden rounded-[24px] border border-[#E8EEED] bg-white p-4 sm:p-5">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-stretch sm:gap-5">
+            <section className="rounded-[24px] border border-[#E8EEED] bg-white p-4 sm:p-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-5">
                 <div
                   className={cn(
-                    "mx-auto w-full max-w-[339px] shrink-0 sm:mx-0 sm:w-full sm:max-w-[280px] lg:max-w-[339px]",
+                    "mx-auto w-full max-w-[220px] shrink-0 sm:mx-0 sm:max-w-[180px] lg:max-w-[220px]",
                     medicineImageFrameClass,
                   )}
                   style={{ aspectRatio: TREATMENT_IMAGE_ASPECT }}
@@ -88,7 +88,7 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
                       src={treatmentImage}
                       alt={data.treatment.name}
                       fill
-                      sizes="(max-width: 640px) 100vw, 339px"
+                      sizes="(max-width: 640px) 220px, 180px"
                       unoptimized={treatmentExternal}
                       className={medicineImageFitClass}
                     />

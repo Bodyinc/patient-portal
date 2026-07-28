@@ -163,9 +163,9 @@ export default function ProfileEditor({ initialProfile }: { initialProfile: Edit
   }
 
   return (
-    <main className="min-w-0 flex-1 overflow-x-hidden p-3 sm:p-4">
-      <div className="space-y-4">
-        <section className="space-y-1 px-1">
+    <main className="mx-auto w-full max-w-[1440px] flex-1 overflow-x-hidden px-4 py-4 sm:px-6 lg:px-8">
+      <div className="flex w-full flex-col gap-6">
+        <section className="space-y-2">
           <h1 className="text-xl font-medium tracking-[-0.5px] text-[#152A51] sm:text-2xl lg:text-[28px]">
             Profile Information
           </h1>

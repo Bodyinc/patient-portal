@@ -58,7 +58,8 @@ export default function MedicationCard({
         }
       }}
       className={cn(
-        "flex h-full w-full max-w-full cursor-pointer flex-col overflow-hidden rounded-[24px] border bg-white p-3 shadow-none transition-all onboarding-font sm:p-4",
+        // h-auto + self-start (via grid items-start): hug content so zoom won't stretch/clip
+        "flex h-auto w-full max-w-full cursor-pointer flex-col rounded-[24px] border bg-white p-3 shadow-none transition-all onboarding-font sm:p-4",
         selected
           ? "border-[#152A51] ring-2 ring-[#152A51]/15"
           : "border-[#E8EEED] hover:border-[#152A51]/30",
@@ -88,9 +89,9 @@ export default function MedicationCard({
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col gap-2 pt-3 sm:gap-2.5 sm:pt-4">
+      <div className="flex flex-col gap-2 pt-3 sm:gap-2.5 sm:pt-4">
         <div className="flex items-start justify-between gap-2">
-          <h2 className="text-[16px] font-medium leading-snug tracking-[-0.25px] text-[#152A51] sm:text-[18px]">
+          <h2 className="min-w-0 flex-1 text-[16px] font-medium leading-snug tracking-[-0.25px] text-[#152A51] sm:text-[18px]">
             {medication.name}
           </h2>
           {medication.tag ? (
@@ -106,11 +107,11 @@ export default function MedicationCard({
           </span>
         ) : null}
 
-        <p className="line-clamp-2 text-[13px] leading-snug text-[#152A51]/80 sm:text-[14px]">
+        <p className="text-[13px] leading-snug text-[#152A51]/80 sm:text-[14px]">
           {medication.description}
         </p>
 
-        <div className="mt-auto space-y-2.5 pt-3">
+        <div className="space-y-2.5 pt-3">
           {hasVariants ? (
             <select
               value={variantId ?? ""}

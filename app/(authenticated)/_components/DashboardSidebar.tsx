@@ -26,14 +26,19 @@ export default function DashboardSidebar({ className, onNavigate }: DashboardSid
 
   return (
     <aside
-      className={cn("flex min-h-0 flex-col justify-between bg-[#F3F6F6] p-4 sm:p-5", className)}
+      className={cn(
+        // Figma: 260px width (parent), fill height, space-between, padding 24/20/20/20,
+        // bg #FFFFFF, border-right 1px #E5E7EB
+        "flex h-full w-full flex-col justify-between border-r border-[#E5E7EB] bg-white px-5 pb-5 pt-6",
+        className,
+      )}
     >
       <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide">
         <div className="flex justify-center">
           <Image src="/logo.svg" alt="BodyInc" width={128} height={40} priority />
         </div>
 
-        <div className="my-5 border-b border-[#E8EEED]" />
+        <div className="my-5 border-b border-[#E5E7EB]" />
 
         <nav className="mt-3 space-y-2 sm:mt-6">
           {DASHBOARD_NAV.map((item) => {
@@ -52,7 +57,8 @@ export default function DashboardSidebar({ className, onNavigate }: DashboardSid
         </nav>
       </div>
 
-      <div className="shrink-0 space-y-2 pt-3 sm:space-y-3">
+      {/* Figma sidebar-bottom: vertical, hug height, gap 12px, fill width */}
+      <div className="flex w-full shrink-0 flex-col gap-3 pt-3">
         {DASHBOARD_FOOTER_NAV.map((item) => {
           const active = isNavItemActive(pathname, item.href);
           return (

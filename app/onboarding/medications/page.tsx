@@ -108,7 +108,7 @@ export default function MedicationsPage() {
           </p>
         </div>
 
-        <div className="mx-auto grid min-h-0 w-full max-w-[980px] flex-1 grid-cols-1 gap-4 overflow-y-auto scrollbar-hide pb-2 sm:grid-cols-2 xl:grid-cols-3 xl:gap-5">
+        <div className="mx-auto grid min-h-0 w-full max-w-[980px] flex-1 auto-rows-min grid-cols-1 content-start justify-center justify-items-stretch gap-4 overflow-y-auto overflow-x-hidden scrollbar-hide pb-2 sm:grid-cols-[repeat(auto-fill,minmax(260px,320px))] sm:justify-items-stretch xl:gap-5">
           {isLoading ? (
             <p className="col-span-full text-center text-sm text-[#152A51]/70">
               Loading medications…

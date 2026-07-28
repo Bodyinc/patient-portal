@@ -34,7 +34,7 @@ export default async function MyMedsPage({
     ]);
 
     return (
-      <main className="min-w-0 flex-1 overflow-x-hidden p-3 sm:p-4">
+      <main className="mx-auto w-full max-w-[1440px] flex-1 overflow-x-hidden px-4 py-4 sm:px-6 lg:px-1">
         <MyMedsPageClient
           data={data}
           fullName={user.user_metadata?.full_name ?? "Patient"}
