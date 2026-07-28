@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { DM_Sans } from "next/font/google";
 
 import { Providers } from "./providers";
@@ -10,6 +11,26 @@ const dmSans = DM_Sans({
   weight: ["400", "500", "600", "700"],
   display: "swap",
 });
+
+const benignErrorGuardScript = `
+(function () {
+  function swallowResourceError(e) {
+    var t = e.target;
+    if (t && t.tagName === "IMG") {
+      e.stopImmediatePropagation();
+    }
+  }
+  function swallowBenignRejection(e) {
+    var r = e.reason;
+    if (r && typeof Event !== "undefined" && r instanceof Event && r.type === "error") {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+  }
+  window.addEventListener("error", swallowResourceError, true);
+  window.addEventListener("unhandledrejection", swallowBenignRejection, true);
+})();
+`;
 
 export const metadata: Metadata = {
   title: {
@@ -23,6 +44,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning className={dmSans.className}>
       <body suppressHydrationWarning>
+        <Script id="benign-error-guard" strategy="beforeInteractive">
+          {benignErrorGuardScript}
+        </Script>
         <ServiceWorkerCleanup />
         <Providers>{children}</Providers>
       </body>

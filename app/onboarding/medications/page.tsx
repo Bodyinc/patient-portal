@@ -7,14 +7,17 @@ import { toast } from "sonner";
 
 import { saveIntakeMedicine } from "@/lib/actions/intake";
 
-import OnboardingShell from "../_components/OnboardingShell";
 import MedicationCard from "../_components/MedicationCard";
 import MedicationDetailsDialog from "../_components/MedicationDetailsDialog";
 import OnboardingFooter from "../_components/OnboardingFooter";
 import OnboardingFrame from "../_components/OnboardingFrame";
 import { useMedicinesForCategory } from "../_hooks/use-intake-catalog";
-import { prefetchQuestionnaireAndPackages } from "../_lib/intake-query";
-import { getNextStepPath, getPrevStepPath } from "../_lib/onboarding-navigation";
+import { prefetchPackagesForMedicine } from "../_lib/intake-query";
+import {
+  getNextStepPath,
+  getPrevStepPath,
+  pushOnboardingRoute,
+} from "../_lib/onboarding-navigation";
 import { useOnboarding } from "../_lib/onboarding-store";
 
 export default function MedicationsPage() {
@@ -67,7 +70,6 @@ export default function MedicationsPage() {
     const patch = {
       medicationId: selected,
       variantId: selectedVariantId,
-      requiresQuestionnaire: result.data.requiresQuestionnaire,
       questionnaireAnswers: {},
       questionnaireComplete: false,
       selectedPackageId: null,
@@ -75,18 +77,18 @@ export default function MedicationsPage() {
       checkoutConfirmed: false,
     };
     updateState(patch);
-    await prefetchQuestionnaireAndPackages(queryClient, selected, selectedVariantId);
+    await prefetchPackagesForMedicine(queryClient, selected, selectedVariantId);
     const next = getNextStepPath("/onboarding/medications", { ...state, ...patch });
-    if (next) router.push(next);
+    if (next) await pushOnboardingRoute(router, next);
   }
 
-  function handleBack() {
+  async function handleBack() {
     const prev = getPrevStepPath("/onboarding/medications", state);
-    if (prev) router.push(prev);
+    if (prev) await pushOnboardingRoute(router, prev);
   }
 
   return (
-    <OnboardingShell>
+    <>
       <OnboardingFrame
         footer={
           <OnboardingFooter
@@ -108,13 +110,11 @@ export default function MedicationsPage() {
           </p>
         </div>
 
-        <div className="mx-auto grid min-h-0 w-full max-w-[980px] flex-1 auto-rows-min grid-cols-1 content-start justify-center justify-items-stretch gap-4 overflow-y-auto overflow-x-hidden scrollbar-hide pb-2 sm:grid-cols-[repeat(auto-fill,minmax(260px,320px))] sm:justify-items-stretch xl:gap-5">
+        <div className="mx-auto flex min-h-0 w-full max-w-[860px] flex-1 flex-col gap-4 overflow-y-auto px-3 pb-2 scrollbar-hide sm:gap-5 sm:px-5">
           {isLoading ? (
-            <p className="col-span-full text-center text-sm text-[#152A51]/70">
-              Loading medications…
-            </p>
+            <p className="text-center text-sm text-[#152A51]/70">Loading medications…</p>
           ) : isError ? (
-            <div className="col-span-full text-center">
+            <div className="text-center">
               <p className="text-sm text-red-600">
                 {error instanceof Error ? error.message : "Could not load medications."}
               </p>
@@ -127,7 +127,7 @@ export default function MedicationsPage() {
               </button>
             </div>
           ) : !categoryEligible ? (
-            <div className="col-span-full rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-4 text-center">
+            <div className="rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-4 text-center">
               <p className="text-sm font-medium text-amber-900">
                 {ineligibleReason ??
                   "Based on your profile, no medications are available for this goal."}
@@ -137,16 +137,17 @@ export default function MedicationsPage() {
               </p>
             </div>
           ) : medications.length === 0 ? (
-            <p className="col-span-full text-center text-sm text-[#152A51]/70">
+            <p className="text-center text-sm text-[#152A51]/70">
               No medications are available for this goal right now. Try going back and selecting a
               different goal.
             </p>
           ) : (
-            medications.map((medication) => (
+            medications.map((medication, index) => (
               <MedicationCard
                 key={medication.id}
                 medication={medication}
                 selected={selected === medication.id}
+                accentIndex={index}
                 onSelect={selectMedication}
                 onViewDetails={setDetailsMedicationId}
               />
@@ -167,6 +168,6 @@ export default function MedicationsPage() {
           setDetailsMedicationId(null);
         }}
       />
-    </OnboardingShell>
+    </>
   );
 }

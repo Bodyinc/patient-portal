@@ -11,11 +11,22 @@ export const ONBOARDING = {
   gauge: "#6A9B9C",
   check: "#6A9B9C",
   /** Figma product shot surface behind medicine images */
-  medicineImageBg: "#5D7293",
+  medicineImageBg: "#5A778D",
+  /** Medication card solid badge accents (Figma) */
+  badgeTerracotta: "#C47A5A",
+  badgeOrchid: "#C47A9B",
+  /** Selected radio on medication cards */
+  selectTeal: "#6A9B9C",
 } as const;
 
+/** Solid highlight badge colors — cycle by medicine index when multiple cards highlight. */
+export const MEDICATION_BADGE_ACCENTS = [
+  ONBOARDING.badgeTerracotta,
+  ONBOARDING.badgeOrchid,
+] as const;
+
 /** Rounded frame for DB medicine product shots (Figma blue-gray surface). */
-export const medicineImageFrameClass = "relative overflow-hidden rounded-[20px] bg-[#5D7293]";
+export const medicineImageFrameClass = "relative overflow-hidden rounded-[20px] bg-[#5A778D]";
 
 export const medicineImageFitClass = "object-contain p-4 sm:p-6";
 

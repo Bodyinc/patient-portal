@@ -7,7 +7,6 @@ import { toast } from "sonner";
 
 import { saveSelectedPlan } from "@/lib/actions/intake";
 
-import OnboardingShell from "../_components/OnboardingShell";
 import OnboardingFooter from "../_components/OnboardingFooter";
 import OnboardingFrame from "../_components/OnboardingFrame";
 import PageHeader from "./components/PageHeader";
@@ -16,7 +15,11 @@ import PricingCard from "./components/PricingCard";
 import TreatmentSummary from "./components/TreatmentSummary";
 import { useMedicinesForCategory, usePackages } from "../_hooks/use-intake-catalog";
 import { invalidateIntakeSummary, prefetchIntakeSummary } from "../_lib/intake-query";
-import { getNextStepPath, getPrevStepPath } from "../_lib/onboarding-navigation";
+import {
+  getNextStepPath,
+  getPrevStepPath,
+  pushOnboardingRoute,
+} from "../_lib/onboarding-navigation";
 import { useOnboarding } from "../_lib/onboarding-store";
 
 export default function SelectPlanPage() {
@@ -74,47 +77,49 @@ export default function SelectPlanPage() {
       ...state,
       selectedPackageId,
     });
-    if (next) router.push(next);
+    if (next) await pushOnboardingRoute(router, next);
   }
 
-  function handleBack() {
+  async function handleBack() {
     const prev = getPrevStepPath("/onboarding/select-plan", state);
-    if (prev) router.push(prev);
+    if (prev) await pushOnboardingRoute(router, prev);
   }
 
   return (
-    <OnboardingShell>
-      <OnboardingFrame
-        footer={
-          <OnboardingFooter
-            onBack={handleBack}
-            onContinue={handleContinue}
-            continueLabel="Continue"
-            continueDisabled={!selectedPackageId || saving || isLoading}
-            variant="figma"
+    <OnboardingFrame
+      footer={
+        <OnboardingFooter
+          onBack={handleBack}
+          onContinue={handleContinue}
+          continueLabel="Continue"
+          continueDisabled={!selectedPackageId || saving || isLoading}
+          variant="figma"
+        />
+      }
+    >
+      <div className="mx-auto flex min-h-0 w-full max-w-[649px] flex-1 flex-col overflow-y-auto scrollbar-hide px-1 pb-4">
+        <PageHeader />
+
+        <div className="flex flex-1 flex-col gap-6 sm:gap-8">
+          <TreatmentSummary
+            medicine={selectedMedicine}
+            goalName={state.goalName}
+            requiresQuestionnaire={state.requiresQuestionnaire}
           />
-        }
-      >
-        <div className="mx-auto flex min-h-0 w-full max-w-[649px] flex-1 flex-col overflow-y-auto scrollbar-hide px-1 pb-4">
-          <PageHeader />
 
-          <div className="flex flex-1 flex-col gap-6 sm:gap-8">
-            <TreatmentSummary medicine={selectedMedicine} goalName={state.goalName} />
+          <PlanToggle
+            packages={packages}
+            selectedPackageId={selectedPackageId}
+            onChange={setSelectedPackageId}
+          />
 
-            <PlanToggle
-              packages={packages}
-              selectedPackageId={selectedPackageId}
-              onChange={setSelectedPackageId}
-            />
+          <PricingCard pkg={selectedPackage} />
 
-            <PricingCard pkg={selectedPackage} />
-
-            <p className="text-center text-[12px] font-normal italic leading-snug text-[#152A51]/70 onboarding-font sm:text-[13px]">
-              {clinicalNote}
-            </p>
-          </div>
+          <p className="text-center text-[12px] font-normal italic leading-snug text-[#152A51]/70 onboarding-font sm:text-[13px]">
+            {clinicalNote}
+          </p>
         </div>
-      </OnboardingFrame>
-    </OnboardingShell>
+      </div>
+    </OnboardingFrame>
   );
 }

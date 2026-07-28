@@ -90,6 +90,87 @@ async function getSessionMedicineLink(sessionId: string) {
   return link;
 }
 
+async function categoryHasActiveQuestionnaire(categoryId: string): Promise<boolean> {
+  const { data: links, error: linkError } = await supabaseAdmin
+    .from("questionnaire_categories")
+    .select("questionnaire_id")
+    .eq("category_id", categoryId);
+
+  if (linkError || !links?.length) return false;
+
+  const questionnaireIds = links.map((l) => l.questionnaire_id);
+  const { data: active } = await supabaseAdmin
+    .from("questionnaires")
+    .select("id")
+    .in("id", questionnaireIds)
+    .eq("is_active", true)
+    .limit(1);
+
+  return (active ?? []).length > 0;
+}
+
+async function loadQuestionnaireDto(
+  questionnaireId: string,
+): Promise<IntakeActionResult<QuestionnaireDto>> {
+  const { data: questionnaire, error: questionnaireError } = await supabaseAdmin
+    .from("questionnaires")
+    .select("id, name, description, is_active")
+    .eq("id", questionnaireId)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (questionnaireError) {
+    return { ok: false, code: "fetch_error", message: questionnaireError.message };
+  }
+  if (!questionnaire) {
+    return { ok: false, code: "not_found", message: "Questionnaire not found" };
+  }
+
+  const { data: questions, error: questionsError } = await supabaseAdmin
+    .from("questionnaire_questions")
+    .select("id, prompt, description, question_type, is_required, sort_order, disqualify_rules")
+    .eq("questionnaire_id", questionnaire.id)
+    .order("sort_order", { ascending: true });
+
+  if (questionsError) {
+    return { ok: false, code: "fetch_error", message: questionsError.message };
+  }
+
+  const questionIds = (questions ?? []).map((q) => q.id);
+  const { data: options, error: optionsError } = await supabaseAdmin
+    .from("questionnaire_question_options")
+    .select("id, question_id, label, sort_order")
+    .in("question_id", questionIds.length ? questionIds : ["00000000-0000-0000-0000-000000000000"])
+    .order("sort_order", { ascending: true });
+
+  if (optionsError) {
+    return { ok: false, code: "fetch_error", message: optionsError.message };
+  }
+
+  const optionsByQuestion = new Map<string, { id: string; label: string }[]>();
+  for (const option of options ?? []) {
+    const list = optionsByQuestion.get(option.question_id) ?? [];
+    list.push({ id: option.id, label: option.label });
+    optionsByQuestion.set(option.question_id, list);
+  }
+
+  return {
+    ok: true,
+    data: {
+      id: questionnaire.id,
+      title: questionnaire.name,
+      questions: (questions ?? []).map((q) => ({
+        id: q.id,
+        text: q.prompt,
+        description: q.description,
+        questionType: normalizeQuestionType(q.question_type),
+        isRequired: q.is_required,
+        options: optionsByQuestion.get(q.id) ?? [],
+      })),
+    },
+  };
+}
+
 async function buildIntakeSummary(
   sessionId: string,
   existingSession?: IntakeSessionRow,
@@ -114,7 +195,7 @@ async function buildIntakeSummary(
     getSessionCategory(sessionId),
     supabaseAdmin
       .from("intake_session_medicines")
-      .select("medicine_id, medicines(id, name, requires_questionnaire)")
+      .select("medicine_id, medicines(id, name)")
       .eq("session_id", sessionId)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -137,16 +218,17 @@ async function buildIntakeSummary(
 
   const medicineId = medicineLinkResult.data?.medicine_id ?? null;
   const medicine =
-    (
-      medicineLinkResult.data as {
-        medicines?: { id: string; name: string; requires_questionnaire: boolean } | null;
-      } | null
-    )?.medicines ?? null;
+    (medicineLinkResult.data as { medicines?: { id: string; name: string } | null } | null)
+      ?.medicines ?? null;
   const packageData = packageResult.data;
   const eligibility =
     eligibilityResult.data && eligibilityResult.data.medicine_id === medicineId
       ? eligibilityResult.data
       : null;
+
+  const requiresQuestionnaire = categoryLink?.category_id
+    ? await categoryHasActiveQuestionnaire(categoryLink.category_id)
+    : false;
 
   const bmi =
     session.height_cm !== null && session.weight_kg !== null
@@ -180,7 +262,7 @@ async function buildIntakeSummary(
     marketingConsent: session.marketing_consent,
     medicineId: medicine?.id ?? null,
     medicineName: medicine?.name ?? null,
-    requiresQuestionnaire: medicine?.requires_questionnaire ?? false,
+    requiresQuestionnaire,
     selectedPackageId: session.selected_plan_id,
     packageName: packageData?.name ?? null,
     variantName:
@@ -214,9 +296,15 @@ export async function ensureIntakeSession(): Promise<IntakeActionResult<{ sessio
 }
 
 function resolveCategoryImageSrc(
+  categoryImageUrl: string | null | undefined,
   icon: string | null | undefined,
   medicineImageUrl: string | null | undefined,
 ): string | null {
+  const categoryImageTrimmed = categoryImageUrl?.trim();
+  if (categoryImageTrimmed) {
+    return categoryImageTrimmed;
+  }
+
   const iconTrimmed = icon?.trim();
   if (
     iconTrimmed &&
@@ -234,7 +322,7 @@ function resolveCategoryImageSrc(
 export async function getActiveCategories(): Promise<IntakeActionResult<CategoryDto[]>> {
   const { data, error } = await supabaseAdmin
     .from("medication_categories")
-    .select("id, slug, name, tagline, description, icon")
+    .select("id, slug, name, tagline, description, icon, image_url")
     .eq("is_active", true)
     .order("sort_order", { ascending: true });
 
@@ -286,7 +374,11 @@ export async function getActiveCategories(): Promise<IntakeActionResult<Category
       tagline: row.tagline,
       description: row.description,
       icon: row.icon,
-      imageSrc: resolveCategoryImageSrc(row.icon, firstMedicineImageByCategory.get(row.id)),
+      imageSrc: resolveCategoryImageSrc(
+        row.image_url,
+        row.icon,
+        firstMedicineImageByCategory.get(row.id),
+      ),
     })),
   };
 }
@@ -346,7 +438,7 @@ export async function getMedicinesForCategory(
   const { data: meds, error: medsError } = await supabaseAdmin
     .from("medicines")
     .select(
-      "id, name, short_description, long_description, image_url, from_price_cents, important_info, notice_text, requires_questionnaire, is_active, status, sort_order",
+      "id, name, short_description, long_description, image_url, from_price_cents, important_info, notice_text, is_active, status, sort_order",
     )
     .in("id", medicineIds);
 
@@ -389,7 +481,6 @@ export async function getMedicinesForCategory(
       imageSrc: resolveMedicineImageSrc(med.image_url),
       fromPriceCents: med.from_price_cents == null ? null : Number(med.from_price_cents),
       variants: variantsByMedicineId.get(med.id) ?? [],
-      requiresQuestionnaire: med.requires_questionnaire,
     });
   }
 
@@ -401,7 +492,9 @@ export async function getMedicinesForCategory(
 
 export async function saveIntakeCategory(
   categorySlug: string,
-): Promise<IntakeActionResult<{ categoryId: string; goalName: string }>> {
+): Promise<
+  IntakeActionResult<{ categoryId: string; goalName: string; requiresQuestionnaire: boolean }>
+> {
   const sessionResult = await requireIntakeSession();
   if ("error" in sessionResult) {
     return { ok: false, code: "session_error", message: sessionResult.error };
@@ -456,7 +549,16 @@ export async function saveIntakeCategory(
     return { ok: false, code: "save_error", message: error.message };
   }
 
-  return { ok: true, data: { categoryId: category.id, goalName: category.name } };
+  const requiresQuestionnaire = await categoryHasActiveQuestionnaire(category.id);
+
+  return {
+    ok: true,
+    data: {
+      categoryId: category.id,
+      goalName: category.name,
+      requiresQuestionnaire,
+    },
+  };
 }
 
 const demographicsSchema = z.object({
@@ -544,7 +646,7 @@ export async function saveIntakeBmi(
 
 export async function saveIntakeMedicine(
   medicineId: string,
-): Promise<IntakeActionResult<{ requiresQuestionnaire: boolean }>> {
+): Promise<IntakeActionResult<{ medicineId: string }>> {
   const sessionResult = await requireIntakeSession();
   if ("error" in sessionResult) {
     return { ok: false, code: "session_error", message: sessionResult.error };
@@ -557,7 +659,7 @@ export async function saveIntakeMedicine(
 
   const { data: medicine, error: medError } = await supabaseAdmin
     .from("medicines")
-    .select("id, requires_questionnaire, is_active, status")
+    .select("id, is_active, status")
     .eq("id", medicineId)
     .maybeSingle();
 
@@ -612,7 +714,7 @@ export async function saveIntakeMedicine(
     return { ok: false, code: "save_error", message: error.message };
   }
 
-  return { ok: true, data: { requiresQuestionnaire: medicine.requires_questionnaire } };
+  return { ok: true, data: { medicineId: medicine.id } };
 }
 
 const contactSchema = z.object({
@@ -760,29 +862,27 @@ export async function saveIntakeAddress(
   return { ok: true, data: { sessionId: sessionResult.session.id } };
 }
 
-export async function getQuestionnaireForMedicine(
-  medicineId: string,
+export async function getQuestionnaireForCategory(
+  categorySlug: string,
 ): Promise<IntakeActionResult<QuestionnaireDto | null>> {
-  // Questionnaires attach to categories (questionnaire_categories), not medicines directly.
-  // Resolve the medicine's categories, then find an active questionnaire linked to any of them.
-  const { data: categoryLinks, error: categoryLinkError } = await supabaseAdmin
-    .from("medication_category_medicines")
-    .select("category_id")
-    .eq("medicine_id", medicineId);
+  const { data: category, error: categoryError } = await supabaseAdmin
+    .from("medication_categories")
+    .select("id")
+    .eq("slug", categorySlug)
+    .eq("is_active", true)
+    .maybeSingle();
 
-  if (categoryLinkError) {
-    return { ok: false, code: "fetch_error", message: categoryLinkError.message };
+  if (categoryError) {
+    return { ok: false, code: "fetch_error", message: categoryError.message };
   }
-
-  const categoryIds = (categoryLinks ?? []).map((l) => l.category_id);
-  if (categoryIds.length === 0) {
+  if (!category) {
     return { ok: true, data: null };
   }
 
   const { data: questionnaireLinks, error: questionnaireLinkError } = await supabaseAdmin
     .from("questionnaire_categories")
     .select("questionnaire_id")
-    .in("category_id", categoryIds);
+    .eq("category_id", category.id);
 
   if (questionnaireLinkError) {
     return { ok: false, code: "fetch_error", message: questionnaireLinkError.message };
@@ -795,7 +895,7 @@ export async function getQuestionnaireForMedicine(
 
   const { data: activeQuestionnaires, error: questionnaireError } = await supabaseAdmin
     .from("questionnaires")
-    .select("id, name, description, is_active")
+    .select("id")
     .in("id", questionnaireIds)
     .eq("is_active", true)
     .limit(1);
@@ -804,54 +904,59 @@ export async function getQuestionnaireForMedicine(
     return { ok: false, code: "fetch_error", message: questionnaireError.message };
   }
 
-  const questionnaire = activeQuestionnaires?.[0];
-  if (!questionnaire) {
+  const questionnaireId = activeQuestionnaires?.[0]?.id;
+  if (!questionnaireId) {
     return { ok: true, data: null };
   }
 
-  const { data: questions, error: questionsError } = await supabaseAdmin
-    .from("questionnaire_questions")
-    .select("id, prompt, description, question_type, is_required, sort_order, disqualify_rules")
-    .eq("questionnaire_id", questionnaire.id)
-    .order("sort_order", { ascending: true });
+  const loaded = await loadQuestionnaireDto(questionnaireId);
+  if (!loaded.ok) return loaded;
+  return { ok: true, data: loaded.data };
+}
 
-  if (questionsError) {
-    return { ok: false, code: "fetch_error", message: questionsError.message };
+export async function getCategoryRequiresQuestionnaire(
+  categorySlug: string,
+): Promise<IntakeActionResult<boolean>> {
+  const { data: category, error: categoryError } = await supabaseAdmin
+    .from("medication_categories")
+    .select("id")
+    .eq("slug", categorySlug)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (categoryError) {
+    return { ok: false, code: "fetch_error", message: categoryError.message };
+  }
+  if (!category) {
+    return { ok: true, data: false };
   }
 
-  const questionIds = (questions ?? []).map((q) => q.id);
-  const { data: options, error: optionsError } = await supabaseAdmin
-    .from("questionnaire_question_options")
-    .select("id, question_id, label, sort_order")
-    .in("question_id", questionIds.length ? questionIds : ["00000000-0000-0000-0000-000000000000"])
-    .order("sort_order", { ascending: true });
+  return { ok: true, data: await categoryHasActiveQuestionnaire(category.id) };
+}
 
-  if (optionsError) {
-    return { ok: false, code: "fetch_error", message: optionsError.message };
+/** @deprecated Prefer getQuestionnaireForCategory — questionnaires are linked to categories. */
+export async function getQuestionnaireForMedicine(
+  medicineId: string,
+): Promise<IntakeActionResult<QuestionnaireDto | null>> {
+  const { data: categoryLink, error: categoryLinkError } = await supabaseAdmin
+    .from("medication_category_medicines")
+    .select("category_id, medication_categories(slug)")
+    .eq("medicine_id", medicineId)
+    .limit(1)
+    .maybeSingle();
+
+  if (categoryLinkError) {
+    return { ok: false, code: "fetch_error", message: categoryLinkError.message };
   }
 
-  const optionsByQuestion = new Map<string, { id: string; label: string }[]>();
-  for (const option of options ?? []) {
-    const list = optionsByQuestion.get(option.question_id) ?? [];
-    list.push({ id: option.id, label: option.label });
-    optionsByQuestion.set(option.question_id, list);
+  const slug = (categoryLink as { medication_categories?: { slug: string } | null } | null)
+    ?.medication_categories?.slug;
+
+  if (!slug) {
+    return { ok: true, data: null };
   }
 
-  return {
-    ok: true,
-    data: {
-      id: questionnaire.id,
-      title: questionnaire.name,
-      questions: (questions ?? []).map((q) => ({
-        id: q.id,
-        text: q.prompt,
-        description: q.description,
-        questionType: normalizeQuestionType(q.question_type),
-        isRequired: q.is_required,
-        options: optionsByQuestion.get(q.id) ?? [],
-      })),
-    },
-  };
+  return getQuestionnaireForCategory(slug);
 }
 
 export async function saveQuestionnaireResponses(

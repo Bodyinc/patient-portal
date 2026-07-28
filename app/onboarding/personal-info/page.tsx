@@ -15,10 +15,16 @@ import { checkPatientEmail } from "@/lib/actions/patient-auth";
 import { wrongPortalMessage } from "@/lib/auth/constants";
 import { PHONE_SCHEMA } from "@/lib/validation";
 
-import OnboardingShell from "../_components/OnboardingShell";
 import OnboardingStepLayout from "../_components/OnboardingStepLayout";
-import { prefetchQuestionnaireAndPackages } from "../_lib/intake-query";
-import { getNextStepPath, getPrevStepPath } from "../_lib/onboarding-navigation";
+import {
+  prefetchPackagesForMedicine,
+  prefetchQuestionnaireForCategory,
+} from "../_lib/intake-query";
+import {
+  getNextStepPath,
+  getPrevStepPath,
+  pushOnboardingRoute,
+} from "../_lib/onboarding-navigation";
 import { useOnboarding } from "../_lib/onboarding-store";
 
 const personalInfoSchema = z.object({
@@ -105,83 +111,86 @@ export default function PersonalInfoPage() {
     }
 
     updateState(parsed.data);
-    if (state.medicationId) {
-      await prefetchQuestionnaireAndPackages(queryClient, state.medicationId);
-    }
+    await Promise.all([
+      state.goalId && state.requiresQuestionnaire
+        ? prefetchQuestionnaireForCategory(queryClient, state.goalId)
+        : Promise.resolve(),
+      state.medicationId
+        ? prefetchPackagesForMedicine(queryClient, state.medicationId)
+        : Promise.resolve(),
+    ]);
     const next = getNextStepPath("/onboarding/personal-info", { ...state, ...parsed.data });
-    if (next) router.push(next);
+    if (next) await pushOnboardingRoute(router, next);
   }
 
-  function handleBack() {
+  async function handleBack() {
     const prev = getPrevStepPath("/onboarding/personal-info", state);
-    if (prev) router.push(prev);
+    if (prev) await pushOnboardingRoute(router, prev);
   }
 
   return (
-    <OnboardingShell>
-      <OnboardingStepLayout
-        title="Personal information"
-        description="We'll use this to set up your account and contact you about your treatment."
-        onBack={handleBack}
-        onContinue={handleContinue}
-        continueDisabled={saving}
-        continueLabel="Continue"
-        maxWidth="form"
-        variant="bare"
-        align="center"
-      >
-        <div className="space-y-6 text-left">
+    <OnboardingStepLayout
+      title="Personal information"
+      description="We'll use this to set up your account and contact you about your treatment."
+      onBack={handleBack}
+      onContinue={handleContinue}
+      continueDisabled={saving}
+      continueLabel="Continue"
+      maxWidth="form"
+      variant="bare"
+      align="center"
+    >
+      <div className="space-y-6 text-left">
+        <div className="space-y-2.5">
+          <Label htmlFor="fullName" className={fieldLabelClass}>
+            Full name
+          </Label>
+          <Input
+            id="fullName"
+            value={form.fullName}
+            onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
+            placeholder="John Doe"
+            className={fieldControlClass}
+          />
+        </div>
+
+        <div className="grid gap-6 sm:grid-cols-2 sm:gap-4">
           <div className="space-y-2.5">
-            <Label htmlFor="fullName" className={fieldLabelClass}>
-              Full name
+            <Label htmlFor="email" className={fieldLabelClass}>
+              Email address
             </Label>
             <Input
-              id="fullName"
-              value={form.fullName}
-              onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
-              placeholder="John Doe"
+              id="email"
+              type="email"
+              autoComplete="email"
+              value={form.email}
+              onChange={(e) => {
+                setEmailError(null);
+                setForm((f) => ({ ...f, email: e.target.value }));
+              }}
+              placeholder="name@company.com"
+              className={fieldControlClass}
+              aria-invalid={emailError ? true : undefined}
+            />
+            {emailError ? <p className="text-sm text-red-600">{emailError}</p> : null}
+          </div>
+
+          <div className="space-y-2.5">
+            <Label htmlFor="phone" className={fieldLabelClass}>
+              Phone number
+            </Label>
+            <Input
+              id="phone"
+              type="tel"
+              autoComplete="tel"
+              value={form.phone}
+              onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+              placeholder="(555) 000-0000"
               className={fieldControlClass}
             />
           </div>
-
-          <div className="grid gap-6 sm:grid-cols-2 sm:gap-4">
-            <div className="space-y-2.5">
-              <Label htmlFor="email" className={fieldLabelClass}>
-                Email address
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                autoComplete="email"
-                value={form.email}
-                onChange={(e) => {
-                  setEmailError(null);
-                  setForm((f) => ({ ...f, email: e.target.value }));
-                }}
-                placeholder="name@company.com"
-                className={fieldControlClass}
-                aria-invalid={emailError ? true : undefined}
-              />
-              {emailError ? <p className="text-sm text-red-600">{emailError}</p> : null}
-            </div>
-
-            <div className="space-y-2.5">
-              <Label htmlFor="phone" className={fieldLabelClass}>
-                Phone number
-              </Label>
-              <Input
-                id="phone"
-                type="tel"
-                autoComplete="tel"
-                value={form.phone}
-                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                placeholder="(555) 000-0000"
-                className={fieldControlClass}
-              />
-            </div>
-          </div>
         </div>
-      </OnboardingStepLayout>
-    </OnboardingShell>
+      </div>
+    </OnboardingStepLayout>
   );
 }

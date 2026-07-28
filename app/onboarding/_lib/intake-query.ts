@@ -6,7 +6,7 @@ import {
   getIntakeSummary,
   getMedicinesForCategory,
   getPackagesForMedicine,
-  getQuestionnaireForMedicine,
+  getQuestionnaireForCategory,
 } from "@/lib/actions/intake";
 import { CATALOG_STALE_MS, intakeQueryKeys, SUMMARY_STALE_MS } from "@/lib/intake/query-keys";
 
@@ -26,30 +26,46 @@ export async function prefetchMedicinesForCategory(queryClient: QueryClient, cat
   });
 }
 
-export async function prefetchQuestionnaireAndPackages(
+export async function prefetchQuestionnaireForCategory(
+  queryClient: QueryClient,
+  categorySlug: string,
+) {
+  await queryClient.prefetchQuery({
+    queryKey: intakeQueryKeys.questionnaire(categorySlug),
+    queryFn: async () => {
+      const result = await getQuestionnaireForCategory(categorySlug);
+      if (!result.ok) throw new Error(result.message);
+      return result.data;
+    },
+    staleTime: CATALOG_STALE_MS,
+  });
+}
+
+export async function prefetchPackagesForMedicine(
   queryClient: QueryClient,
   medicineId: string,
   variantId?: string | null,
 ) {
+  await queryClient.prefetchQuery({
+    queryKey: intakeQueryKeys.packages(medicineId, variantId),
+    queryFn: async () => {
+      const result = await getPackagesForMedicine(medicineId, variantId ?? null);
+      if (!result.ok) throw new Error(result.message);
+      return result.data;
+    },
+    staleTime: CATALOG_STALE_MS,
+  });
+}
+
+export async function prefetchQuestionnaireAndPackages(
+  queryClient: QueryClient,
+  categorySlug: string,
+  medicineId: string,
+  variantId?: string | null,
+) {
   await Promise.all([
-    queryClient.prefetchQuery({
-      queryKey: intakeQueryKeys.questionnaire(medicineId),
-      queryFn: async () => {
-        const result = await getQuestionnaireForMedicine(medicineId);
-        if (!result.ok) throw new Error(result.message);
-        return result.data;
-      },
-      staleTime: CATALOG_STALE_MS,
-    }),
-    queryClient.prefetchQuery({
-      queryKey: intakeQueryKeys.packages(medicineId, variantId),
-      queryFn: async () => {
-        const result = await getPackagesForMedicine(medicineId, variantId ?? null);
-        if (!result.ok) throw new Error(result.message);
-        return result.data;
-      },
-      staleTime: CATALOG_STALE_MS,
-    }),
+    prefetchQuestionnaireForCategory(queryClient, categorySlug),
+    prefetchPackagesForMedicine(queryClient, medicineId, variantId),
   ]);
 }
 

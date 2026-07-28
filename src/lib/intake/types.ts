@@ -8,7 +8,7 @@ export type CategoryDto = {
   tagline: string | null;
   description: string | null;
   icon: string | null;
-  /** Category image URL from DB (`icon` if URL, else first linked medicine `image_url`). */
+  /** Category image URL from DB (`image_url`, else `icon` URL, else first linked medicine image). */
   imageSrc: string | null;
 };
 
@@ -30,7 +30,6 @@ export type MedicineDto = {
   fromPriceCents: number | null;
   // Empty when the medicine has no variants (buy the medicine directly).
   variants: IntakeVariantOption[];
-  requiresQuestionnaire: boolean;
 };
 
 export type QuestionType = "text" | "number" | "boolean" | "single_select" | "multi_select";

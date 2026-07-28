@@ -492,6 +492,7 @@ export type Database = {
           tagline: string | null;
           description: string | null;
           icon: string | null;
+          image_url: string | null;
           eligibility_rules: Json;
           sort_order: number;
           is_active: boolean;
@@ -505,6 +506,7 @@ export type Database = {
           tagline?: string | null;
           description?: string | null;
           icon?: string | null;
+          image_url?: string | null;
           eligibility_rules?: Json;
           sort_order?: number;
           is_active?: boolean;
@@ -518,6 +520,7 @@ export type Database = {
           tagline?: string | null;
           description?: string | null;
           icon?: string | null;
+          image_url?: string | null;
           eligibility_rules?: Json;
           sort_order?: number;
           is_active?: boolean;

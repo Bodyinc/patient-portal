@@ -12,9 +12,14 @@ import { medicineImageFrameClass, medicineImageFitClass } from "../../_lib/onboa
 type TreatmentSummaryProps = {
   medicine: MedicineDto | null;
   goalName: string | null;
+  requiresQuestionnaire?: boolean;
 };
 
-export default function TreatmentSummary({ medicine, goalName }: TreatmentSummaryProps) {
+export default function TreatmentSummary({
+  medicine,
+  goalName,
+  requiresQuestionnaire = false,
+}: TreatmentSummaryProps) {
   if (!medicine) return null;
 
   const imageFromDb =
@@ -22,7 +27,7 @@ export default function TreatmentSummary({ medicine, goalName }: TreatmentSummar
 
   const pills = [
     medicine.tag?.trim() || null,
-    medicine.requiresQuestionnaire ? "Licensed Provider Consultation" : null,
+    requiresQuestionnaire ? "Licensed Provider Consultation" : null,
   ].filter(Boolean) as string[];
 
   return (

@@ -8,11 +8,15 @@ import { evaluateMedicineEligibility, saveQuestionnaireResponses } from "@/lib/a
 import { isQuestionAnswered } from "@/lib/intake/questionnaire";
 import type { QuestionnaireAnswerValue, QuestionnaireResponseInput } from "@/lib/intake/types";
 
-import OnboardingShell from "../_components/OnboardingShell";
 import OnboardingStepLayout from "../_components/OnboardingStepLayout";
 import QuestionInput from "../_components/QuestionInput";
 import { useQuestionnaire } from "../_hooks/use-intake-catalog";
-import { getNextStepPath, getPrevStepPath } from "../_lib/onboarding-navigation";
+import {
+  getNextStepPath,
+  getPrevStepPath,
+  pushOnboardingRoute,
+  replaceOnboardingRoute,
+} from "../_lib/onboarding-navigation";
 import { useOnboarding } from "../_lib/onboarding-store";
 
 function toResponseInput(
@@ -61,10 +65,11 @@ export default function QuestionnairePage() {
   const {
     data: questionnaire,
     isLoading,
+    isSuccess,
     isError,
     error,
     refetch,
-  } = useQuestionnaire(state.medicationId);
+  } = useQuestionnaire(state.goalId);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -72,29 +77,29 @@ export default function QuestionnairePage() {
   }, [hydrated, state.questionnaireAnswers]);
 
   useEffect(() => {
-    if (!hydrated) return;
-    if (!state.requiresQuestionnaire) {
-      router.replace("/onboarding/select-plan");
-    }
-  }, [hydrated, router, state.requiresQuestionnaire]);
-
-  // medicines.requires_questionnaire is a standalone flag, so it can be true while no active
-  // questionnaire is linked. Clearing it here is what breaks the redirect loop: the step guard in
-  // onboarding-store recomputes from state, and while the flag stayed set it treated the step as
-  // incomplete and bounced us straight back from /select-plan.
-  useEffect(() => {
     if (!hydrated || isLoading) return;
-    if (state.requiresQuestionnaire && state.medicationId && questionnaire === null) {
-      updateState({ requiresQuestionnaire: false, questionnaireComplete: true });
-      toast.error("No questionnaire is available for this medication.");
-      router.replace("/onboarding/select-plan");
+
+    if (questionnaire) {
+      if (!state.requiresQuestionnaire || state.questionnaireComplete) {
+        updateState({ requiresQuestionnaire: true, questionnaireComplete: false });
+      }
+      return;
     }
+
+    if (!isSuccess || questionnaire !== null) return;
+
+    if (state.requiresQuestionnaire) {
+      updateState({ requiresQuestionnaire: false, questionnaireComplete: true });
+      toast.error("No questionnaire is available for this goal.");
+    }
+    replaceOnboardingRoute(router, "/onboarding/select-plan");
   }, [
     hydrated,
     isLoading,
+    isSuccess,
     questionnaire,
     router,
-    state.medicationId,
+    state.questionnaireComplete,
     state.requiresQuestionnaire,
     updateState,
   ]);
@@ -105,7 +110,7 @@ export default function QuestionnairePage() {
 
   async function handleContinue() {
     if (!questionnaire || !state.medicationId) {
-      router.push("/onboarding/select-plan");
+      await pushOnboardingRoute(router, "/onboarding/select-plan");
       return;
     }
 
@@ -143,7 +148,7 @@ export default function QuestionnairePage() {
         eligibilityResult: eligibilityResult.data.result,
         questionnaireComplete: false,
       });
-      router.push("/onboarding/medications");
+      await pushOnboardingRoute(router, "/onboarding/medications");
       return;
     }
 
@@ -154,86 +159,78 @@ export default function QuestionnairePage() {
     };
     updateState(patch);
     const next = getNextStepPath("/onboarding/questionnaire", { ...state, ...patch });
-    if (next) router.push(next);
+    if (next) await pushOnboardingRoute(router, next);
   }
 
-  function handleBack() {
+  async function handleBack() {
     const prev = getPrevStepPath("/onboarding/questionnaire", state);
-    if (prev) router.push(prev);
+    if (prev) await pushOnboardingRoute(router, prev);
   }
 
-  if (!hydrated || isLoading) {
+  if (!hydrated || !state.goalId || isLoading) {
     return (
-      <OnboardingShell>
-        <div className="flex flex-1 items-center justify-center px-4">
-          <p className="text-[14px] text-[#152A51]/70 onboarding-font">Loading questionnaire…</p>
-        </div>
-      </OnboardingShell>
+      <div className="flex flex-1 items-center justify-center px-4">
+        <p className="text-[14px] text-[#152A51]/70 onboarding-font">Loading questionnaire…</p>
+      </div>
     );
   }
 
   if (isError) {
     return (
-      <OnboardingShell>
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4">
-          <p className="text-center text-[14px] text-red-600 onboarding-font">
-            {error instanceof Error ? error.message : "Could not load questionnaire."}
-          </p>
-          <button
-            type="button"
-            onClick={() => void refetch()}
-            className="text-[14px] font-medium text-[#152A51] underline onboarding-font"
-          >
-            Try again
-          </button>
-        </div>
-      </OnboardingShell>
+      <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4">
+        <p className="text-center text-[14px] text-red-600 onboarding-font">
+          {error instanceof Error ? error.message : "Could not load questionnaire."}
+        </p>
+        <button
+          type="button"
+          onClick={() => void refetch()}
+          className="text-[14px] font-medium text-[#152A51] underline onboarding-font"
+        >
+          Try again
+        </button>
+      </div>
     );
   }
 
   if (!questionnaire || !state.medicationId) {
     return (
-      <OnboardingShell>
-        <div className="flex flex-1 items-center justify-center px-4">
-          <p className="text-[14px] text-[#152A51]/70 onboarding-font">Redirecting…</p>
-        </div>
-      </OnboardingShell>
+      <div className="flex flex-1 items-center justify-center px-4">
+        <p className="text-[14px] text-[#152A51]/70 onboarding-font">Redirecting…</p>
+      </div>
     );
   }
 
   return (
-    <OnboardingShell>
-      <OnboardingStepLayout
-        title={questionnaire.title}
-        description="A short screening is required for your selected medication. Answer each question below."
-        onBack={handleBack}
-        onContinue={handleContinue}
-        continueLabel="Continue"
-        continueDisabled={saving}
-        maxWidth="2xl"
-        variant="bare"
-        align="center"
-        layout="fill"
-      >
-        <div className="space-y-6 pb-2 text-left sm:space-y-7">
-          {questionnaire.questions.map((question, index) => (
-            <div key={question.id} className="space-y-2.5">
-              <p className="text-[15px] font-medium leading-snug text-[#152A51] sm:text-[16px]">
-                {index + 1}. {question.text}
-                {question.isRequired ? <span className="text-red-500"> *</span> : null}
-              </p>
-              {question.description ? (
-                <p className="text-[13px] leading-snug text-[#152A51]/70">{question.description}</p>
-              ) : null}
-              <QuestionInput
-                question={question}
-                value={answers[question.id]}
-                onChange={(value) => updateAnswer(question.id, value)}
-              />
-            </div>
-          ))}
-        </div>
-      </OnboardingStepLayout>
-    </OnboardingShell>
+    <OnboardingStepLayout
+      title={questionnaire.title}
+      description="A short screening is required for your selected health goal. Answer each question below."
+      onBack={handleBack}
+      onContinue={handleContinue}
+      continueLabel="Continue"
+      continueDisabled={saving}
+      maxWidth="2xl"
+      variant="bare"
+      align="center"
+      layout="fill"
+    >
+      <div className="space-y-6 pb-2 text-left sm:space-y-7">
+        {questionnaire.questions.map((question, index) => (
+          <div key={question.id} className="space-y-2.5">
+            <p className="text-[15px] font-medium leading-snug text-[#152A51] sm:text-[16px]">
+              {index + 1}. {question.text}
+              {question.isRequired ? <span className="text-red-500"> *</span> : null}
+            </p>
+            {question.description ? (
+              <p className="text-[13px] leading-snug text-[#152A51]/70">{question.description}</p>
+            ) : null}
+            <QuestionInput
+              question={question}
+              value={answers[question.id]}
+              onChange={(value) => updateAnswer(question.id, value)}
+            />
+          </div>
+        ))}
+      </div>
+    </OnboardingStepLayout>
   );
 }

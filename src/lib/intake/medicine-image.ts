@@ -1,4 +1,4 @@
-export const DEFAULT_MEDICINE_IMAGE = "/syrup.svg";
+export const DEFAULT_MEDICINE_IMAGE = "/medicine-vial-default.png";
 
 export function resolveMedicineImageSrc(imageUrl: string | null | undefined): string {
   const trimmed = imageUrl?.trim();

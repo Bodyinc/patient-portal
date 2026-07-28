@@ -5,6 +5,8 @@ import { Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+import { debugLog } from "../_lib/debug-log";
+
 type OnboardingFooterProps = {
   onBack?: () => void;
   onContinue?: () => void;
@@ -32,7 +34,7 @@ export default function OnboardingFooter({
     <Button
       type="button"
       variant="outline"
-      onClick={onBack}
+      onClick={() => onBack?.()}
       className={
         isFigma
           ? "h-[46px] w-full rounded-full border-[#152A51]/30 bg-transparent px-[19px] text-[14px] font-medium leading-none text-[#152A51] shadow-none hover:bg-[#152A51]/5 sm:w-auto"
@@ -46,7 +48,30 @@ export default function OnboardingFooter({
   const continueButton = showContinue ? (
     <Button
       type="button"
-      onClick={onContinue}
+      onClick={() => {
+        debugLog({
+          runId: "post-fix-3",
+          hypothesisId: "A",
+          location: "OnboardingFooter.tsx:continue",
+          message: "Continue clicked",
+          data: { hasHandler: Boolean(onContinue), continueDisabled },
+        });
+        void Promise.resolve(onContinue?.()).catch((reason: unknown) => {
+          debugLog({
+            runId: "post-fix-3",
+            hypothesisId: "B",
+            location: "OnboardingFooter.tsx:continue-reject",
+            message: "onContinue promise rejected",
+            data: {
+              reasonType: reason === null ? "null" : typeof reason,
+              reasonString: String(reason),
+              isEvent: typeof Event !== "undefined" && reason instanceof Event,
+              eventType:
+                typeof Event !== "undefined" && reason instanceof Event ? reason.type : undefined,
+            },
+          });
+        });
+      }}
       disabled={continueDisabled}
       className={
         isFigma

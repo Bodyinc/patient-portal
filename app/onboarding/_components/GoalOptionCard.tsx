@@ -1,9 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import { Check } from "lucide-react";
+import { useState } from "react";
 
-import { isExternalMedicineImage } from "@/lib/intake/medicine-image";
 import type { CategoryDto } from "@/lib/intake/types";
 import { cn } from "@/lib/utils";
 
@@ -17,9 +16,17 @@ type GoalOptionCardProps = {
 /** Figma goal card image: ~203×231, radius 11.79, unselected blur 14.74 */
 const IMAGE_RADIUS = "rounded-[12px]";
 
+function isUsableImageSrc(src: string | null | undefined): src is string {
+  if (!src) return false;
+  const trimmed = src.trim();
+  if (!trimmed) return false;
+  return trimmed.startsWith("/") || trimmed.startsWith("http://") || trimmed.startsWith("https://");
+}
+
 export default function GoalOptionCard({ goal, selected, dimmed, onClick }: GoalOptionCardProps) {
-  const imageSrc = goal.imageSrc;
-  const external = imageSrc ? isExternalMedicineImage(imageSrc) : false;
+  const imageSrc = isUsableImageSrc(goal.imageSrc) ? goal.imageSrc.trim() : null;
+  const [imageFailed, setImageFailed] = useState(false);
+  const showImage = Boolean(imageSrc) && !imageFailed;
   const subtitle = goal.tagline?.trim() || "Starting from $70/month";
 
   return (
@@ -40,14 +47,15 @@ export default function GoalOptionCard({ goal, selected, dimmed, onClick }: Goal
           style={dimmed ? undefined : { filter: "none", opacity: 1 }}
         >
           <div className="relative aspect-[203/231] w-full">
-            {imageSrc ? (
-              <Image
+            {showImage && imageSrc ? (
+              <img
                 src={imageSrc}
                 alt={goal.name}
-                fill
-                sizes="203px"
-                unoptimized={external}
-                className={cn("object-cover", IMAGE_RADIUS)}
+                className={cn("absolute inset-0 h-full w-full object-cover", IMAGE_RADIUS)}
+                onError={(e) => {
+                  e.stopPropagation();
+                  setImageFailed(true);
+                }}
               />
             ) : (
               <div className={cn("absolute inset-0 bg-[#E8EEED]", IMAGE_RADIUS)} />

@@ -2,6 +2,8 @@ import type { OnboardingState } from "./onboarding-store";
 import type { QuestionDto } from "@/lib/intake/types";
 import { isQuestionAnswered } from "@/lib/intake/questionnaire";
 
+import { debugLog } from "./debug-log";
+
 export const ONBOARDING_STEPS = [
   { id: "goal", path: "/onboarding/goal" },
   { id: "demographics", path: "/onboarding/demographics" },
@@ -144,4 +146,59 @@ export function getProgressForPath(pathname: string) {
     total: coreSteps.length,
     percent: Math.round(((index + 1) / coreSteps.length) * 100),
   };
+}
+
+type OnboardingRouter = {
+  push: (href: string) => unknown;
+  replace: (href: string) => unknown;
+};
+
+let navigationGraceUntil = 0;
+
+export function markOnboardingNavigation() {
+  navigationGraceUntil = Date.now() + 1500;
+}
+
+export function isOnboardingNavigationPending() {
+  return Date.now() < navigationGraceUntil;
+}
+
+function logNavRejection(method: "push" | "replace", href: string, reason: unknown) {
+  debugLog({
+    runId: "post-fix-4",
+    hypothesisId: "F",
+    location: "onboarding-navigation.ts:nav-reject",
+    message: `router.${method} rejected`,
+    data: {
+      href,
+      reasonType: reason === null ? "null" : typeof reason,
+      reasonString: String(reason),
+      isEvent: typeof Event !== "undefined" && reason instanceof Event,
+      eventType: typeof Event !== "undefined" && reason instanceof Event ? reason.type : undefined,
+    },
+  });
+}
+
+async function runNavAction(method: "push" | "replace", action: () => unknown, href: string) {
+  try {
+    const result = action();
+    if (result && typeof (result as Promise<unknown>).then === "function") {
+      await (result as Promise<unknown>).catch((reason) => logNavRejection(method, href, reason));
+    }
+  } catch (reason) {
+    logNavRejection(method, href, reason);
+  }
+}
+
+/** Await navigation so rejections stay inside handleContinue (avoids Next.js [object Event] overlay). */
+export async function pushOnboardingRoute(router: Pick<OnboardingRouter, "push">, href: string) {
+  markOnboardingNavigation();
+  await runNavAction("push", () => router.push(href), href);
+}
+
+export async function replaceOnboardingRoute(
+  router: Pick<OnboardingRouter, "replace">,
+  href: string,
+) {
+  await runNavAction("replace", () => router.replace(href), href);
 }

@@ -7,7 +7,7 @@ import {
   getIntakeSummary,
   getMedicinesForCategory,
   getPackagesForMedicine,
-  getQuestionnaireForMedicine,
+  getQuestionnaireForCategory,
 } from "@/lib/actions/intake";
 import { CATALOG_STALE_MS, intakeQueryKeys, SUMMARY_STALE_MS } from "@/lib/intake/query-keys";
 
@@ -39,16 +39,16 @@ export function useMedicinesForCategory(categorySlug: string | null) {
   });
 }
 
-export function useQuestionnaire(medicineId: string | null) {
+export function useQuestionnaire(categorySlug: string | null) {
   return useQuery({
-    queryKey: intakeQueryKeys.questionnaire(medicineId),
+    queryKey: intakeQueryKeys.questionnaire(categorySlug),
     queryFn: async () => {
-      if (!medicineId) return null;
-      const result = await getQuestionnaireForMedicine(medicineId);
+      if (!categorySlug) return null;
+      const result = await getQuestionnaireForCategory(categorySlug);
       if (!result.ok) throw new Error(result.message);
       return result.data;
     },
-    enabled: Boolean(medicineId),
+    enabled: Boolean(categorySlug),
     staleTime: CATALOG_STALE_MS,
   });
 }

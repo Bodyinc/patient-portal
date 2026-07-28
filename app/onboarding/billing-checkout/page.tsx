@@ -12,7 +12,6 @@ import {
 } from "@/lib/actions/patient-auth";
 import { createClient } from "@/lib/supabase/client";
 
-import OnboardingShell from "../_components/OnboardingShell";
 import OnboardingFooter from "../_components/OnboardingFooter";
 import OnboardingFrame from "../_components/OnboardingFrame";
 import PageHeader from "./components/PageHeader";
@@ -164,96 +163,94 @@ export default function BillingCheckoutPage() {
   }
 
   return (
-    <OnboardingShell>
-      <OnboardingFrame
-        showProgress={false}
-        footer={<OnboardingFooter onBack={handleBack} showContinue={false} variant="figma" />}
-      >
-        {/* Changed wrapper overflow to auto so layout adapts gracefully when zoomed */}
-        <div className="flex h-full w-full flex-col gap-2 overflow-y-auto scrollbar-hide lg:gap-3 lg:overflow-hidden">
-          <PageHeader />
+    <OnboardingFrame
+      showProgress={false}
+      footer={<OnboardingFooter onBack={handleBack} showContinue={false} variant="figma" />}
+    >
+      {/* Changed wrapper overflow to auto so layout adapts gracefully when zoomed */}
+      <div className="flex h-full w-full flex-col gap-2 overflow-y-auto scrollbar-hide lg:gap-3 lg:overflow-hidden">
+        <PageHeader />
 
-          <div className="grid min-h-0 flex-1 grid-cols-1 items-start gap-3 overflow-y-auto scrollbar-hide pb-4 lg:grid-cols-[1.65fr_1fr] lg:gap-4 lg:overflow-hidden lg:pb-0">
-            <div className="flex flex-col gap-3 lg:h-full lg:overflow-y-auto lg:pr-0 scrollbar-hide">
-              <div className="grid shrink-0 grid-cols-1 gap-2 sm:grid-cols-2">
-                <InfoCard
-                  title="Patient Information"
-                  items={[
-                    { label: "Name", value: summary?.fullName || state.fullName || "—" },
-                    { label: "Email Address", value: summary?.email || state.email || "—" },
-                    { label: "Phone Number", value: summary?.phone || state.phone || "—" },
-                  ]}
-                />
+        <div className="grid min-h-0 flex-1 grid-cols-1 items-start gap-3 overflow-y-auto scrollbar-hide pb-4 lg:grid-cols-[1.65fr_1fr] lg:gap-4 lg:overflow-hidden lg:pb-0">
+          <div className="flex flex-col gap-3 lg:h-full lg:overflow-y-auto lg:pr-0 scrollbar-hide">
+            <div className="grid shrink-0 grid-cols-1 gap-2 sm:grid-cols-2">
+              <InfoCard
+                title="Patient Information"
+                items={[
+                  { label: "Name", value: summary?.fullName || state.fullName || "—" },
+                  { label: "Email Address", value: summary?.email || state.email || "—" },
+                  { label: "Phone Number", value: summary?.phone || state.phone || "—" },
+                ]}
+              />
 
-                <InfoCard
-                  title="Clinical Profile"
-                  items={[
-                    {
-                      label: "State",
-                      value: getStateName(summary?.stateCode ?? state.state) || "—",
-                    },
-                    { label: "Date of Birth", value: summary?.dob || state.dob || "—" },
-                    {
-                      label: "BMI",
-                      value:
-                        summary?.bmi !== null && summary?.bmi !== undefined
-                          ? String(summary.bmi)
-                          : state.bmi !== null
-                            ? String(state.bmi)
-                            : "—",
-                    },
-                  ]}
-                />
-              </div>
-
-              <div className="shrink-0">
-                {clientSecret ? (
-                  <OnboardingPaymentForm
-                    clientSecret={clientSecret}
-                    returnUrl={`${
-                      typeof window !== "undefined" ? window.location.origin : ""
-                    }/onboarding/checkout-complete`}
-                    onPaid={() => void handlePaid()}
-                  />
-                ) : (
-                  <PaymentForm />
-                )}
-              </div>
-
-              <TermsCheckbox checked={consentAccepted} onChange={setConsentAccepted} />
-            </div>
-
-            {/* Right column handles order summary layout constraint */}
-            <div className="w-full lg:h-full lg:overflow-y-auto scrollbar-hide">
-              <OrderSummary
-                medicationName={medicationName}
-                planLabel={planLabel}
-                medicationTotal={pricing.medicationTotal}
-                subtotal={pricing.subtotal}
-                discount={pricing.discount}
-                discountLabel={pricing.discountLabel}
-                total={pricing.total}
-                promoCode={promoCode}
-                promoMessage={promoMessage}
-                promoError={promoError}
-                applyingPromo={applyingPromo}
-                consentAccepted={consentAccepted}
-                confirming={confirming}
-                loading={summary?.packagePrice == null}
-                hideContinue={Boolean(clientSecret)}
-                renewalShippingCents={renewalShippingCents}
-                onPromoCodeChange={(value) => {
-                  setPromoCode(value);
-                  setPromoError(null);
-                  setPromoMessage(null);
-                }}
-                onApplyPromo={handleApplyPromo}
-                onContinue={() => void handleContinueToPayment()}
+              <InfoCard
+                title="Clinical Profile"
+                items={[
+                  {
+                    label: "State",
+                    value: getStateName(summary?.stateCode ?? state.state) || "—",
+                  },
+                  { label: "Date of Birth", value: summary?.dob || state.dob || "—" },
+                  {
+                    label: "BMI",
+                    value:
+                      summary?.bmi !== null && summary?.bmi !== undefined
+                        ? String(summary.bmi)
+                        : state.bmi !== null
+                          ? String(state.bmi)
+                          : "—",
+                  },
+                ]}
               />
             </div>
+
+            <div className="shrink-0">
+              {clientSecret ? (
+                <OnboardingPaymentForm
+                  clientSecret={clientSecret}
+                  returnUrl={`${
+                    typeof window !== "undefined" ? window.location.origin : ""
+                  }/onboarding/checkout-complete`}
+                  onPaid={() => void handlePaid()}
+                />
+              ) : (
+                <PaymentForm />
+              )}
+            </div>
+
+            <TermsCheckbox checked={consentAccepted} onChange={setConsentAccepted} />
+          </div>
+
+          {/* Right column handles order summary layout constraint */}
+          <div className="w-full lg:h-full lg:overflow-y-auto scrollbar-hide">
+            <OrderSummary
+              medicationName={medicationName}
+              planLabel={planLabel}
+              medicationTotal={pricing.medicationTotal}
+              subtotal={pricing.subtotal}
+              discount={pricing.discount}
+              discountLabel={pricing.discountLabel}
+              total={pricing.total}
+              promoCode={promoCode}
+              promoMessage={promoMessage}
+              promoError={promoError}
+              applyingPromo={applyingPromo}
+              consentAccepted={consentAccepted}
+              confirming={confirming}
+              loading={summary?.packagePrice == null}
+              hideContinue={Boolean(clientSecret)}
+              renewalShippingCents={renewalShippingCents}
+              onPromoCodeChange={(value) => {
+                setPromoCode(value);
+                setPromoError(null);
+                setPromoMessage(null);
+              }}
+              onApplyPromo={handleApplyPromo}
+              onContinue={() => void handleContinueToPayment()}
+            />
           </div>
         </div>
-      </OnboardingFrame>
-    </OnboardingShell>
+      </div>
+    </OnboardingFrame>
   );
 }

@@ -8,11 +8,13 @@ import { toast } from "sonner";
 import { saveIntakeCategory } from "@/lib/actions/intake";
 
 import GoalOptionCard from "../_components/GoalOptionCard";
-import OnboardingShell from "../_components/OnboardingShell";
 import OnboardingStepLayout from "../_components/OnboardingStepLayout";
 import { useIntakeCategories } from "../_hooks/use-intake-catalog";
-import { prefetchMedicinesForCategory } from "../_lib/intake-query";
-import { getNextStepPath } from "../_lib/onboarding-navigation";
+import {
+  prefetchMedicinesForCategory,
+  prefetchQuestionnaireForCategory,
+} from "../_lib/intake-query";
+import { getNextStepPath, pushOnboardingRoute } from "../_lib/onboarding-navigation";
 import { useOnboarding } from "../_lib/onboarding-store";
 
 export default function GoalPage() {
@@ -21,7 +23,7 @@ export default function GoalPage() {
   const { state, updateState, hydrated } = useOnboarding();
   const [selected, setSelected] = useState(state.goalId ?? "");
   const [saving, setSaving] = useState(false);
-  const { data: categories = [], isLoading } = useIntakeCategories();
+  const { data: categories = [], isLoading, isError, error, refetch } = useIntakeCategories();
 
   useEffect(() => {
     if (!hydrated) return;
@@ -53,45 +55,74 @@ export default function GoalPage() {
     }
 
     setSaving(true);
-    const result = await saveIntakeCategory(selected);
-    setSaving(false);
+    try {
+      const result = await saveIntakeCategory(selected);
 
-    if (!result.ok) {
-      toast.error(result.message);
-      return;
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
+
+      const patch = {
+        goalId: selected,
+        goalName: result.data.goalName,
+        medicationId: null,
+        requiresQuestionnaire: result.data.requiresQuestionnaire,
+        questionnaireAnswers: {},
+        questionnaireComplete: false,
+        selectedPackageId: null,
+        eligibilityResult: null,
+        checkoutConfirmed: false,
+      };
+      updateState(patch);
+      await Promise.all([
+        prefetchMedicinesForCategory(queryClient, selected),
+        result.data.requiresQuestionnaire
+          ? prefetchQuestionnaireForCategory(queryClient, selected)
+          : Promise.resolve(),
+      ]);
+      const next = getNextStepPath("/onboarding/goal", { ...state, ...patch });
+      if (next) await pushOnboardingRoute(router, next);
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : typeof err === "string"
+            ? err
+            : "Unable to save your goal. Please try again.";
+      toast.error(message);
+    } finally {
+      setSaving(false);
     }
-
-    const patch = {
-      goalId: selected,
-      goalName: result.data.goalName,
-      medicationId: null,
-      requiresQuestionnaire: false,
-      questionnaireAnswers: {},
-      questionnaireComplete: false,
-      selectedPackageId: null,
-      eligibilityResult: null,
-      checkoutConfirmed: false,
-    };
-    updateState(patch);
-    await prefetchMedicinesForCategory(queryClient, selected);
-    const next = getNextStepPath("/onboarding/goal", { ...state, ...patch });
-    if (next) router.push(next);
   }
 
   return (
-    <OnboardingShell>
-      <OnboardingStepLayout
-        title="Choose your health goal."
-        description=""
-        onContinue={handleContinue}
-        continueDisabled={!selected || saving || isLoading}
-        continueLabel="Continue"
-        showBack={false}
-        variant="bare"
-        align="center"
-        maxWidth="4xl"
-        layout="fill"
-      >
+    <OnboardingStepLayout
+      title="Choose your health goal."
+      description=""
+      onContinue={handleContinue}
+      continueDisabled={!selected || saving || isLoading || isError}
+      continueLabel="Continue"
+      showBack={false}
+      variant="bare"
+      align="center"
+      maxWidth="4xl"
+      layout="fill"
+    >
+      {isError ? (
+        <div className="mx-auto max-w-md space-y-4 text-center">
+          <p className="text-[14px] text-[#152A51]/80">
+            {error instanceof Error ? error.message : "Unable to load goals right now."}
+          </p>
+          <button
+            type="button"
+            onClick={() => void refetch()}
+            className="h-[45px] rounded-[14px] bg-[#E8EEED] px-5 text-[14px] font-medium text-[#152A51]"
+          >
+            Try again
+          </button>
+        </div>
+      ) : (
         <div className="mx-auto grid w-full grid-cols-2 justify-items-center gap-x-4 gap-y-6 sm:grid-cols-3 sm:gap-x-5 sm:gap-y-8">
           {categories.map((goal) => (
             <GoalOptionCard
@@ -103,7 +134,7 @@ export default function GoalPage() {
             />
           ))}
         </div>
-      </OnboardingStepLayout>
-    </OnboardingShell>
+      )}
+    </OnboardingStepLayout>
   );
 }
