@@ -1,5 +1,6 @@
 "use client";
 
+import { Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -13,7 +14,6 @@ import { Label } from "@/components/ui/label";
 import { saveIntakeContact } from "@/lib/actions/intake";
 import { checkPatientEmail } from "@/lib/actions/patient-auth";
 import { wrongPortalMessage } from "@/lib/auth/constants";
-import { PHONE_SCHEMA } from "@/lib/validation";
 
 import OnboardingStepLayout from "../_components/OnboardingStepLayout";
 import {
@@ -27,11 +27,16 @@ import {
 } from "../_lib/onboarding-navigation";
 import { useOnboarding } from "../_lib/onboarding-store";
 
-const personalInfoSchema = z.object({
-  fullName: z.string().trim().min(1, "Enter your full name").max(120),
-  email: z.string().trim().email("Enter a valid email").max(255),
-  phone: PHONE_SCHEMA,
-});
+const personalInfoSchema = z
+  .object({
+    fullName: z.string().trim().min(1, "Enter your full name").max(120),
+    email: z.string().trim().email("Enter a valid email").max(255),
+    confirmEmail: z.string().trim().email("Confirm your email").max(255),
+  })
+  .refine((data) => data.email.toLowerCase() === data.confirmEmail.toLowerCase(), {
+    message: "Emails do not match",
+    path: ["confirmEmail"],
+  });
 
 const fieldLabelClass = "text-[14px] font-normal leading-none text-[#152A51]";
 
@@ -49,7 +54,7 @@ export default function PersonalInfoPage() {
   const [form, setForm] = useState({
     fullName: state.fullName,
     email: state.email,
-    phone: state.phone,
+    confirmEmail: state.email,
   });
 
   useEffect(() => {
@@ -57,9 +62,9 @@ export default function PersonalInfoPage() {
     setForm({
       fullName: state.fullName,
       email: state.email,
-      phone: state.phone,
+      confirmEmail: state.email,
     });
-  }, [hydrated, state.fullName, state.email, state.phone]);
+  }, [hydrated, state.fullName, state.email]);
 
   async function handleContinue() {
     setEmailError(null);
@@ -98,7 +103,12 @@ export default function PersonalInfoPage() {
       return;
     }
 
-    const result = await saveIntakeContact(parsed.data);
+    const contact = {
+      fullName: parsed.data.fullName,
+      email: parsed.data.email,
+      phone: state.phone || "",
+    };
+    const result = await saveIntakeContact(contact);
     setSaving(false);
 
     if (!result.ok) {
@@ -110,7 +120,7 @@ export default function PersonalInfoPage() {
       return;
     }
 
-    updateState(parsed.data);
+    updateState(contact);
     await Promise.all([
       state.goalId && state.requiresQuestionnaire
         ? prefetchQuestionnaireForCategory(queryClient, state.goalId)
@@ -119,7 +129,7 @@ export default function PersonalInfoPage() {
         ? prefetchPackagesForMedicine(queryClient, state.medicationId)
         : Promise.resolve(),
     ]);
-    const next = getNextStepPath("/onboarding/personal-info", { ...state, ...parsed.data });
+    const next = getNextStepPath("/onboarding/personal-info", { ...state, ...contact });
     if (next) await pushOnboardingRoute(router, next);
   }
 
@@ -131,7 +141,6 @@ export default function PersonalInfoPage() {
   return (
     <OnboardingStepLayout
       title="Personal information"
-      description="We'll use this to set up your account and contact you about your treatment."
       onBack={handleBack}
       onContinue={handleContinue}
       continueDisabled={saving}
@@ -141,7 +150,25 @@ export default function PersonalInfoPage() {
       align="center"
     >
       <div className="space-y-6 text-left">
-        <div className="space-y-2.5">
+        {/* Figma: clinician photo + assessment complete banner */}
+        <div className="mx-auto flex w-fit items-center gap-4">
+          <div className="relative h-[123px] w-[100px] shrink-0 overflow-hidden rounded-[11px]">
+            <img src="/woman.png" alt="" className="h-full w-full object-cover object-center" />
+          </div>
+          <div className="max-w-[270px] space-y-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#6A9B9C] px-3 py-1.5 text-[12px] font-medium leading-none text-white sm:text-[13px]">
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white/20">
+                <Check className="h-2.5 w-2.5 stroke-[3]" aria-hidden />
+              </span>
+              Your assessment is complete
+            </span>
+            <p className="text-[13px] font-normal leading-snug text-[#152A51]/80 sm:text-[14px]">
+              You&apos;re one step away from viewing your treatment recommendations.
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
           <Label htmlFor="fullName" className={fieldLabelClass}>
             Full name
           </Label>
@@ -155,7 +182,7 @@ export default function PersonalInfoPage() {
         </div>
 
         <div className="grid gap-6 sm:grid-cols-2 sm:gap-4">
-          <div className="space-y-2.5">
+          <div className="space-y-4">
             <Label htmlFor="email" className={fieldLabelClass}>
               Email address
             </Label>
@@ -168,24 +195,24 @@ export default function PersonalInfoPage() {
                 setEmailError(null);
                 setForm((f) => ({ ...f, email: e.target.value }));
               }}
-              placeholder="name@company.com"
+              placeholder="email@example.com"
               className={fieldControlClass}
               aria-invalid={emailError ? true : undefined}
             />
             {emailError ? <p className="text-sm text-red-600">{emailError}</p> : null}
           </div>
 
-          <div className="space-y-2.5">
-            <Label htmlFor="phone" className={fieldLabelClass}>
-              Phone number
+          <div className="space-y-4">
+            <Label htmlFor="confirmEmail" className={fieldLabelClass}>
+              Confirm email
             </Label>
             <Input
-              id="phone"
-              type="tel"
-              autoComplete="tel"
-              value={form.phone}
-              onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-              placeholder="(555) 000-0000"
+              id="confirmEmail"
+              type="email"
+              autoComplete="email"
+              value={form.confirmEmail}
+              onChange={(e) => setForm((f) => ({ ...f, confirmEmail: e.target.value }))}
+              placeholder="email@example.com"
               className={fieldControlClass}
             />
           </div>

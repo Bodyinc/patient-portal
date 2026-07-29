@@ -20,6 +20,7 @@ import PaymentForm from "./components/PaymentForm";
 import OnboardingPaymentForm from "./components/OnboardingPaymentForm";
 import OrderSummary from "./components/OrderSummary";
 import TermsCheckbox from "./components/TermsCheckbox";
+import CheckoutReassurance from "./components/CheckoutReassurance";
 import { useIntakeSummary } from "../_hooks/use-intake-catalog";
 import { calculateCheckoutPricing } from "../_lib/intake-pricing";
 import { getStateName } from "../_lib/onboarding-config";
@@ -167,12 +168,12 @@ export default function BillingCheckoutPage() {
       showProgress={false}
       footer={<OnboardingFooter onBack={handleBack} showContinue={false} variant="figma" />}
     >
-      {/* Changed wrapper overflow to auto so layout adapts gracefully when zoomed */}
+      {/* Wrapper scrolls on small screens; desktop keeps the original fixed two-column layout. */}
       <div className="flex h-full w-full flex-col gap-2 overflow-y-auto scrollbar-hide lg:gap-3 lg:overflow-hidden">
         <PageHeader />
 
         <div className="grid min-h-0 flex-1 grid-cols-1 items-start gap-3 overflow-y-auto scrollbar-hide pb-4 lg:grid-cols-[1.65fr_1fr] lg:gap-4 lg:overflow-hidden lg:pb-0">
-          <div className="flex flex-col gap-3 lg:h-full lg:overflow-y-auto lg:pr-0 scrollbar-hide">
+          <div className="flex flex-col gap-3 scrollbar-hide lg:h-full lg:overflow-y-auto lg:pr-0">
             <div className="grid shrink-0 grid-cols-1 gap-2 sm:grid-cols-2">
               <InfoCard
                 title="Patient Information"
@@ -219,10 +220,11 @@ export default function BillingCheckoutPage() {
             </div>
 
             <TermsCheckbox checked={consentAccepted} onChange={setConsentAccepted} />
+            <CheckoutReassurance />
           </div>
 
-          {/* Right column handles order summary layout constraint */}
-          <div className="w-full lg:h-full lg:overflow-y-auto scrollbar-hide">
+          {/* Original right-column scrolling is retained for shorter desktop viewports. */}
+          <div className="w-full scrollbar-hide lg:h-full lg:overflow-y-auto">
             <OrderSummary
               medicationName={medicationName}
               planLabel={planLabel}

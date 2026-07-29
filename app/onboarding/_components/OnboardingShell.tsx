@@ -9,14 +9,14 @@ export default function OnboardingShell({ children, showLogo = true }: Onboardin
   return (
     <main className="relative flex h-dvh flex-col overflow-hidden bg-white px-4 py-2 sm:px-6 sm:py-3 lg:px-10">
       {showLogo ? (
-        <header className="relative z-10 mb-4 flex h-20 shrink-0 items-center justify-center sm:h-24 lg:h-28">
+        <header className="relative z-10 mb-1 flex h-12 shrink-0 items-center justify-center sm:h-16 lg:h-20">
           {/* Plain img — next/image can reject with [object Event] when the shell remounts on each step. */}
           <img
             src="/logo.svg"
             alt="Body Inc."
             width={214}
             height={75}
-            className="h-12 w-auto sm:h-14 lg:h-16"
+            className="h-10 w-auto sm:h-12 lg:h-14"
           />
         </header>
       ) : null}

@@ -30,7 +30,7 @@ export default function MedicationDetailsDialog({
   onOpenChange,
   onSelect,
 }: MedicationDetailsDialogProps) {
-  const variants = medication?.variants ?? [];
+  const variants = useMemo(() => medication?.variants ?? [], [medication?.variants]);
   const hasVariants = variants.length > 0;
   const defaultVariantId = useMemo(() => {
     if (!hasVariants) return null;

@@ -36,7 +36,7 @@ import { normalizeQuestionType } from "@/lib/intake/questionnaire";
 import { resolveMedicineImageSrc } from "@/lib/intake/medicine-image";
 import { classifyPatientEmail } from "@/lib/auth/patient-email";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { DOB_SCHEMA, PHONE_SCHEMA } from "@/lib/validation";
+import { DOB_SCHEMA, OPTIONAL_PHONE_SCHEMA, PHONE_SCHEMA } from "@/lib/validation";
 import type { Json } from "@/lib/supabase/types";
 
 function parseImportantInfo(value: Json): string[] {
@@ -720,7 +720,8 @@ export async function saveIntakeMedicine(
 const contactSchema = z.object({
   fullName: z.string().trim().min(1).max(120),
   email: z.string().trim().email().max(255),
-  phone: PHONE_SCHEMA,
+  // Phone is collected on delivery-address; optional here for confirm-email contact step.
+  phone: OPTIONAL_PHONE_SCHEMA,
 });
 
 export async function saveIntakeContact(
@@ -768,7 +769,7 @@ export async function saveIntakeContact(
     .update({
       full_name: data.fullName,
       email,
-      phone: data.phone,
+      phone: data.phone || "",
     })
     .eq("id", sessionResult.session.id);
 
