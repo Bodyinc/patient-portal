@@ -175,7 +175,7 @@ export default function DeliveryAddressPage() {
     >
       <div className="space-y-6 text-left">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-3">
-          <div className="space-y-2.5 sm:col-span-2">
+          <div className="space-y-4 sm:col-span-2">
             <Label htmlFor="streetAddress" className={fieldLabelClass}>
               Address <span className="text-[#152A51]/50">*</span>
             </Label>
@@ -188,7 +188,7 @@ export default function DeliveryAddressPage() {
               className={fieldControlClass}
             />
           </div>
-          <div className="space-y-2.5">
+          <div className="space-y-4">
             <Label htmlFor="apartment" className={fieldLabelClass}>
               Apartment number <span className="text-[#152A51]/50">*</span>
             </Label>
@@ -204,7 +204,7 @@ export default function DeliveryAddressPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-3">
-          <div className="space-y-2.5">
+          <div className="space-y-4">
             <Label htmlFor="postalCode" className={fieldLabelClass}>
               Zip code <span className="text-[#152A51]/50">*</span>
             </Label>
@@ -217,7 +217,7 @@ export default function DeliveryAddressPage() {
               className={fieldControlClass}
             />
           </div>
-          <div className="space-y-2.5 sm:col-span-2">
+          <div className="space-y-4 sm:col-span-2">
             <Label htmlFor="city" className={fieldLabelClass}>
               City <span className="text-[#152A51]/50">*</span>
             </Label>
@@ -245,7 +245,7 @@ export default function DeliveryAddressPage() {
           <div className="space-y-4 rounded-[14px] border border-[#E8E8E8] bg-[#F7F8FA] p-4">
             <p className="text-[14px] font-medium text-[#152A51]">Billing address</p>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-3">
-              <div className="space-y-2.5 sm:col-span-2">
+              <div className="space-y-4 sm:col-span-2">
                 <Label htmlFor="billingStreetAddress" className={fieldLabelClass}>
                   Address <span className="text-[#152A51]/50">*</span>
                 </Label>
@@ -257,7 +257,7 @@ export default function DeliveryAddressPage() {
                   className={fieldControlClass}
                 />
               </div>
-              <div className="space-y-2.5">
+              <div className="space-y-4">
                 <Label htmlFor="billingApartment" className={fieldLabelClass}>
                   Apartment number
                 </Label>
@@ -271,7 +271,7 @@ export default function DeliveryAddressPage() {
               </div>
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-3">
-              <div className="space-y-2.5">
+              <div className="space-y-4">
                 <Label htmlFor="billingPostalCode" className={fieldLabelClass}>
                   Zip code <span className="text-[#152A51]/50">*</span>
                 </Label>
@@ -283,7 +283,7 @@ export default function DeliveryAddressPage() {
                   className={fieldControlClass}
                 />
               </div>
-              <div className="space-y-2.5">
+              <div className="space-y-4">
                 <Label htmlFor="billingCity" className={fieldLabelClass}>
                   City <span className="text-[#152A51]/50">*</span>
                 </Label>
@@ -295,7 +295,7 @@ export default function DeliveryAddressPage() {
                   className={fieldControlClass}
                 />
               </div>
-              <div className="space-y-2.5">
+              <div className="space-y-4">
                 <Label htmlFor="billingStateCode" className={fieldLabelClass}>
                   State <span className="text-[#152A51]/50">*</span>
                 </Label>
@@ -322,7 +322,7 @@ export default function DeliveryAddressPage() {
           </div>
         )}
 
-        <div className="space-y-2.5">
+        <div className="space-y-4">
           <Label htmlFor="phone" className={fieldLabelClass}>
             Phone number <span className="text-[#152A51]/50">*</span>
           </Label>

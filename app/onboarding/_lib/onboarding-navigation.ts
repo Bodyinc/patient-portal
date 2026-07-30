@@ -108,7 +108,7 @@ export function getEarliestIncompleteStep(state: OnboardingState): string {
   if (!state.state || !state.sex || !state.dob) return "/onboarding/demographics";
   if (!isBmiComplete(state)) return "/onboarding/bmi";
   if (!state.medicationId) return "/onboarding/medications";
-  if (!state.fullName || !state.email || !state.phone) return "/onboarding/personal-info";
+  if (!state.fullName || !state.email) return "/onboarding/personal-info";
   if (!isAddressComplete(state)) return "/onboarding/delivery-address";
 
   if (includesQuestionnaire(state) && !isQuestionnaireComplete(state)) {

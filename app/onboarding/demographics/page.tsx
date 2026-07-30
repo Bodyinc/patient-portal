@@ -114,7 +114,7 @@ export default function DemographicsPage() {
       align="center"
     >
       <div className="space-y-6">
-        <div className="space-y-2.5">
+        <div className="space-y-4">
           <Label htmlFor="state" className={fieldLabelClass}>
             State
           </Label>
@@ -138,7 +138,7 @@ export default function DemographicsPage() {
           </Select>
         </div>
 
-        <div className="space-y-2.5">
+        <div className="space-y-4">
           <Label className={fieldLabelClass}>Sex</Label>
           <div className="grid gap-2 sm:grid-cols-3">
             {SEX_OPTIONS.map((option) => (
@@ -159,7 +159,7 @@ export default function DemographicsPage() {
           </div>
         </div>
 
-        <div className="space-y-2.5">
+        <div className="space-y-4">
           <Label htmlFor="dob" className={fieldLabelClass}>
             Date of birth
           </Label>

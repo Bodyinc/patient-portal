@@ -1,13 +1,13 @@
 "use client";
 
 import { Check } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
 import MedicineImage from "./MedicineImage";
 import type { MedicineDto } from "@/lib/intake/types";
 import { formatMonthly } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
-import { fieldControlClass, MEDICATION_BADGE_ACCENTS, ONBOARDING } from "../_lib/onboarding-theme";
+import { MEDICATION_BADGE_ACCENTS, ONBOARDING } from "../_lib/onboarding-theme";
 
 type MedicationCardProps = {
   medication: MedicineDto;
@@ -21,20 +21,27 @@ const HIGHLIGHT_BADGE_RE = /popular|highest|best|fastest|maximum|most/i;
 const DOSAGE_BADGE_RE = /\b(\d+(\.\d+)?\s*mg|size\s*\d|\d+(\.\d+)?\s*ml)\b/i;
 const MAX_SECONDARY_BADGES = 3;
 
+/** Figma card 856×355 — left image is roughly square within that height */
+const IMAGE_PANEL_CLASS =
+  "relative isolate h-[220px] w-full shrink-0 overflow-hidden rounded-t-[35px] bg-[#5A778D] sm:h-full sm:w-[320px] sm:rounded-l-[35px] sm:rounded-tr-none";
+
+/** Figma: price oval 259 × 74 */
 function PlansFromBadge({ fromPriceCents }: { fromPriceCents: number | null }) {
   if (fromPriceCents == null) {
     return (
-      <span className="rounded-full bg-white px-4 py-2 text-center text-[12px] font-medium leading-none text-[#152A51] shadow-[0_4px_14px_rgba(0,0,0,0.16)] sm:text-[13px]">
+      <span className="flex h-[58px] w-[min(259px,calc(100%-1.5rem))] items-center justify-center rounded-full bg-white text-center text-[13px] font-medium leading-none text-[#152A51] shadow-[0_4px_14px_rgba(0,0,0,0.16)] sm:h-[74px]">
         Pricing coming soon
       </span>
     );
   }
 
   return (
-    <span className="rounded-full bg-white px-4 py-2 text-center text-[12px] font-medium leading-none text-[#152A51] shadow-[0_4px_14px_rgba(0,0,0,0.16)] sm:text-[13px]">
+    <span className="flex h-[58px] w-[min(259px,calc(100%-1.5rem))] items-center justify-center gap-1 rounded-full bg-white text-center text-[13px] font-medium leading-none text-[#152A51] shadow-[0_4px_14px_rgba(0,0,0,0.16)] sm:h-[74px] sm:text-[14px]">
       Plans from{" "}
-      <span className="text-[15px] font-bold sm:text-[16px]">{formatMonthly(fromPriceCents)}</span>
-      /mo
+      <span className="text-[18px] font-bold tracking-[-0.3px] sm:text-[22px]">
+        {formatMonthly(fromPriceCents)}
+        <span className="text-[13px] font-medium sm:text-[14px]">/mo</span>
+      </span>
     </span>
   );
 }
@@ -64,6 +71,7 @@ export default function MedicationCard({
   onViewDetails,
 }: MedicationCardProps) {
   const hasVariants = medication.variants.length > 0;
+  // Cheapest variant is used for pricing + selection; dosage is chosen in details.
   const defaultVariantId = useMemo(() => {
     if (!hasVariants) return null;
     return [...medication.variants].sort(
@@ -71,9 +79,8 @@ export default function MedicationCard({
     )[0].id;
   }, [hasVariants, medication.variants]);
 
-  const [variantId, setVariantId] = useState<string | null>(defaultVariantId);
   const selectedVariant = hasVariants
-    ? (medication.variants.find((v) => v.id === variantId) ?? null)
+    ? (medication.variants.find((v) => v.id === defaultVariantId) ?? null)
     : null;
   const displayFromPriceCents =
     (hasVariants ? selectedVariant?.fromPriceCents : null) ?? medication.fromPriceCents;
@@ -92,46 +99,51 @@ export default function MedicationCard({
     <div
       role="button"
       tabIndex={0}
-      onClick={() => onSelect?.(medication.id, variantId)}
+      onClick={() => onSelect?.(medication.id, defaultVariantId)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          onSelect?.(medication.id, variantId);
+          onSelect?.(medication.id, defaultVariantId);
         }
       }}
       className={cn(
-        "relative flex h-auto w-full cursor-pointer flex-col overflow-visible rounded-[24px] border bg-white shadow-[0_2px_16px_rgba(21,42,81,0.08)] transition-all onboarding-font sm:flex-row sm:items-stretch",
-        selected
-          ? "border-[#152A51]/30 ring-2 ring-[#6A9B9C]/20"
-          : "border-[#E8EEED] hover:border-[#152A51]/20",
+        // Figma Rectangle 90: 856×355, radius 37, border 2 #E8EEED, shadow 0 15 40
+        "relative flex h-auto w-full max-w-[856px] cursor-pointer flex-col overflow-visible rounded-[37px] border-2 border-[#E8EEED] bg-white shadow-[0_15px_40px_rgba(59,71,89,0.10)] transition-all onboarding-font sm:h-[355px] sm:flex-row sm:items-stretch",
+        selected && "ring-2 ring-[#6A9B9C]/25",
       )}
     >
-      {/* Left: product shot + centered price pill */}
-      <div className="relative isolate h-[220px] w-full shrink-0 overflow-hidden rounded-t-[23px] bg-[#5A778D] sm:h-auto sm:min-h-[200px] sm:w-[38%] sm:max-w-[300px] sm:rounded-l-[23px] sm:rounded-tr-none">
-        <div className="absolute inset-0 flex items-end justify-center pb-1 pt-3">
-          <MedicineImage
-            src={medication.imageSrc}
-            alt={medication.name}
-            width={280}
-            height={320}
-            fill
-            className="object-contain object-bottom px-3 pb-2 pt-1"
-          />
-        </div>
+      {/* Left: product shot — zoomed enough to slice base at “Multiple dose”, keep slate bg visible */}
+      <div className={IMAGE_PANEL_CLASS}>
+        <MedicineImage
+          src={medication.imageSrc}
+          alt={medication.name}
+          width={180}
+          height={180}
+          fill
+          fit="cover"
+          position="center 50%"
+        />
 
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center px-4">
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center px-3">
           <PlansFromBadge fromPriceCents={displayFromPriceCents} />
         </div>
-
-        {medication.tag ? (
-          <p className="pointer-events-none absolute inset-x-0 bottom-3 z-10 text-center text-[11px] font-medium leading-snug text-white/90 sm:text-[12px]">
-            {medication.tag}
-          </p>
-        ) : null}
       </div>
 
       {/* Right: title, badge, description, controls */}
       <div className="relative flex min-w-0 flex-1 flex-col justify-center gap-2.5 px-5 py-5 pr-12 sm:gap-3 sm:px-6 sm:py-6 sm:pr-14">
+        {secondaryBadges.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {secondaryBadges.map((badge) => (
+              <span
+                key={badge}
+                className="rounded-full border border-[#D5D9E0] bg-white px-2.5 py-1 text-[11px] font-medium leading-none text-[#152A51] sm:text-[12px]"
+              >
+                {badge}
+              </span>
+            ))}
+          </div>
+        ) : null}
+
         <div className="min-w-0 space-y-2 pr-1">
           <h2 className="text-[17px] font-semibold leading-snug tracking-[-0.3px] text-[#152A51] sm:text-[19px]">
             {medication.name}
@@ -153,57 +165,20 @@ export default function MedicationCard({
           ) : null}
         </div>
 
-        {secondaryBadges.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5">
-            {secondaryBadges.map((badge) => (
-              <span
-                key={badge}
-                className="rounded-full border border-[#D5D9E0] bg-white px-2.5 py-1 text-[11px] font-medium leading-none text-[#152A51] sm:text-[12px]"
-              >
-                {badge}
-              </span>
-            ))}
+        {onViewDetails ? (
+          <div className="pt-0.5">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onViewDetails(medication.id);
+              }}
+              className="h-[40px] shrink-0 rounded-full border border-[#152A51]/25 bg-white px-4 text-[13px] font-medium text-[#152A51] transition hover:bg-[#F3F6F6] sm:text-[14px]"
+            >
+              View Details
+            </button>
           </div>
         ) : null}
-
-        {(hasVariants || onViewDetails) && (
-          <div className="flex flex-col gap-2 pt-0.5 sm:flex-row sm:items-center sm:gap-3">
-            {hasVariants ? (
-              <select
-                value={variantId ?? ""}
-                onClick={(e) => e.stopPropagation()}
-                onChange={(e) => {
-                  e.stopPropagation();
-                  const next = e.target.value;
-                  setVariantId(next);
-                  onSelect?.(medication.id, next);
-                }}
-                className={cn("h-[40px] min-w-0 flex-1 text-[13px]", fieldControlClass)}
-                aria-label="Select variant"
-              >
-                {medication.variants.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.name}
-                    {v.fromPriceCents == null ? " — coming soon" : ""}
-                  </option>
-                ))}
-              </select>
-            ) : null}
-
-            {onViewDetails ? (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onViewDetails(medication.id);
-                }}
-                className="h-[40px] shrink-0 rounded-full border border-[#152A51]/25 bg-white px-4 text-[13px] font-medium text-[#152A51] transition hover:bg-[#F3F6F6] sm:text-[14px]"
-              >
-                View Details
-              </button>
-            ) : null}
-          </div>
-        )}
       </div>
 
       {/* Selection indicator — overlaps card edge per Figma */}

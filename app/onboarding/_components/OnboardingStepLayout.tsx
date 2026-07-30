@@ -71,7 +71,7 @@ export default function OnboardingStepLayout({
 
   const contentClass = isCentered
     ? isBare
-      ? "mt-8 sm:mt-10"
+      ? "mt-4 sm:mt-10"
       : "mt-3 sm:mt-4"
     : isBare
       ? "mt-6 min-h-0 flex-1 overflow-y-auto scrollbar-hide sm:mt-8"
@@ -92,7 +92,10 @@ export default function OnboardingStepLayout({
   return (
     <OnboardingFrame showProgress={showProgress} footer={footer}>
       <div
-        className={`flex min-h-0 flex-1 flex-col ${isCentered ? "justify-center" : "overflow-hidden"}`}
+        className={cn(
+          "flex min-h-0 flex-1 flex-col",
+          isCentered ? "justify-center -translate-y-4 sm:-translate-y-4" : "overflow-hidden",
+        )}
       >
         <Card className={`mx-auto w-full ${maxWidthClass[maxWidth]} ${cardClass}`}>
           <div className={cn("shrink-0 onboarding-font", textAlign)}>

@@ -123,8 +123,8 @@ export default function BmiPage() {
       variant="bare"
       align="center"
     >
-      <div className="space-y-6">
-        <div className="space-y-2.5 text-left">
+      <div className="space-y-4">
+        <div className="space-y-4 text-left">
           <Label className={fieldLabelClass}>Height</Label>
           <div className="grid grid-cols-2 gap-3">
             <div className="relative">
@@ -172,7 +172,7 @@ export default function BmiPage() {
           </div>
         </div>
 
-        <div className="space-y-2.5 text-left">
+        <div className="space-y-4 text-left">
           <Label htmlFor="weight" className={fieldLabelClass}>
             Current weight
           </Label>

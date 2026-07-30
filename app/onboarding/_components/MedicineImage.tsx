@@ -16,8 +16,10 @@ type MedicineImageProps = {
   height: number;
   className?: string;
   fill?: boolean;
-  /** When true, never show the default vial — render nothing if DB image is missing. */
+  /** Only render a database image; hide the frame when no image is available. */
   dbOnly?: boolean;
+  fit?: "cover" | "contain";
+  position?: string;
 };
 
 export default function MedicineImage({
@@ -28,6 +30,8 @@ export default function MedicineImage({
   className,
   fill,
   dbOnly = false,
+  fit = "contain",
+  position,
 }: MedicineImageProps) {
   const initial = dbOnly ? getDbMedicineImageSrc(src) : resolveMedicineImageSrc(src);
   const [imgSrc, setImgSrc] = useState<string | null>(initial);
@@ -43,7 +47,13 @@ export default function MedicineImage({
       <img
         src={imgSrc}
         alt={alt}
-        className={cn("absolute inset-0 h-full w-full object-cover", blendClass, className)}
+        className={cn(
+          "absolute inset-0 h-full w-full",
+          fit === "cover" ? "object-cover" : "object-contain",
+          blendClass,
+          className,
+        )}
+        style={position ? { objectPosition: position } : undefined}
         onError={(e) => {
           e.stopPropagation();
           setImgSrc(dbOnly ? null : DEFAULT_MEDICINE_IMAGE);
