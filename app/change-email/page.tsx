@@ -67,7 +67,7 @@ function ChangeEmailContent() {
 
       <form onSubmit={onSubmit} className="space-y-6">
         <div className="space-y-2">
-          <Label htmlFor="change-email" className="text-[14px] font-semibold text-[#2E00AB]">
+          <Label htmlFor="change-email" className="text-[14px] font-semibold text-[#152A51]">
             New Email Address
           </Label>
           <Input
@@ -87,11 +87,11 @@ function ChangeEmailContent() {
         </Button>
       </form>
 
-      <p className="mt-6 text-center text-sm text-[#2E00AB]/80">
+      <p className="mt-6 text-center text-sm text-[#152A51]/80">
         <button
           type="button"
           onClick={() => router.back()}
-          className="font-medium text-[#2E00AB] hover:underline"
+          className="font-medium text-[#152A51] hover:underline"
         >
           Back
         </button>

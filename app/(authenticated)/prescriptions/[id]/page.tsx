@@ -22,11 +22,11 @@ export default async function PrescriptionPage({
 
   if (!rx || rx.user_id !== user.id) {
     return (
-      <main className="min-w-0 flex-1 bg-[#FAF8FF] p-4">
-        <div className="mx-auto max-w-2xl rounded-xl border border-[#E6DEFF] bg-white p-6 text-center text-sm text-[#2E00AB]/70">
+      <main className="min-w-0 flex-1 bg-[#F3F6F6] p-4">
+        <div className="mx-auto max-w-2xl rounded-xl border border-[#E8EEED] bg-white p-6 text-center text-sm text-[#152A51]/70">
           Prescription not found.
           <div className="mt-2">
-            <Link href="/my-meds" className="font-medium text-[#2E00AB] underline">
+            <Link href="/my-meds" className="font-medium text-[#152A51] underline">
               Back to My Meds
             </Link>
           </div>
@@ -49,7 +49,7 @@ export default async function PrescriptionPage({
     (user.user_metadata?.full_name as string | undefined) ?? user.email ?? "Patient";
 
   return (
-    <main className="min-w-0 flex-1 bg-[#FAF8FF] p-3 sm:p-4 print:bg-white print:p-0">
+    <main className="min-w-0 flex-1 bg-[#F3F6F6] p-3 sm:p-4 print:bg-white print:p-0">
       <PrescriptionDocument
         prescription={{
           id: rx.id,

@@ -38,7 +38,7 @@ export default function OnboardingFooter({
       className={
         isFigma
           ? "h-[46px] w-full rounded-full border-[#152A51]/30 bg-transparent px-[19px] text-[14px] font-medium leading-none text-[#152A51] shadow-none hover:bg-[#152A51]/5 sm:w-auto"
-          : "w-full border-[#2E00AB] text-[#2E00AB] sm:w-auto"
+          : "w-full border-[#152A51] text-[#152A51] sm:w-auto"
       }
     >
       ← Previous
@@ -76,7 +76,7 @@ export default function OnboardingFooter({
       className={
         isFigma
           ? "h-[46px] w-full rounded-full bg-[#E3E084] px-[19px] py-[14px] text-[14px] font-medium leading-none text-[#152A51] shadow-none hover:bg-[#D9D674] sm:w-auto"
-          : "w-full bg-[#2E00AB] hover:bg-[#2E00AB]/90 sm:w-auto"
+          : "w-full bg-[#152A51] hover:bg-[#152A51]/90 sm:w-auto"
       }
     >
       {continueLabel}

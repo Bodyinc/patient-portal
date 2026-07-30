@@ -37,18 +37,18 @@ export default function BillingHeader({
             isPending={searchPending}
           />
           <div className="flex items-center gap-3 self-end sm:self-auto">
-            <Bell className="h-4 w-4 text-[#2E00AB]" />
+            <Bell className="h-4 w-4 text-[#152A51]" />
             <div className="flex items-center gap-2">
               {avatarUrl ? (
                 <img src={avatarUrl} alt={fullName} className="h-9 w-9 rounded-md object-cover" />
               ) : (
-                <div className="flex h-9 w-9 items-center justify-center rounded-md bg-[#EDE7FF] text-sm font-semibold text-[#2E00AB]">
+                <div className="flex h-9 w-9 items-center justify-center rounded-md bg-[#E8EEED] text-sm font-semibold text-[#152A51]">
                   {fullName.charAt(0).toUpperCase()}
                 </div>
               )}
               <div className="text-right">
-                <p className="text-sm font-semibold text-[#2E00AB]">{fullName}</p>
-                <p className="text-xs text-[#2E00AB]/70">Patient ID: {patientId}</p>
+                <p className="text-sm font-semibold text-[#152A51]">{fullName}</p>
+                <p className="text-xs text-[#152A51]/70">Patient ID: {patientId}</p>
               </div>
             </div>
           </div>

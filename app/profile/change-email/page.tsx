@@ -58,7 +58,7 @@ function OtpBoxes({ value, onChange }: { value: string; onChange: (v: string) =>
           <InputOTPSlot
             key={index}
             index={index}
-            className="h-10 w-6.5 rounded-[8px] border border-[#2E00AB]/40 bg-white text-lg font-semibold text-[#2E00AB] shadow-none outline-none first:rounded-[8px] first:border-l last:rounded-[8px] after:hidden focus:outline-none focus:ring-0 focus-visible:border-[#2E00AB] focus-visible:ring-0 focus-visible:ring-offset-0 sm:h-[50px] sm:w-[50px] sm:text-[24px]"
+            className="h-10 w-6.5 rounded-[8px] border border-[#152A51]/40 bg-white text-lg font-semibold text-[#152A51] shadow-none outline-none first:rounded-[8px] first:border-l last:rounded-[8px] after:hidden focus:outline-none focus:ring-0 focus-visible:border-[#152A51] focus-visible:ring-0 focus-visible:ring-offset-0 sm:h-[50px] sm:w-[50px] sm:text-[24px]"
           />
         ))}
       </InputOTP>
@@ -232,17 +232,17 @@ export default function ProfileChangeEmailPage() {
     <AuthPageShell footer={null}>
       <div className="text-center">
         {phase === "loading" ? (
-          <p className="text-base text-[#2E00AB] sm:text-[18px]">Loading…</p>
+          <p className="text-base text-[#152A51] sm:text-[18px]">Loading…</p>
         ) : phase === "sendCurrent" ? (
           <>
-            <p className="mb-2 text-sm font-medium uppercase tracking-wide text-[#2E00AB]/50">
+            <p className="mb-2 text-sm font-medium uppercase tracking-wide text-[#152A51]/50">
               {stepLabel}
             </p>
             <AuthHeading
               title="Confirm Your Email"
               description="First, verify your current email address. We'll send a code to:"
             />
-            <p className="break-all text-base font-medium text-[#2E00AB] sm:text-lg lg:text-[22px]">
+            <p className="break-all text-base font-medium text-[#152A51] sm:text-lg lg:text-[22px]">
               {currentEmail}
             </p>
             <Button
@@ -255,14 +255,14 @@ export default function ProfileChangeEmailPage() {
           </>
         ) : phase === "verifyCurrent" ? (
           <>
-            <p className="mb-2 text-sm font-medium uppercase tracking-wide text-[#2E00AB]/50">
+            <p className="mb-2 text-sm font-medium uppercase tracking-wide text-[#152A51]/50">
               {stepLabel}
             </p>
             <AuthHeading
               title="Enter Verification Code"
               description={`Enter the ${OTP_LENGTH}-digit code sent to`}
             />
-            <p className="break-all text-base font-medium text-[#2E00AB] sm:text-lg lg:text-[22px]">
+            <p className="break-all text-base font-medium text-[#152A51] sm:text-lg lg:text-[22px]">
               {currentEmail}
             </p>
             <OtpBoxes value={otp} onChange={setOtp} />
@@ -273,7 +273,7 @@ export default function ProfileChangeEmailPage() {
             >
               {busy ? "Verifying…" : "Verify current email"}
             </Button>
-            <p className="mt-6 text-base text-[#2E00AB] sm:text-[18px]">
+            <p className="mt-6 text-base text-[#152A51] sm:text-[18px]">
               Didn&apos;t receive the code?{" "}
               <button
                 type="button"
@@ -286,7 +286,7 @@ export default function ProfileChangeEmailPage() {
           </>
         ) : phase === "enterNew" ? (
           <>
-            <p className="mb-2 text-sm font-medium uppercase tracking-wide text-[#2E00AB]/50">
+            <p className="mb-2 text-sm font-medium uppercase tracking-wide text-[#152A51]/50">
               {stepLabel}
             </p>
             <AuthHeading
@@ -294,7 +294,7 @@ export default function ProfileChangeEmailPage() {
               description="We'll send a code to this address to verify it before switching."
             />
             <div className="space-y-2 text-left">
-              <Label htmlFor="new-email" className="text-[14px] font-semibold text-[#2E00AB]">
+              <Label htmlFor="new-email" className="text-[14px] font-semibold text-[#152A51]">
                 New email address
               </Label>
               <Input
@@ -317,14 +317,14 @@ export default function ProfileChangeEmailPage() {
           </>
         ) : (
           <>
-            <p className="mb-2 text-sm font-medium uppercase tracking-wide text-[#2E00AB]/50">
+            <p className="mb-2 text-sm font-medium uppercase tracking-wide text-[#152A51]/50">
               {stepLabel}
             </p>
             <AuthHeading
               title="Verify New Email"
               description={`Enter the ${OTP_LENGTH}-digit code sent to`}
             />
-            <p className="break-all text-base font-medium text-[#2E00AB] sm:text-lg lg:text-[22px]">
+            <p className="break-all text-base font-medium text-[#152A51] sm:text-lg lg:text-[22px]">
               {newEmail}
             </p>
             <OtpBoxes value={otp} onChange={setOtp} />
@@ -335,7 +335,7 @@ export default function ProfileChangeEmailPage() {
             >
               {busy ? "Verifying…" : "Confirm new email"}
             </Button>
-            <p className="mt-6 text-base text-[#2E00AB] sm:text-[18px]">
+            <p className="mt-6 text-base text-[#152A51] sm:text-[18px]">
               Didn&apos;t receive the code?{" "}
               <button
                 type="button"
@@ -348,8 +348,8 @@ export default function ProfileChangeEmailPage() {
           </>
         )}
 
-        <p className="mt-8 text-center text-sm text-[#2E00AB]/80">
-          <Link href="/profile" className="font-medium text-[#2E00AB] hover:underline">
+        <p className="mt-8 text-center text-sm text-[#152A51]/80">
+          <Link href="/profile" className="font-medium text-[#152A51] hover:underline">
             ← Back to profile
           </Link>
         </p>

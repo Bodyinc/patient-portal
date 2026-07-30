@@ -37,31 +37,31 @@ export default function SubscriptionRow({ subscription }: SubscriptionRowProps) 
   }
 
   return (
-    <article className="rounded-md border border-[#EEE9FF] bg-[#FCFBFF] p-4">
+    <article className="rounded-md border border-[#E8EEED] bg-[#F3F6F6] p-4">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 flex-1 items-start gap-3">
           <img
             src={subscription.imageSrc}
             alt={subscription.medicineName}
-            className="h-14 w-14 shrink-0 rounded-md border border-[#E6DEFF] object-cover"
+            className="h-14 w-14 shrink-0 rounded-md border border-[#E8EEED] object-cover"
           />
           <div className="min-w-0">
-            <h3 className="text-base font-semibold text-[#2E00AB]">{subscription.medicineName}</h3>
+            <h3 className="text-base font-semibold text-[#152A51]">{subscription.medicineName}</h3>
             {subscription.variantName || subscription.planLabel ? (
               <div className="mt-1 flex flex-wrap items-center gap-1.5">
                 {subscription.variantName ? (
-                  <span className="rounded-full bg-[#EDE7FF] px-2 py-0.5 text-[11px] font-medium text-[#2E00AB]">
+                  <span className="rounded-full bg-[#E8EEED] px-2 py-0.5 text-[11px] font-medium text-[#152A51]">
                     {subscription.variantName}
                   </span>
                 ) : null}
                 {subscription.planLabel ? (
-                  <span className="rounded-full border border-[#D5CAFF] px-2 py-0.5 text-[11px] font-medium text-[#2E00AB]/80">
+                  <span className="rounded-full border border-[#D5DFDE] px-2 py-0.5 text-[11px] font-medium text-[#152A51]/80">
                     {subscription.planLabel}
                   </span>
                 ) : null}
               </div>
             ) : null}
-            <p className="mt-1 text-sm text-[#2E00AB]/70">{subscription.description}</p>
+            <p className="mt-1 text-sm text-[#152A51]/70">{subscription.description}</p>
             {subscription.cancelAtPeriodEnd ? (
               <p className="mt-1 text-xs font-medium text-amber-700">
                 Cancels at end of billing period
@@ -72,14 +72,14 @@ export default function SubscriptionRow({ subscription }: SubscriptionRowProps) 
 
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:min-w-[280px]">
           <div>
-            <p className="text-xs text-[#2E00AB]/60">Next Billing Date</p>
-            <p className="mt-1 text-sm font-medium text-[#2E00AB]">
+            <p className="text-xs text-[#152A51]/60">Next Billing Date</p>
+            <p className="mt-1 text-sm font-medium text-[#152A51]">
               {formatDate(subscription.nextBillingDate)}
             </p>
           </div>
           <div>
-            <p className="text-xs text-[#2E00AB]/60">Upcoming Charge</p>
-            <p className="mt-1 text-sm font-semibold text-[#2E00AB]">
+            <p className="text-xs text-[#152A51]/60">Upcoming Charge</p>
+            <p className="mt-1 text-sm font-semibold text-[#152A51]">
               {formatCurrency(subscription.upcomingCharge)}
             </p>
           </div>
@@ -90,7 +90,7 @@ export default function SubscriptionRow({ subscription }: SubscriptionRowProps) 
             type="button"
             onClick={handleUpgrade}
             disabled={!subscription.medicineId}
-            className="w-full rounded-md border border-[#2E00AB] px-4 py-2 text-sm font-medium text-[#2E00AB] hover:bg-[#F6F3FF] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+            className="w-full rounded-md border border-[#152A51] px-4 py-2 text-sm font-medium text-[#152A51] hover:bg-[#F3F6F6] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
           >
             Upgrade
           </button>
@@ -98,7 +98,7 @@ export default function SubscriptionRow({ subscription }: SubscriptionRowProps) 
             type="button"
             onClick={handleCancel}
             disabled={subscription.cancelAtPeriodEnd}
-            className="w-full rounded-md border border-[#D5CAFF] bg-white px-4 py-2 text-sm text-[#2E00AB]/80 hover:bg-[#FAF8FF] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+            className="w-full rounded-md border border-[#D5DFDE] bg-white px-4 py-2 text-sm text-[#152A51]/80 hover:bg-[#F3F6F6] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
           >
             Cancel
           </button>

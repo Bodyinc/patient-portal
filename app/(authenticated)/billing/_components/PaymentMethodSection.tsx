@@ -81,7 +81,7 @@ function UpdateCardForm({ onDone }: { onDone: () => void }) {
       <Button
         type="submit"
         disabled={!stripe || submitting}
-        className="h-11 w-full bg-[#2E00AB] text-white hover:bg-[#2E00AB]/90"
+        className="h-11 w-full bg-[#152A51] text-white hover:bg-[#152A51]/90"
       >
         {submitting ? "Saving…" : "Save card"}
       </Button>
@@ -117,15 +117,15 @@ export default function PaymentMethodSection() {
   }
 
   return (
-    <section className="rounded-md border border-[#E6DEFF] bg-white p-4">
+    <section className="rounded-md border border-[#E8EEED] bg-white p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EDE7FF] text-[#2E00AB]">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#E8EEED] text-[#152A51]">
             <CreditCard className="h-5 w-5" />
           </span>
           <div>
-            <h2 className="text-base font-semibold text-[#2E00AB]">Payment Method</h2>
-            <p className="text-sm text-[#2E00AB]/70">
+            <h2 className="text-base font-semibold text-[#152A51]">Payment Method</h2>
+            <p className="text-sm text-[#152A51]/70">
               Update the card used for your subscription renewals.
             </p>
           </div>
@@ -134,7 +134,7 @@ export default function PaymentMethodSection() {
           type="button"
           onClick={openDialog}
           variant="outline"
-          className="border-[#2E00AB] text-[#2E00AB] hover:bg-[#F6F3FF]"
+          className="border-[#152A51] text-[#152A51] hover:bg-[#F3F6F6]"
         >
           Update card
         </Button>
@@ -150,7 +150,7 @@ export default function PaymentMethodSection() {
           </DialogHeader>
 
           {loading || !clientSecret ? (
-            <p className="py-6 text-center text-sm text-[#2E00AB]/60">Loading secure form…</p>
+            <p className="py-6 text-center text-sm text-[#152A51]/60">Loading secure form…</p>
           ) : (
             <Elements
               stripe={getStripeJs()}

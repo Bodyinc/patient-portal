@@ -57,12 +57,12 @@ function AuthPageContent() {
           Login with OTP
         </Button>
 
-        <p className="text-center text-sm text-[#2E00AB]/80">
+        <p className="text-center text-sm text-[#152A51]/80">
           New to Body Inc?{" "}
           <button
             type="button"
             onClick={() => router.push("/onboarding/goal")}
-            className="font-medium text-[#2E00AB] hover:underline"
+            className="font-medium text-[#152A51] hover:underline"
           >
             Get started
           </button>
@@ -126,7 +126,7 @@ function LoginForm() {
   return (
     <form onSubmit={onSubmit} className="space-y-6 sm:space-y-7">
       <div className="space-y-2">
-        <Label htmlFor="login-email" className="text-[14px] font-semibold leading-5 text-[#2E00AB]">
+        <Label htmlFor="login-email" className="text-[14px] font-semibold leading-5 text-[#152A51]">
           Email Address
         </Label>
 
@@ -145,7 +145,7 @@ function LoginForm() {
       <div className="space-y-2">
         <Label
           htmlFor="login-password"
-          className="text-[14px] font-semibold leading-5 text-[#2E00AB]"
+          className="text-[14px] font-semibold leading-5 text-[#152A51]"
         >
           Password
         </Label>
@@ -162,14 +162,14 @@ function LoginForm() {
         />
 
         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <label className="flex cursor-pointer items-center gap-2 text-[14px] text-[#8B6FD8]">
+          <label className="flex cursor-pointer items-center gap-2 text-[14px] text-[#6D7890]">
             <input type="checkbox" className="h-4 w-4 rounded border-[#E5E5E5]" />
             Remember Me
           </label>
 
           <Link
             href="/forgot-password"
-            className="text-[14px] font-medium text-[#2E00AB] hover:underline"
+            className="text-[14px] font-medium text-[#152A51] hover:underline"
           >
             Forgot Password?
           </Link>

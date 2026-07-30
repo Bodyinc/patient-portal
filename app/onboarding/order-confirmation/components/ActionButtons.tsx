@@ -12,7 +12,7 @@ export default function ActionButtons() {
       <Button
         type="button"
         onClick={() => router.push("/dashboard")}
-        className="h-10 w-full rounded-md bg-[#2E00AB] px-6 hover:bg-[#24008a] sm:w-auto"
+        className="h-10 w-full rounded-md bg-[#152A51] px-6 hover:bg-[#10213F] sm:w-auto"
       >
         Go to Dashboard
         <ArrowRight className="ml-2 h-4 w-4" />
@@ -21,7 +21,7 @@ export default function ActionButtons() {
       <Button
         type="button"
         variant="outline"
-        className="h-10 w-full rounded-md border-[#2E00AB]/40 px-6 text-[#2E00AB] sm:w-auto"
+        className="h-10 w-full rounded-md border-[#152A51]/40 px-6 text-[#152A51] sm:w-auto"
       >
         View Treatment Details
         <ArrowRight className="ml-2 h-4 w-4" />

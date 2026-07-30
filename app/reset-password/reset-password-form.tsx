@@ -111,7 +111,7 @@ export function ResetPasswordForm({ recovery, error }: ResetPasswordFormProps) {
     <AuthPageShell footer={null}>
       <div className="text-center">
         {pageState === "loading" ? (
-          <p className="text-base text-[#2E00AB] sm:text-[18px]">Verifying reset link...</p>
+          <p className="text-base text-[#152A51] sm:text-[18px]">Verifying reset link...</p>
         ) : pageState === "invalid" ? (
           <>
             <AuthHeading
@@ -121,7 +121,7 @@ export function ResetPasswordForm({ recovery, error }: ResetPasswordFormProps) {
 
             <Link
               href="/forgot-password"
-              className="inline-block text-base text-[#2E00AB] underline underline-offset-4 sm:text-[18px]"
+              className="inline-block text-base text-[#152A51] underline underline-offset-4 sm:text-[18px]"
             >
               Request a new reset link
             </Link>
@@ -135,7 +135,7 @@ export function ResetPasswordForm({ recovery, error }: ResetPasswordFormProps) {
 
             <form onSubmit={onSubmit} className="space-y-5 text-left">
               <div>
-                <Label htmlFor="np" className="mb-2 block text-[14px] font-semibold text-[#2E00AB]">
+                <Label htmlFor="np" className="mb-2 block text-[14px] font-semibold text-[#152A51]">
                   New Password
                 </Label>
 
@@ -155,7 +155,7 @@ export function ResetPasswordForm({ recovery, error }: ResetPasswordFormProps) {
               <div>
                 <Label
                   htmlFor="np2"
-                  className="mb-2 block text-[14px] font-semibold text-[#2E00AB]"
+                  className="mb-2 block text-[14px] font-semibold text-[#152A51]"
                 >
                   Confirm Password
                 </Label>
@@ -177,7 +177,7 @@ export function ResetPasswordForm({ recovery, error }: ResetPasswordFormProps) {
                 {busy ? "Saving..." : "Save & Continue →"}
               </Button>
 
-              <p className="break-words text-center text-sm leading-snug text-[#2E00AB] sm:text-base">
+              <p className="break-words text-center text-sm leading-snug text-[#152A51] sm:text-base">
                 Can&apos;t access your email?{" "}
                 <button type="button" className="font-semibold underline underline-offset-4">
                   Contact support
@@ -188,7 +188,7 @@ export function ResetPasswordForm({ recovery, error }: ResetPasswordFormProps) {
               <div className="text-center">
                 <Link
                   href="/auth"
-                  className="text-base text-[#2E00AB] underline underline-offset-4 sm:text-[18px]"
+                  className="text-base text-[#152A51] underline underline-offset-4 sm:text-[18px]"
                 >
                   ← Back to login options
                 </Link>

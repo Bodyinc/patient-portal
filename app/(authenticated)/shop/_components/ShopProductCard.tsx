@@ -1,12 +1,11 @@
 "use client";
 
-import Image from "next/image";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { getDbMedicineImageSrc, isExternalMedicineImage } from "@/lib/intake/medicine-image";
+import { getDbMedicineImageSrc } from "@/lib/intake/medicine-image";
 import type { ShopMedicineCardDto } from "@/lib/shop/types";
 import { formatFromPrice } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
@@ -15,6 +14,7 @@ import {
   medicineImageFrameClass,
   medicineImageFitClass,
 } from "../../../onboarding/_lib/onboarding-theme";
+import MedicineImage from "../../../onboarding/_components/MedicineImage";
 
 const IMAGE_ASPECT = "339 / 354.6";
 
@@ -40,7 +40,6 @@ export default function ShopProductCard({ item }: { item: ShopMedicineCardDto })
   const available = displayFromPriceCents != null;
 
   const imageSrc = getDbMedicineImageSrc(item.imageSrc);
-  const external = imageSrc ? isExternalMedicineImage(imageSrc) : false;
 
   function handleContinue() {
     if (!available) return;
@@ -74,15 +73,17 @@ export default function ShopProductCard({ item }: { item: ShopMedicineCardDto })
     </div>
   ) : null;
 
-  const imageBlock = (
+  // Fixed aspect ratio block used specifically for the primary grid card
+  const cardImageBlock = (
     <div className={cn("w-full", medicineImageFrameClass)} style={{ aspectRatio: IMAGE_ASPECT }}>
       {imageSrc ? (
-        <Image
+        <MedicineImage
           src={imageSrc}
           alt={item.name}
           fill
-          sizes="(max-width: 1024px) 100vw, 339px"
-          unoptimized={external}
+          dbOnly
+          fit="cover"
+          position="top"
           className={medicineImageFitClass}
         />
       ) : null}
@@ -92,7 +93,7 @@ export default function ShopProductCard({ item }: { item: ShopMedicineCardDto })
   return (
     <>
       <article className="flex h-full flex-col overflow-hidden rounded-[24px] border border-[#E8EEED] bg-white p-3 sm:p-4">
-        {imageBlock}
+        {cardImageBlock}
 
         <div className="flex flex-1 flex-col gap-2 pt-3 sm:gap-2.5 sm:pt-4">
           <div className="flex items-start justify-between gap-2">
@@ -124,9 +125,23 @@ export default function ShopProductCard({ item }: { item: ShopMedicineCardDto })
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[95vh] max-w-4xl gap-0 overflow-y-auto scrollbar-hide rounded-[24px] border-[#E8EEED] p-4 sm:rounded-[24px] sm:p-6">
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,339px)_1fr]">
-            <div className="flex h-full flex-col justify-between rounded-[24px] border border-[#E8EEED] bg-white p-3">
-              {imageBlock}
-              <p className="mt-4 px-1 text-[22px] font-medium tracking-[-0.3px] text-[#152A51]">
+            <div className="flex h-full min-h-[350px] flex-col justify-between rounded-[24px] border border-[#E8EEED] bg-white p-3">
+              {/* Dynamic full-height container that stops right before the price tag */}
+              <div className={cn("relative min-h-[220px] w-full flex-1", medicineImageFrameClass)}>
+                {imageSrc ? (
+                  <MedicineImage
+                    src={imageSrc}
+                    alt={item.name}
+                    fill
+                    dbOnly
+                    fit="cover"
+                    position="top"
+                    className={medicineImageFitClass}
+                  />
+                ) : null}
+              </div>
+
+              <p className="mt-4 shrink-0 px-1 text-[22px] font-medium tracking-[-0.3px] text-[#152A51]">
                 {formatFromPrice(displayFromPriceCents)}
               </p>
             </div>

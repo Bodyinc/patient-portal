@@ -50,7 +50,7 @@ export default function ForgotPasswordPage() {
 
             <Link
               href="/auth"
-              className="inline-block text-base text-[#2E00AB] underline underline-offset-4 sm:text-[18px]"
+              className="inline-block text-base text-[#152A51] underline underline-offset-4 sm:text-[18px]"
             >
               ← Back to login options
             </Link>
@@ -66,7 +66,7 @@ export default function ForgotPasswordPage() {
               <div>
                 <Label
                   htmlFor="fp-email"
-                  className="mb-2 block text-[14px] font-semibold text-[#2E00AB]"
+                  className="mb-2 block text-[14px] font-semibold text-[#152A51]"
                 >
                   Email Address
                 </Label>
@@ -87,7 +87,7 @@ export default function ForgotPasswordPage() {
                 {busy ? "Sending..." : "Send Reset Link"}
               </Button>
 
-              <p className="mt-6 break-words text-center text-sm leading-snug text-[#2E00AB] sm:text-base">
+              <p className="mt-6 break-words text-center text-sm leading-snug text-[#152A51] sm:text-base">
                 Can&apos;t access your email?{" "}
                 <Link href="/support" className="font-semibold underline underline-offset-4">
                   Contact support
@@ -98,7 +98,7 @@ export default function ForgotPasswordPage() {
               <div className="mt-8 text-center">
                 <Link
                   href="/auth"
-                  className="text-base text-[#2E00AB] underline underline-offset-4 sm:text-[18px]"
+                  className="text-base text-[#152A51] underline underline-offset-4 sm:text-[18px]"
                 >
                   ← Back to login options
                 </Link>

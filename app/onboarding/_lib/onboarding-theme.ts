@@ -25,10 +25,11 @@ export const MEDICATION_BADGE_ACCENTS = [
   ONBOARDING.badgeOrchid,
 ] as const;
 
-/** Rounded frame for DB medicine product shots (Figma blue-gray surface). */
+/** Unified rounded frame with Figma blue-slate background surface. */
 export const medicineImageFrameClass = "relative overflow-hidden rounded-[20px] bg-[#5A778D]";
 
-export const medicineImageFitClass = "object-contain p-4 sm:p-6";
+/** Standardized crop: Top-aligned and zoomed to cut lower body at Figma specification. */
+export const medicineImageFitClass = "object-cover object-top scale-110";
 
 /** Shared label / control classes for Figma-styled form fields. */
 export const fieldLabelClass = "text-[14px] font-normal leading-none text-[#152A51]";

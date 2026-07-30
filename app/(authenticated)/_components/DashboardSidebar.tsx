@@ -27,12 +27,11 @@ export default function DashboardSidebar({ className, onNavigate }: DashboardSid
   return (
     <aside
       className={cn(
-        // Figma: 260px width (parent), fill height, space-between, padding 24/20/20/20,
-        // bg #FFFFFF, border-right 1px #E5E7EB
         "flex h-full w-full flex-col justify-between border-r border-[#E5E7EB] bg-white px-5 pb-5 pt-6",
         className,
       )}
     >
+      {/* Top navigation container that scrolls internally if items exceed height */}
       <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide">
         <div className="flex justify-center">
           <Image src="/logo.svg" alt="BodyInc" width={128} height={40} priority />

@@ -18,7 +18,8 @@ export default function DashboardShell({ children }: DashboardShellProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   return (
-    <div className="dashboard-font flex min-h-screen flex-col overflow-x-hidden bg-white lg:flex-row">
+    // Change min-h-screen to h-screen overflow-hidden
+    <div className="dashboard-font flex h-screen overflow-hidden bg-white lg:flex-row">
       <div className="flex items-center justify-between border-b border-[#E5E7EB] bg-white px-4 py-2.5 lg:hidden">
         <Image src="/logo.svg" alt="BodyInc" width={96} height={30} priority />
         <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
@@ -34,12 +35,13 @@ export default function DashboardShell({ children }: DashboardShellProps) {
         </Sheet>
       </div>
 
-      {/* Figma sidebar: fixed 260px, white, right border only — no rounded inset */}
-      <aside className="hidden lg:flex lg:w-[260px] lg:min-w-[260px] lg:max-w-[260px] lg:shrink-0">
-        <DashboardSidebar className="sticky top-0 h-dvh w-full" />
+      {/* Sidebar container strictly locked to full height */}
+      <aside className="hidden lg:flex lg:h-full lg:w-[260px] lg:min-w-[260px] lg:max-w-[260px] lg:shrink-0">
+        <DashboardSidebar className="h-full w-full" />
       </aside>
 
-      <div className="min-w-0 flex-1 overflow-x-hidden">{children}</div>
+      {/* Dashboard area scrolls independently when content overflows */}
+      <div className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden">{children}</div>
     </div>
   );
 }

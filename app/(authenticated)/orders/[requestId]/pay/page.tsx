@@ -25,25 +25,25 @@ export default async function AdditionalPaymentPage({
   });
 
   return (
-    <main className="min-w-0 flex-1 bg-[#FAF8FF] p-3 sm:p-4">
+    <main className="min-w-0 flex-1 bg-[#F3F6F6] p-3 sm:p-4">
       <div className="mx-auto max-w-lg space-y-4">
-        <Link href="/my-meds" className="text-sm font-medium text-[#2E00AB] hover:opacity-80">
+        <Link href="/my-meds" className="text-sm font-medium text-[#152A51] hover:opacity-80">
           ← Back to My Meds
         </Link>
 
         {!intent ? (
-          <div className="rounded-xl border border-[#2E00AB]/15 bg-white p-6 text-center text-sm text-[#2E00AB]/70">
+          <div className="rounded-xl border border-[#152A51]/15 bg-white p-6 text-center text-sm text-[#152A51]/70">
             There&apos;s no payment due on this order.
           </div>
         ) : (
           <>
             <div className="space-y-1">
-              <h1 className="text-xl font-semibold text-[#2E00AB]">Additional payment</h1>
-              <p className="text-sm text-[#2E00AB]/70">
+              <h1 className="text-xl font-semibold text-[#152A51]">Additional payment</h1>
+              <p className="text-sm text-[#152A51]/70">
                 {intent.reason ?? `Price difference for ${intent.medicineName}`}
               </p>
-              <p className="text-2xl font-bold text-[#2E00AB]">{money(intent.amountCents)}</p>
-              <p className="text-xs text-[#2E00AB]/60">
+              <p className="text-2xl font-bold text-[#152A51]">{money(intent.amountCents)}</p>
+              <p className="text-xs text-[#152A51]/60">
                 Once this is paid, your prescription will be generated and sent for fulfillment.
               </p>
             </div>
