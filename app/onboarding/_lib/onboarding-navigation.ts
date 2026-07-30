@@ -8,10 +8,10 @@ export const ONBOARDING_STEPS = [
   { id: "goal", path: "/onboarding/goal" },
   { id: "demographics", path: "/onboarding/demographics" },
   { id: "bmi", path: "/onboarding/bmi" },
-  { id: "medications", path: "/onboarding/medications" },
+  { id: "questionnaire", path: "/onboarding/questionnaire" },
   { id: "personal-info", path: "/onboarding/personal-info" },
   { id: "delivery-address", path: "/onboarding/delivery-address" },
-  { id: "questionnaire", path: "/onboarding/questionnaire" },
+  { id: "medications", path: "/onboarding/medications" },
   { id: "select-plan", path: "/onboarding/select-plan" },
   { id: "billing-checkout", path: "/onboarding/billing-checkout" },
   { id: "order-confirmation", path: "/onboarding/order-confirmation" },
@@ -79,8 +79,14 @@ export function getNextStepPath(currentPath: string, state: OnboardingState): st
   const current = getStepByPath(currentPath);
   if (!current) return null;
 
-  if (current.id === "delivery-address") {
-    return includesQuestionnaire(state) ? "/onboarding/questionnaire" : "/onboarding/select-plan";
+  if (current.id === "bmi") {
+    return includesQuestionnaire(state) ? "/onboarding/questionnaire" : "/onboarding/personal-info";
+  }
+
+  if (current.id === "questionnaire") {
+    // Ineligible patients stay on questionnaire; eligible/complete continue to personal info.
+    if (!isQuestionnaireComplete(state)) return null;
+    return "/onboarding/personal-info";
   }
 
   const index = getStepIndex(currentPath);
@@ -92,10 +98,12 @@ export function getPrevStepPath(currentPath: string, state: OnboardingState): st
   const current = getStepByPath(currentPath);
   if (!current) return null;
 
-  if (current.id === "select-plan") {
-    return includesQuestionnaire(state)
-      ? "/onboarding/questionnaire"
-      : "/onboarding/delivery-address";
+  if (current.id === "personal-info") {
+    return includesQuestionnaire(state) ? "/onboarding/questionnaire" : "/onboarding/bmi";
+  }
+
+  if (current.id === "questionnaire") {
+    return "/onboarding/bmi";
   }
 
   const index = getStepIndex(currentPath);
@@ -107,14 +115,14 @@ export function getEarliestIncompleteStep(state: OnboardingState): string {
   if (!state.goalId) return "/onboarding/goal";
   if (!state.state || !state.sex || !state.dob) return "/onboarding/demographics";
   if (!isBmiComplete(state)) return "/onboarding/bmi";
-  if (!state.medicationId) return "/onboarding/medications";
-  if (!state.fullName || !state.email) return "/onboarding/personal-info";
-  if (!isAddressComplete(state)) return "/onboarding/delivery-address";
 
   if (includesQuestionnaire(state) && !isQuestionnaireComplete(state)) {
     return "/onboarding/questionnaire";
   }
 
+  if (!state.fullName || !state.email) return "/onboarding/personal-info";
+  if (!isAddressComplete(state)) return "/onboarding/delivery-address";
+  if (!state.medicationId) return "/onboarding/medications";
   if (!state.selectedPackageId) return "/onboarding/select-plan";
   if (!state.checkoutConfirmed) return "/onboarding/billing-checkout";
   return "/onboarding/order-confirmation";

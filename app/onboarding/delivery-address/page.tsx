@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { getCategoryRequiresQuestionnaire, saveIntakeAddress } from "@/lib/actions/intake";
+import { saveIntakeAddress } from "@/lib/actions/intake";
 import { PHONE_SCHEMA } from "@/lib/validation";
 
 import OnboardingStepLayout from "../_components/OnboardingStepLayout";
@@ -143,15 +143,8 @@ export default function DeliveryAddressPage() {
       return;
     }
 
-    let requiresQuestionnaire = state.requiresQuestionnaire;
-    if (state.goalId) {
-      const req = await getCategoryRequiresQuestionnaire(state.goalId);
-      if (req.ok) requiresQuestionnaire = req.data;
-    }
-
-    const navState = { ...state, ...patch, requiresQuestionnaire };
-    updateState({ ...patch, requiresQuestionnaire });
-    const next = getNextStepPath("/onboarding/delivery-address", navState);
+    updateState(patch);
+    const next = getNextStepPath("/onboarding/delivery-address", { ...state, ...patch });
     if (next) await pushOnboardingRoute(router, next);
   }
 

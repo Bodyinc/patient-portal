@@ -81,8 +81,7 @@ export default function QuestionnairePage() {
 
     if (questionnaire) {
       // Discovering a questionnaire should mark it as required, but must not erase a
-      // completion that was just saved. Resetting questionnaireComplete here caused
-      // the step guard to send patients back from select-plan/confirmation.
+      // completion that was just saved.
       if (!state.requiresQuestionnaire) {
         updateState({ requiresQuestionnaire: true });
       }
@@ -91,11 +90,9 @@ export default function QuestionnairePage() {
 
     if (!isSuccess || questionnaire !== null) return;
 
-    if (state.requiresQuestionnaire) {
-      updateState({ requiresQuestionnaire: false, questionnaireComplete: true });
-      toast.error("No questionnaire is available for this goal.");
-    }
-    replaceOnboardingRoute(router, "/onboarding/select-plan");
+    // No questionnaire for this goal — skip to personal info.
+    updateState({ requiresQuestionnaire: false, questionnaireComplete: true });
+    replaceOnboardingRoute(router, "/onboarding/personal-info");
   }, [
     hydrated,
     isLoading,
@@ -111,8 +108,8 @@ export default function QuestionnairePage() {
   }
 
   async function handleContinue() {
-    if (!questionnaire || !state.medicationId) {
-      await pushOnboardingRoute(router, "/onboarding/select-plan");
+    if (!questionnaire) {
+      await pushOnboardingRoute(router, "/onboarding/personal-info");
       return;
     }
 
@@ -128,14 +125,15 @@ export default function QuestionnairePage() {
       toResponseInput(q.id, q.questionType, answers[q.id] ?? {}),
     );
 
-    const saveResult = await saveQuestionnaireResponses(state.medicationId, responses);
+    // Goal-level save/evaluate — medicine is chosen later in the flow.
+    const saveResult = await saveQuestionnaireResponses(null, responses);
     if (!saveResult.ok) {
       setSaving(false);
       toast.error(saveResult.message);
       return;
     }
 
-    const eligibilityResult = await evaluateMedicineEligibility(state.medicationId);
+    const eligibilityResult = await evaluateMedicineEligibility(null);
     setSaving(false);
 
     if (!eligibilityResult.ok) {
@@ -144,13 +142,13 @@ export default function QuestionnairePage() {
     }
 
     if (eligibilityResult.data.result === "ineligible") {
-      toast.error(eligibilityResult.data.reason ?? "You are not eligible for this medication.");
+      toast.error(eligibilityResult.data.reason ?? "You are not eligible for this treatment.");
       updateState({
         questionnaireAnswers: answers,
         eligibilityResult: eligibilityResult.data.result,
         questionnaireComplete: false,
       });
-      await pushOnboardingRoute(router, "/onboarding/medications");
+      // Stay on questionnaire — do not open personal info / shipping / medicine.
       return;
     }
 
@@ -194,7 +192,7 @@ export default function QuestionnairePage() {
     );
   }
 
-  if (!questionnaire || !state.medicationId) {
+  if (!questionnaire) {
     return (
       <div className="flex flex-1 items-center justify-center px-4">
         <p className="text-[14px] text-[#152A51]/70 onboarding-font">Redirecting…</p>

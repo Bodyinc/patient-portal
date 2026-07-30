@@ -221,9 +221,15 @@ async function buildIntakeSummary(
     (medicineLinkResult.data as { medicines?: { id: string; name: string } | null } | null)
       ?.medicines ?? null;
   const packageData = packageResult.data;
+  // Prefer medicine-scoped eligibility; fall back to goal-level (null medicine_id) results
+  // recorded when the questionnaire ran before medicine selection.
+  const eligibilityRaw = eligibilityResult.data;
   const eligibility =
-    eligibilityResult.data && eligibilityResult.data.medicine_id === medicineId
-      ? eligibilityResult.data
+    eligibilityRaw &&
+    (eligibilityRaw.medicine_id === medicineId ||
+      eligibilityRaw.medicine_id === null ||
+      medicineId === null)
+      ? eligibilityRaw
       : null;
 
   const requiresQuestionnaire = categoryLink?.category_id
@@ -513,30 +519,15 @@ export async function saveIntakeCategory(
     return { ok: false, code: "not_found", message: "Category not found" };
   }
 
-  const { data: priorMedicineLinks } = await supabaseAdmin
-    .from("intake_session_medicines")
-    .select("medicine_id")
-    .eq("session_id", sessionId);
-
-  const priorMedicineIds = (priorMedicineLinks ?? []).map((l) => l.medicine_id);
-
+  // Clear all questionnaire / eligibility for this session (medicine-scoped and goal-level).
   await Promise.all([
     supabaseAdmin.from("intake_session_categories").delete().eq("session_id", sessionId),
     supabaseAdmin.from("intake_session_medicines").delete().eq("session_id", sessionId),
-    priorMedicineIds.length > 0
-      ? supabaseAdmin
-          .from("intake_session_questionnaire_responses")
-          .delete()
-          .eq("session_id", sessionId)
-          .in("medicine_id", priorMedicineIds)
-      : Promise.resolve(),
-    priorMedicineIds.length > 0
-      ? supabaseAdmin
-          .from("intake_session_eligibility_results")
-          .delete()
-          .eq("session_id", sessionId)
-          .in("medicine_id", priorMedicineIds)
-      : Promise.resolve(),
+    supabaseAdmin
+      .from("intake_session_questionnaire_responses")
+      .delete()
+      .eq("session_id", sessionId),
+    supabaseAdmin.from("intake_session_eligibility_results").delete().eq("session_id", sessionId),
     supabaseAdmin.from("intake_sessions").update({ selected_plan_id: null }).eq("id", sessionId),
   ]);
 
@@ -667,22 +658,12 @@ export async function saveIntakeMedicine(
     return { ok: false, code: "not_found", message: "Medicine not found" };
   }
 
-  await Promise.all([
-    supabaseAdmin
-      .from("intake_session_questionnaire_responses")
-      .delete()
-      .eq("session_id", sessionResult.session.id)
-      .eq("medicine_id", medicineId),
-    supabaseAdmin
-      .from("intake_session_eligibility_results")
-      .delete()
-      .eq("session_id", sessionResult.session.id)
-      .eq("medicine_id", medicineId),
-    supabaseAdmin
-      .from("intake_sessions")
-      .update({ selected_plan_id: null })
-      .eq("id", sessionResult.session.id),
-  ]);
+  // Clear any previously selected plan; questionnaire/eligibility are goal-level and
+  // will be reassigned to this medicine below (not wiped).
+  await supabaseAdmin
+    .from("intake_sessions")
+    .update({ selected_plan_id: null })
+    .eq("id", sessionResult.session.id);
 
   const { data: existingLinks } = await supabaseAdmin
     .from("intake_session_medicines")
@@ -713,6 +694,19 @@ export async function saveIntakeMedicine(
   if (error) {
     return { ok: false, code: "save_error", message: error.message };
   }
+
+  // Attach (or re-attach) session questionnaire / eligibility rows to the selected
+  // medicine so downstream checkout checks that expect medicine_id continue to work.
+  await Promise.all([
+    supabaseAdmin
+      .from("intake_session_questionnaire_responses")
+      .update({ medicine_id: medicineId })
+      .eq("session_id", sessionResult.session.id),
+    supabaseAdmin
+      .from("intake_session_eligibility_results")
+      .update({ medicine_id: medicineId })
+      .eq("session_id", sessionResult.session.id),
+  ]);
 
   return { ok: true, data: { medicineId: medicine.id } };
 }
@@ -960,8 +954,14 @@ export async function getQuestionnaireForMedicine(
   return getQuestionnaireForCategory(slug);
 }
 
+/**
+ * Persist questionnaire answers for the current intake session.
+ * Pass `medicineId: null` when the patient has not chosen a medicine yet
+ * (goal-level screening after BMI). Questionnaire is session-scoped: prior
+ * answers for the session are always replaced.
+ */
 export async function saveQuestionnaireResponses(
-  medicineId: string,
+  medicineId: string | null,
   responses: QuestionnaireResponseInput[],
 ): Promise<IntakeActionResult<{ saved: number }>> {
   const sessionResult = await requireIntakeSession();
@@ -969,11 +969,12 @@ export async function saveQuestionnaireResponses(
     return { ok: false, code: "session_error", message: sessionResult.error };
   }
 
+  const sessionId = sessionResult.session.id;
+
   await supabaseAdmin
     .from("intake_session_questionnaire_responses")
     .delete()
-    .eq("session_id", sessionResult.session.id)
-    .eq("medicine_id", medicineId);
+    .eq("session_id", sessionId);
 
   const MAX_ANSWER_TEXT = 5000;
   const rows = responses.map((response) => {
@@ -986,7 +987,7 @@ export async function saveQuestionnaireResponses(
         ? response.answerNumber
         : null;
     return {
-      session_id: sessionResult.session.id,
+      session_id: sessionId,
       medicine_id: medicineId,
       question_id: response.questionId,
       answer_text: answerText,
@@ -1009,8 +1010,13 @@ export async function saveQuestionnaireResponses(
   return { ok: true, data: { saved: rows.length } };
 }
 
+/**
+ * Evaluate eligibility for the current session.
+ * Pass `medicineId: null` for goal-level evaluation before medicine selection.
+ * Responses are loaded session-wide (goal-level questionnaire).
+ */
 export async function evaluateMedicineEligibility(
-  medicineId: string,
+  medicineId: string | null = null,
 ): Promise<IntakeActionResult<EligibilityResultDto>> {
   const sessionResult = await requireIntakeSession();
   if ("error" in sessionResult) {
@@ -1026,8 +1032,7 @@ export async function evaluateMedicineEligibility(
   const { data: responses } = await supabaseAdmin
     .from("intake_session_questionnaire_responses")
     .select("question_id, answer_option_ids, answer_boolean, answer_text, answer_number")
-    .eq("session_id", session.id)
-    .eq("medicine_id", medicineId);
+    .eq("session_id", session.id);
 
   let questionnaireResult: EligibilityResultDto = { result: "eligible", reason: null };
 
@@ -1067,6 +1072,12 @@ export async function evaluateMedicineEligibility(
   }
 
   const finalResult = combineEligibilityResults([categoryResult, questionnaireResult]);
+
+  // Replace prior eligibility for this session so hydration picks up the latest row.
+  await supabaseAdmin
+    .from("intake_session_eligibility_results")
+    .delete()
+    .eq("session_id", session.id);
 
   await supabaseAdmin.from("intake_session_eligibility_results").insert({
     session_id: session.id,

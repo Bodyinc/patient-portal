@@ -67,13 +67,11 @@ export default function MedicationsPage() {
       return;
     }
 
+    // Preserve goal-level questionnaire answers and eligibility; only reset plan/checkout.
     const patch = {
       medicationId: selected,
       variantId: selectedVariantId,
-      questionnaireAnswers: {},
-      questionnaireComplete: false,
       selectedPackageId: null,
-      eligibilityResult: null,
       checkoutConfirmed: false,
     };
     updateState(patch);

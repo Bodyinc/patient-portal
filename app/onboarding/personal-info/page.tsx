@@ -3,7 +3,6 @@
 import { Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -16,10 +15,6 @@ import { checkPatientEmail } from "@/lib/actions/patient-auth";
 import { wrongPortalMessage } from "@/lib/auth/constants";
 
 import OnboardingStepLayout from "../_components/OnboardingStepLayout";
-import {
-  prefetchPackagesForMedicine,
-  prefetchQuestionnaireForCategory,
-} from "../_lib/intake-query";
 import {
   getNextStepPath,
   getPrevStepPath,
@@ -47,7 +42,6 @@ const fieldControlClass =
 
 export default function PersonalInfoPage() {
   const router = useRouter();
-  const queryClient = useQueryClient();
   const { state, updateState, hydrated } = useOnboarding();
   const [saving, setSaving] = useState(false);
   const [emailError, setEmailError] = useState<ReactNode | null>(null);
@@ -121,14 +115,7 @@ export default function PersonalInfoPage() {
     }
 
     updateState(contact);
-    await Promise.all([
-      state.goalId && state.requiresQuestionnaire
-        ? prefetchQuestionnaireForCategory(queryClient, state.goalId)
-        : Promise.resolve(),
-      state.medicationId
-        ? prefetchPackagesForMedicine(queryClient, state.medicationId)
-        : Promise.resolve(),
-    ]);
+    // Next step is shipping; medicine/packages come later in the flow.
     const next = getNextStepPath("/onboarding/personal-info", { ...state, ...contact });
     if (next) await pushOnboardingRoute(router, next);
   }

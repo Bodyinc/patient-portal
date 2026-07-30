@@ -50,10 +50,6 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  if (pathname.startsWith("/onboarding")) {
-    return supabaseResponse;
-  }
-
   // Middleware only routes; pages re-verify with getUser(). Reading the session from
   // the cookie is local and free — we only hit the auth server when the access token
   // is missing/near expiry (which also refreshes the cookie).
@@ -66,6 +62,24 @@ export async function updateSession(request: NextRequest) {
   if (session && expiresAtMs - Date.now() < 60_000) {
     const { data } = await supabase.auth.getUser();
     user = data.user;
+  }
+
+  if (pathname.startsWith("/onboarding")) {
+    // Checkout authenticates a new patient before showing these final onboarding
+    // pages, so they must remain available. All other onboarding pages are guest-only.
+    const isCheckoutCompletionPath =
+      pathname === "/onboarding/checkout-complete" || pathname === "/onboarding/order-confirmation";
+
+    if (user && !isCheckoutCompletionPath) {
+      // Verify the cookie-backed session before redirecting. This avoids trapping a
+      // visitor whose account was deleted or deactivated while a stale cookie remains.
+      const { data: verified } = await supabase.auth.getUser();
+      if (verified.user) {
+        return redirectWithCookies(request, "/dashboard", supabaseResponse);
+      }
+    }
+
+    return supabaseResponse;
   }
 
   if (isProtectedPath(pathname) && !user) {
