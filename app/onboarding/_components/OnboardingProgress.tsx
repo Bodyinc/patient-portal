@@ -12,12 +12,12 @@ export default function OnboardingProgress() {
 
   return (
     <div className="mb-3 shrink-0 sm:mb-4">
-      <div className="mb-2 flex flex-wrap justify-between gap-2 text-[12px] text-[#152A51]/80 onboarding-font sm:text-sm">
+      {/* <div className="mb-2 flex flex-wrap justify-between gap-2 text-[12px] text-[#152A51]/80 onboarding-font sm:text-sm">
         <span>
           Step {current} of {total}
         </span>
         <span>{percent}% Complete</span>
-      </div>
+      </div> */}
       <div
         className="h-[3px] w-full overflow-hidden rounded-full bg-[#E9EBEF]"
         role="progressbar"

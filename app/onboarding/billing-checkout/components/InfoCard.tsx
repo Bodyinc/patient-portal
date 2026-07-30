@@ -13,12 +13,12 @@ export default function InfoCard({ title, items }: InfoCardProps) {
     <div className="rounded-[14px] border border-[#E8E8E8] bg-white p-4 onboarding-font">
       <div className="mb-3 flex items-center justify-between border-b border-[#E8E8E8] pb-2">
         <h2 className="text-[15px] font-medium text-[#152A51] sm:text-[16px]">{title}</h2>
-        <button
+        {/* <button
           type="button"
           className="text-[12px] font-medium text-[#152A51] underline underline-offset-2 hover:opacity-80"
         >
           Edit
-        </button>
+        </button> */}
       </div>
 
       <div className="space-y-2.5">

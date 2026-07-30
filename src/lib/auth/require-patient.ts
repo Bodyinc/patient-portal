@@ -3,7 +3,7 @@ import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { ensurePatientRole } from "@/lib/actions/patient-auth";
-import { PORTAL_ROLE, WRONG_PORTAL_GENERIC_MESSAGE } from "@/lib/auth/constants";
+import { PORTAL_ROLE } from "@/lib/auth/constants";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { AppRole } from "@/lib/auth/constants";

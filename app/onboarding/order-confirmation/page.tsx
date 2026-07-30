@@ -5,7 +5,7 @@ import { completeIntakeSession } from "@/lib/actions/intake";
 
 import ConfirmationHeader from "./components/ConfirmationHeader";
 import OrderSummary from "./components/OrderSummary";
-import ActionButtons from "./components/ActionButtons";
+import ConfirmationPasswordGate from "./components/ConfirmationPasswordGate";
 
 export default function OrderConfirmationPage() {
   const completedRef = useRef(false);
@@ -27,13 +27,13 @@ export default function OrderConfirmationPage() {
 
       {/* Flex layout with items-start forces columns to maintain their natural content height */}
       <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
-        {/* Left Column - Form & Buttons area takes up remaining space */}
-        <div className="w-full flex-1 flex flex-col gap-6">
-          <ActionButtons />
+        {/* Left Column - password setup first, then dashboard actions after success */}
+        <div className="flex w-full flex-1 flex-col gap-6">
+          <ConfirmationPasswordGate />
         </div>
 
         {/* Right Column - Fixed desktop width for the summary card */}
-        <div className="w-full md:w-[380px] shrink-0">
+        <div className="w-full shrink-0 md:w-[380px]">
           <OrderSummary />
         </div>
       </div>

@@ -3,14 +3,12 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import {
-  claimCheckoutForCurrentUser,
-  preparePostCheckoutAccount,
-} from "@/lib/actions/patient-auth";
+import { claimCheckoutForCurrentUser } from "@/lib/actions/patient-auth";
 import { createClient } from "@/lib/supabase/client";
+import { finishGuestCheckoutSession } from "../_lib/finish-guest-checkout";
 import { useOnboarding } from "../_lib/onboarding-store";
 
-const ORDER_CONFIRMATION_REDIRECT = "/order-confirmation";
+const ORDER_CONFIRMATION_REDIRECT = "/onboarding/order-confirmation";
 
 function StatusScreen({ message }: { message: string }) {
   return (
@@ -46,29 +44,19 @@ function CheckoutCompleteInner() {
       } = await supabase.auth.getUser();
       if (user) {
         await claimCheckoutForCurrentUser();
-        updateState({ checkoutConfirmed: true });
+        updateState({ questionnaireComplete: true, checkoutConfirmed: true });
         router.push(ORDER_CONFIRMATION_REDIRECT);
         return;
       }
 
-      const accountResult = await preparePostCheckoutAccount();
-      if (!accountResult.ok) {
-        setMessage(accountResult.message);
+      const sessionResult = await finishGuestCheckoutSession();
+      if (!sessionResult.ok) {
+        setMessage(sessionResult.message);
         return;
       }
 
-      const { error: otpError } = await supabase.auth.signInWithOtp({ email: accountResult.email });
-      if (otpError) {
-        setMessage(otpError.message);
-        return;
-      }
-
-      updateState({ checkoutConfirmed: true });
-      router.push(
-        `/verify-otp?email=${encodeURIComponent(accountResult.email)}&redirect=${encodeURIComponent(
-          ORDER_CONFIRMATION_REDIRECT,
-        )}`,
-      );
+      updateState({ questionnaireComplete: true, checkoutConfirmed: true });
+      router.push(ORDER_CONFIRMATION_REDIRECT);
     })();
   }, [params, router, supabase, updateState]);
 

@@ -1,33 +1,57 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { createOnboardingSubscription, getCheckoutDiscount } from "@/lib/actions/stripe-checkout";
-import { getPublicFees } from "@/lib/actions/fees";
 import {
-  claimCheckoutForCurrentUser,
-  preparePostCheckoutAccount,
-} from "@/lib/actions/patient-auth";
+  createOnboardingSubscription,
+  getCheckoutDiscount,
+  type OnboardingSubscriptionResult,
+} from "@/lib/actions/stripe-checkout";
+import { getPublicFees } from "@/lib/actions/fees";
+import { claimCheckoutForCurrentUser } from "@/lib/actions/patient-auth";
+import { getStripeJs } from "@/lib/stripe/client";
 import { createClient } from "@/lib/supabase/client";
 
 import OnboardingFooter from "../_components/OnboardingFooter";
 import OnboardingFrame from "../_components/OnboardingFrame";
 import PageHeader from "./components/PageHeader";
 import InfoCard from "./components/InfoCard";
-import PaymentForm from "./components/PaymentForm";
 import OnboardingPaymentForm from "./components/OnboardingPaymentForm";
 import OrderSummary from "./components/OrderSummary";
+import PaymentFormSkeleton from "./components/PaymentFormSkeleton";
 import TermsCheckbox from "./components/TermsCheckbox";
 import CheckoutReassurance from "./components/CheckoutReassurance";
 import { useIntakeSummary } from "../_hooks/use-intake-catalog";
+import { finishGuestCheckoutSession } from "../_lib/finish-guest-checkout";
 import { calculateCheckoutPricing } from "../_lib/intake-pricing";
 import { getStateName } from "../_lib/onboarding-config";
 import { getPrevStepPath } from "../_lib/onboarding-navigation";
 import { useOnboarding } from "../_lib/onboarding-store";
 
-const ORDER_CONFIRMATION_REDIRECT = "/order-confirmation";
+const ORDER_CONFIRMATION_REDIRECT = "/onboarding/order-confirmation";
+
+/** Module-level cache so Strict Mode remounts reuse the same in-flight subscription create. */
+const paymentInitCache = new Map<string, Promise<OnboardingSubscriptionResult>>();
+
+function getPaymentInitPromise(
+  packageId: string,
+  promoCode: string | null,
+  retryToken: number,
+): Promise<OnboardingSubscriptionResult> {
+  const key = `${packageId}::${promoCode ?? ""}::${retryToken}`;
+  let pending = paymentInitCache.get(key);
+  if (!pending) {
+    pending = createOnboardingSubscription(promoCode);
+    paymentInitCache.set(key, pending);
+    // Drop failed entries so retry can recreate.
+    pending.then((result) => {
+      if (!result.ok) paymentInitCache.delete(key);
+    });
+  }
+  return pending;
+}
 
 export default function BillingCheckoutPage() {
   const router = useRouter();
@@ -35,8 +59,9 @@ export default function BillingCheckoutPage() {
   const { state, updateState } = useOnboarding();
   const { data: summary } = useIntakeSummary();
   const [consentAccepted, setConsentAccepted] = useState(false);
-  const [confirming, setConfirming] = useState(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [paymentLoading, setPaymentLoading] = useState(true);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
   const [promoCode, setPromoCode] = useState("");
   const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
   const [applyingPromo, setApplyingPromo] = useState(false);
@@ -45,6 +70,13 @@ export default function BillingCheckoutPage() {
   const [discountAmount, setDiscountAmount] = useState(0);
   const [discountLabel, setDiscountLabel] = useState<string | null>(null);
   const [renewalShippingCents, setRenewalShippingCents] = useState(0);
+  const [retryToken, setRetryToken] = useState(0);
+  const paymentInitSeq = useRef(0);
+
+  // Warm Stripe.js as soon as the checkout page mounts.
+  useEffect(() => {
+    void getStripeJs();
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -79,6 +111,37 @@ export default function BillingCheckoutPage() {
     };
   }, [packageId, appliedPromoCode]);
 
+  // Preload Stripe Payment Element as soon as the package is known.
+  useEffect(() => {
+    if (!packageId) return;
+
+    const seq = ++paymentInitSeq.current;
+    let cancelled = false;
+
+    setPaymentLoading(true);
+    setPaymentError(null);
+    setClientSecret(null);
+
+    void getPaymentInitPromise(packageId, appliedPromoCode, retryToken).then((result) => {
+      if (cancelled || seq !== paymentInitSeq.current) return;
+      if (!result.ok) {
+        setPaymentError(result.message);
+        setPaymentLoading(false);
+        return;
+      }
+      setClientSecret(result.clientSecret);
+      setPaymentLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [packageId, appliedPromoCode, retryToken]);
+
+  const retryPaymentInit = useCallback(() => {
+    setRetryToken((t) => t + 1);
+  }, []);
+
   async function handleApplyPromo() {
     setPromoError(null);
     setPromoMessage(null);
@@ -99,69 +162,52 @@ export default function BillingCheckoutPage() {
     toast.success(`Promo ${d.label} applied`);
   }
 
-  async function handleContinueToPayment() {
-    if (!consentAccepted) {
-      toast.error("Please accept the Terms & Conditions and Privacy Policy to continue");
-      return;
-    }
-
-    setConfirming(true);
-    const result = await createOnboardingSubscription(appliedPromoCode);
-    setConfirming(false);
-
-    if (!result.ok) {
-      toast.error(result.message);
-      return;
-    }
-
-    setClientSecret(result.clientSecret);
-    toast.success("Enter your card details below to complete payment.");
-  }
-
   async function handlePaid() {
-    setConfirming(true);
-
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
     if (user) {
       await claimCheckoutForCurrentUser();
-      updateState({ checkoutConfirmed: true });
+      // Reaching successful payment proves every prior onboarding gate was completed.
+      // Persist questionnaire completion too so stale client state cannot send the
+      // patient backward while navigating to confirmation.
+      updateState({ questionnaireComplete: true, checkoutConfirmed: true });
       toast.success("Payment confirmed.");
       router.push(ORDER_CONFIRMATION_REDIRECT);
       return;
     }
 
-    const accountResult = await preparePostCheckoutAccount();
-    if (!accountResult.ok) {
-      setConfirming(false);
-      toast.error(accountResult.message);
+    const sessionResult = await finishGuestCheckoutSession();
+    if (!sessionResult.ok) {
+      toast.error(sessionResult.message);
       return;
     }
 
-    const { error: otpError } = await supabase.auth.signInWithOtp({
-      email: accountResult.email,
-    });
-
-    if (otpError) {
-      setConfirming(false);
-      toast.error(otpError.message);
-      return;
-    }
-
-    updateState({ checkoutConfirmed: true });
-    toast.success("Payment confirmed. We sent a login code to your email.");
-
-    router.push(
-      `/verify-otp?email=${encodeURIComponent(accountResult.email)}&redirect=${encodeURIComponent(ORDER_CONFIRMATION_REDIRECT)}`,
-    );
+    updateState({ questionnaireComplete: true, checkoutConfirmed: true });
+    toast.success("Payment confirmed.");
+    router.push(ORDER_CONFIRMATION_REDIRECT);
   }
 
   function handleBack() {
     const prev = getPrevStepPath("/onboarding/billing-checkout", state);
     if (prev) router.push(prev);
   }
+
+  const paymentReady = Boolean(clientSecret) && !paymentLoading && !paymentError;
+  const showPaymentForm = paymentReady && consentAccepted;
+  const showSkeleton = !paymentError && (!consentAccepted || !paymentReady);
+  const skeletonHint = !consentAccepted
+    ? paymentReady
+      ? "Accept the Terms & Conditions above to enter your card details."
+      : "Preparing secure payment…"
+    : paymentLoading || !packageId
+      ? "Loading secure payment form…"
+      : "Updating payment for your promo…";
+
+  const returnUrl = `${
+    typeof window !== "undefined" ? window.location.origin : ""
+  }/onboarding/checkout-complete`;
 
   return (
     <OnboardingFrame
@@ -205,21 +251,57 @@ export default function BillingCheckoutPage() {
               />
             </div>
 
-            <div className="shrink-0">
-              {clientSecret ? (
-                <OnboardingPaymentForm
-                  clientSecret={clientSecret}
-                  returnUrl={`${
-                    typeof window !== "undefined" ? window.location.origin : ""
-                  }/onboarding/checkout-complete`}
-                  onPaid={() => void handlePaid()}
-                />
-              ) : (
-                <PaymentForm />
-              )}
+            <TermsCheckbox checked={consentAccepted} onChange={setConsentAccepted} />
+
+            <div className="relative shrink-0">
+              {paymentError ? (
+                <div className="rounded-[14px] border border-[#E8E8E8] bg-white p-4 onboarding-font">
+                  <h2 className="mb-2 text-[15px] font-medium text-[#152A51] sm:text-[16px]">
+                    Payment Details
+                  </h2>
+                  <div className="space-y-2">
+                    <p className="text-[13px] text-red-600">{paymentError}</p>
+                    <button
+                      type="button"
+                      onClick={retryPaymentInit}
+                      className="text-[13px] font-medium text-[#152A51] underline"
+                    >
+                      Try again
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Mount as soon as clientSecret exists so Stripe iframes warm under the skeleton. */}
+              {clientSecret && !paymentError ? (
+                <div
+                  className={showPaymentForm ? undefined : "pointer-events-none select-none"}
+                  aria-hidden={!showPaymentForm || undefined}
+                >
+                  <OnboardingPaymentForm
+                    key={clientSecret}
+                    clientSecret={clientSecret}
+                    returnUrl={returnUrl}
+                    consentAccepted={consentAccepted}
+                    onPaid={() => void handlePaid()}
+                  />
+                </div>
+              ) : null}
+
+              {/* Skeleton covers the warming form until consent + ready; stands alone while loading. */}
+              {showSkeleton ? (
+                <div
+                  className={
+                    clientSecret && !paymentError
+                      ? "absolute inset-0 z-10 overflow-hidden rounded-[14px] bg-white"
+                      : undefined
+                  }
+                >
+                  <PaymentFormSkeleton hint={skeletonHint} />
+                </div>
+              ) : null}
             </div>
 
-            <TermsCheckbox checked={consentAccepted} onChange={setConsentAccepted} />
             <CheckoutReassurance />
           </div>
 
@@ -237,10 +319,7 @@ export default function BillingCheckoutPage() {
               promoMessage={promoMessage}
               promoError={promoError}
               applyingPromo={applyingPromo}
-              consentAccepted={consentAccepted}
-              confirming={confirming}
               loading={summary?.packagePrice == null}
-              hideContinue={Boolean(clientSecret)}
               renewalShippingCents={renewalShippingCents}
               onPromoCodeChange={(value) => {
                 setPromoCode(value);
@@ -248,7 +327,6 @@ export default function BillingCheckoutPage() {
                 setPromoMessage(null);
               }}
               onApplyPromo={handleApplyPromo}
-              onContinue={() => void handleContinueToPayment()}
             />
           </div>
         </div>

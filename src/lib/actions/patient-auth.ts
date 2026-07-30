@@ -22,6 +22,14 @@ export type PostCheckoutAccountResult =
   | { ok: true; email: string; created: boolean }
   | { ok: false; code: "session_error" | "incomplete" | "wrong_portal" | "error"; message: string };
 
+export type CompletePostCheckoutSignInResult =
+  | { ok: true; email: string; tokenHash: string }
+  | {
+      ok: false;
+      code: "session_error" | "incomplete" | "wrong_portal" | "existing_account" | "error";
+      message: string;
+    };
+
 function isDuplicateEmailError(message: string) {
   const lower = message.toLowerCase();
   return (
@@ -350,4 +358,40 @@ export async function preparePostCheckoutAccount(): Promise<PostCheckoutAccountR
 
   await claimIntakeSession(created.user.id);
   return { ok: true, email, created: true };
+}
+
+/**
+ * After guest payment: create/claim the account and return a one-time magic-link token hash
+ * so the client can establish a session without sending an OTP email.
+ * Existing accounts are not auto-signed-in (defensive — personal-info already blocks them).
+ */
+export async function completePostCheckoutSignIn(): Promise<CompletePostCheckoutSignInResult> {
+  const accountResult = await preparePostCheckoutAccount();
+  if (!accountResult.ok) {
+    return accountResult;
+  }
+
+  if (!accountResult.created) {
+    return {
+      ok: false,
+      code: "existing_account",
+      message: "An account with this email already exists. Please log in to access your order.",
+    };
+  }
+
+  const { data, error } = await supabaseAdmin.auth.admin.generateLink({
+    type: "magiclink",
+    email: accountResult.email,
+  });
+
+  const tokenHash = data?.properties?.hashed_token;
+  if (error || !tokenHash) {
+    return {
+      ok: false,
+      code: "error",
+      message: error?.message ?? "Could not start your session. Please try logging in.",
+    };
+  }
+
+  return { ok: true, email: accountResult.email, tokenHash };
 }

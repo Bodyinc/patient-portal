@@ -4,7 +4,7 @@ import { requireIntakeSession } from "@/lib/intake/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createGuestStripeCustomer } from "@/lib/stripe/customers";
 import { createSubscriptionForPrice, ensureNoActiveDuplicate } from "@/lib/stripe/subscriptions";
-import { resolveCheckoutDiscount, incrementPromoRedemption } from "@/lib/stripe/promos";
+import { resolveCheckoutDiscount } from "@/lib/stripe/promos";
 import { getPlatformSettings, effectiveShippingCents } from "@/lib/settings/platform-settings";
 
 export type OnboardingSubscriptionResult =
@@ -115,10 +115,10 @@ export async function createOnboardingSubscription(
       medicine_id: pkg.medicine_id,
       ...(pkg.variant_id ? { variant_id: pkg.variant_id } : {}),
       ...(variantName ? { variant_name: variantName } : {}),
+      // Redeemed on invoice.paid — not at form open — so promo recreation doesn't over-count.
+      ...(discount ? { promo_id: discount.promo.id, promo_code: discount.label } : {}),
     },
   });
-
-  if (discount) await incrementPromoRedemption(discount.promo.id);
 
   await supabaseAdmin
     .from("intake_sessions")

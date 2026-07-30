@@ -7,6 +7,7 @@ import { stripe } from "./server";
 import { sendTransactionalEmail } from "@/lib/email/send";
 import { paymentReceiptEmail, refundNotificationEmail } from "@/lib/email/payment-emails";
 import { maybeConvertReferral } from "@/lib/referrals";
+import { incrementPromoRedemption } from "@/lib/stripe/promos";
 import { recordInvoiceWalletDebit } from "@/lib/wallet";
 import type { Json } from "@/lib/supabase/types";
 
@@ -114,6 +115,21 @@ async function sendPaymentReceipt(invoice: Stripe.Invoice): Promise<void> {
   await sendTransactionalEmail({ to, subject, html });
 }
 
+async function redeemPromoFromSubscription(subscriptionId: string): Promise<void> {
+  try {
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    const promoId = subscription.metadata?.promo_id?.trim();
+    if (!promoId) return;
+    // Clear before increment so a duplicate invoice.paid / payment_succeeded pair is a no-op.
+    await stripe.subscriptions.update(subscriptionId, {
+      metadata: { ...subscription.metadata, promo_id: "", promo_redeemed: "1" },
+    });
+    await incrementPromoRedemption(promoId);
+  } catch (error) {
+    console.error("[promos] redeem on invoice.paid failed:", error);
+  }
+}
+
 async function handleInvoicePaid(
   invoice: Stripe.Invoice,
   options?: { notifyCustomer?: boolean },
@@ -144,6 +160,12 @@ async function handleInvoicePaid(
     status: "succeeded",
     raw_event: invoice as unknown as Json,
   });
+
+  // First invoice only — renewals must not re-consume the onboarding promo.
+  // Run on invoice.paid (notifyCustomer) so invoice.payment_succeeded doesn't double-count.
+  if (options?.notifyCustomer && invoice.billing_reason === "subscription_create") {
+    await redeemPromoFromSubscription(subId);
+  }
 
   await supabaseAdmin
     .from("subscriptions")

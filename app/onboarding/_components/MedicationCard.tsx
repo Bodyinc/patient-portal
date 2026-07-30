@@ -36,11 +36,11 @@ function PlansFromBadge({ fromPriceCents }: { fromPriceCents: number | null }) {
   }
 
   return (
-    <span className="flex h-[58px] w-[min(259px,calc(100%-1.5rem))] items-center justify-center gap-1 rounded-full bg-white text-center text-[13px] font-medium leading-none text-[#152A51] shadow-[0_4px_14px_rgba(0,0,0,0.16)] sm:h-[74px] sm:text-[14px]">
-      Plans from{" "}
-      <span className="text-[18px] font-bold tracking-[-0.3px] sm:text-[22px]">
+    <span className="flex h-[58px] w-[min(259px,calc(100%-1.5rem))] items-center justify-center gap-1 rounded-full bg-white text-center text-[13px] font-medium leading-none text-[#152A51] shadow-[0_4px_14px_rgba(0,0,0,0.16)] sm:h-[60px] sm:text-[14px]">
+      <span className="flex items-end text-[15px] font-medium sm:text-[15px]">Plans from</span>
+      <span className="text-[18px] font-bold tracking-[-0.3px] sm:text-[28px]">
         {formatMonthly(fromPriceCents)}
-        <span className="text-[13px] font-medium sm:text-[14px]">/mo</span>
+        <span className="text-[13px] font-medium sm:text-[20px]">/mo</span>
       </span>
     </span>
   );
@@ -144,7 +144,7 @@ export default function MedicationCard({
         ) : null}
 
         <div className="min-w-0 space-y-2 pr-1">
-          <h2 className="text-[17px] font-semibold leading-snug tracking-[-0.3px] text-[#152A51] sm:text-[19px]">
+          <h2 className="text-[17px] font-medium leading-snug tracking-[-0.3px] text-[#152A51] sm:text-[30px]">
             {medication.name}
           </h2>
 

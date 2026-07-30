@@ -80,8 +80,11 @@ export default function QuestionnairePage() {
     if (!hydrated || isLoading) return;
 
     if (questionnaire) {
-      if (!state.requiresQuestionnaire || state.questionnaireComplete) {
-        updateState({ requiresQuestionnaire: true, questionnaireComplete: false });
+      // Discovering a questionnaire should mark it as required, but must not erase a
+      // completion that was just saved. Resetting questionnaireComplete here caused
+      // the step guard to send patients back from select-plan/confirmation.
+      if (!state.requiresQuestionnaire) {
+        updateState({ requiresQuestionnaire: true });
       }
       return;
     }
@@ -99,7 +102,6 @@ export default function QuestionnairePage() {
     isSuccess,
     questionnaire,
     router,
-    state.questionnaireComplete,
     state.requiresQuestionnaire,
     updateState,
   ]);

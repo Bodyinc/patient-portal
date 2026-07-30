@@ -56,12 +56,12 @@ export default function PlanToggle({ packages, selectedPackageId, onChange }: Pl
                 </span>
               ) : null}
               {showRecommended ? (
-                <span className="absolute -top-3 left-4 rounded-[10px] rounded-b-none bg-[#6A9B9C] px-4 py-2 text-[12px] font-medium leading-none text-white">
+                <span className="absolute mt-0.5 -top-0.5 left-15 rounded-[10px] rounded-t-none bg-[#6A9B9C] px-4 py-2 text-[12px] font-medium leading-none text-white">
                   Recommended
                 </span>
               ) : null}
 
-              <div className="flex items-start gap-3 sm:gap-4">
+              <div className="flex mt-5 items-start gap-3 sm:gap-4">
                 <span
                   className={cn(
                     "mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2",

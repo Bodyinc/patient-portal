@@ -14,14 +14,10 @@ type OrderSummaryProps = {
   promoMessage: string | null;
   promoError: string | null;
   applyingPromo: boolean;
-  consentAccepted: boolean;
-  confirming: boolean;
   loading?: boolean;
-  hideContinue?: boolean;
   renewalShippingCents?: number;
   onPromoCodeChange: (value: string) => void;
   onApplyPromo: () => void;
-  onContinue: () => void;
 };
 
 function formatMoney(amount: number) {
@@ -40,14 +36,10 @@ export default function OrderSummary({
   promoMessage,
   promoError,
   applyingPromo,
-  consentAccepted,
-  confirming,
   loading = false,
-  hideContinue = false,
   renewalShippingCents = 0,
   onPromoCodeChange,
   onApplyPromo,
-  onContinue,
 }: OrderSummaryProps) {
   return (
     <div className="h-fit w-full rounded-[14px] border border-[#E8E8E8] bg-white p-4 onboarding-font sm:p-5">
@@ -126,19 +118,6 @@ export default function OrderSummary({
           {promoError && <p className="mt-2 text-[12px] text-red-600">{promoError}</p>}
           {promoMessage && <p className="mt-2 text-[12px] text-[#34845F]">{promoMessage}</p>}
         </div>
-
-        {!hideContinue && (
-          <div className="pt-6">
-            <button
-              type="button"
-              onClick={onContinue}
-              disabled={!consentAccepted || confirming}
-              className="h-[46px] w-full rounded-full bg-[#E3E084] text-[14px] font-medium text-[#152A51] transition hover:bg-[#D9D674] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {confirming ? "Processing payment..." : "Continue to Payment"}
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );
