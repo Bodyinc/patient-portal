@@ -80,6 +80,8 @@ export default function ShopProductCard({ item }: { item: ShopMedicineCardDto })
         <MedicineImage
           src={imageSrc}
           alt={item.name}
+          width={339}
+          height={355}
           fill
           dbOnly
           fit="cover"
@@ -132,6 +134,8 @@ export default function ShopProductCard({ item }: { item: ShopMedicineCardDto })
                   <MedicineImage
                     src={imageSrc}
                     alt={item.name}
+                    width={339}
+                    height={355}
                     fill
                     dbOnly
                     fit="cover"

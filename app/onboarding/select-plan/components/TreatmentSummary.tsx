@@ -63,10 +63,12 @@ export default function TreatmentSummary({
               <MedicineImage
                 src={imageFromDb}
                 alt={medicine.name}
+                width={339}
+                height={355}
                 fill
                 dbOnly
                 fit="contain"
-                position="center"
+                position="top"
               />
             ) : null}
           </div>

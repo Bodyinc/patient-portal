@@ -26,11 +26,19 @@ const db = createClient(url, key, { auth: { persistSession: false } });
 
 async function patientState(sub) {
   if (sub.user_id) {
-    const { data } = await db.from("profiles").select("state_code").eq("id", sub.user_id).maybeSingle();
+    const { data } = await db
+      .from("profiles")
+      .select("state_code")
+      .eq("id", sub.user_id)
+      .maybeSingle();
     if (data?.state_code) return data.state_code;
   }
   if (sub.session_id) {
-    const { data } = await db.from("intake_sessions").select("state_code").eq("id", sub.session_id).maybeSingle();
+    const { data } = await db
+      .from("intake_sessions")
+      .select("state_code")
+      .eq("id", sub.session_id)
+      .maybeSingle();
     if (data?.state_code) return data.state_code;
   }
   return null;
@@ -38,7 +46,11 @@ async function patientState(sub) {
 
 async function assignProvider(state) {
   if (!state) return null;
-  const { data } = await db.from("providers").select("id").eq("is_active", true).contains("license_states", [state.toUpperCase()]);
+  const { data } = await db
+    .from("providers")
+    .select("id")
+    .eq("is_active", true)
+    .contains("license_states", [state.toUpperCase()]);
   return data && data.length ? data[0].id : null;
 }
 
@@ -55,7 +67,11 @@ console.log(`Found ${subs.length} subscriptions with a medicine.`);
 
 let created = 0;
 for (const sub of subs) {
-  const { data: existing } = await db.from("medication_requests").select("id").eq("subscription_id", sub.id).limit(1);
+  const { data: existing } = await db
+    .from("medication_requests")
+    .select("id")
+    .eq("subscription_id", sub.id)
+    .limit(1);
   if (existing && existing.length) {
     console.log(`- sub ${sub.id} already has an order, skipping`);
     continue;
@@ -73,7 +89,11 @@ for (const sub of subs) {
 
   let variantId = null;
   if (sub.package_id) {
-    const { data: pkg } = await db.from("packages").select("variant_id").eq("id", sub.package_id).maybeSingle();
+    const { data: pkg } = await db
+      .from("packages")
+      .select("variant_id")
+      .eq("id", sub.package_id)
+      .maybeSingle();
     variantId = pkg?.variant_id ?? null;
   }
 
@@ -105,12 +125,14 @@ for (const sub of subs) {
   const events = [{ status: "payment_completed" }];
   if (providerId) events.push({ status: "provider_assigned" });
   events.push({ status });
-  await db.from("medication_request_events").insert(
-    events.map((e) => ({ request_id: order.id, status: e.status, actor_role: "system" })),
-  );
+  await db
+    .from("medication_request_events")
+    .insert(events.map((e) => ({ request_id: order.id, status: e.status, actor_role: "system" })));
 
   created++;
-  console.log(`+ CREATED order ${order.id} for sub ${sub.id} status=${status} provider=${providerId ?? "none"}`);
+  console.log(
+    `+ CREATED order ${order.id} for sub ${sub.id} status=${status} provider=${providerId ?? "none"}`,
+  );
 }
 
 console.log(`\nDone. Created ${created} order(s).`);
