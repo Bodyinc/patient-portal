@@ -11,20 +11,20 @@ export default function SubscriptionsSection({ subscriptions }: SubscriptionsSec
   const activeCount = subscriptions.length;
 
   return (
-    <section className="rounded-md border border-[#E6DEFF] bg-white p-4">
+    <section className="rounded-md border border-[#E8EEED] bg-white p-4">
       <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-xl font-semibold text-[#2E00AB]">Your Subscriptions</h2>
-        <p className="text-sm text-[#2E00AB]/70">
+        <h2 className="text-xl font-semibold text-[#152A51]">Your Subscriptions</h2>
+        <p className="text-sm text-[#152A51]/70">
           {activeCount} Active Subscription{activeCount === 1 ? "" : "s"}
         </p>
       </div>
 
       {subscriptions.length === 0 ? (
-        <div className="rounded-md border border-dashed border-[#E6DEFF] bg-[#FAF8FF] px-4 py-8 text-center">
-          <p className="text-sm text-[#2E00AB]/70">No active subscriptions yet.</p>
+        <div className="rounded-md border border-dashed border-[#E8EEED] bg-[#F3F6F6] px-4 py-8 text-center">
+          <p className="text-sm text-[#152A51]/70">No active subscriptions yet.</p>
           <Link
             href="/shop"
-            className="mt-3 inline-flex rounded-md bg-[#2E00AB] px-4 py-2 text-sm font-medium text-white hover:bg-[#2E00AB]/90"
+            className="mt-3 inline-flex rounded-md bg-[#152A51] px-4 py-2 text-sm font-medium text-white hover:bg-[#152A51]/90"
           >
             Browse Shop
           </Link>

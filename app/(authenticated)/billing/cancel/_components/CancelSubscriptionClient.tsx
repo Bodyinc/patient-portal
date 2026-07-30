@@ -65,17 +65,17 @@ export default function CancelSubscriptionClient({ subscription }: CancelSubscri
   return (
     <div className="relative flex min-h-[calc(100vh-8rem)] items-center justify-center px-2 py-6 sm:px-4">
       <div
-        className="pointer-events-none absolute inset-0 bg-[#FAF8FF]/80 backdrop-blur-[2px]"
+        className="pointer-events-none absolute inset-0 bg-[#F3F6F6]/80 backdrop-blur-[2px]"
         aria-hidden
       />
 
-      <section className="relative z-10 w-full max-w-xl rounded-2xl border border-[#E6DEFF] bg-white p-5 shadow-sm sm:p-8">
+      <section className="relative z-10 w-full max-w-xl rounded-2xl border border-[#E8EEED] bg-white p-5 shadow-sm sm:p-8">
         <div className="text-center">
-          <h1 className="text-2xl font-semibold text-[#2E00AB] sm:text-3xl">Help Us Improve</h1>
-          <p className="mt-2 text-sm text-[#2E00AB]/70 sm:text-base">
+          <h1 className="text-2xl font-semibold text-[#152A51] sm:text-3xl">Help Us Improve</h1>
+          <p className="mt-2 text-sm text-[#152A51]/70 sm:text-base">
             Help us improve by sharing why you&apos;re cancelling.
           </p>
-          <p className="mt-1 text-xs text-[#2E00AB]/60">{subscription.medicineName}</p>
+          <p className="mt-1 text-xs text-[#152A51]/60">{subscription.medicineName}</p>
         </div>
 
         <div className="mt-6 space-y-3">
@@ -86,16 +86,16 @@ export default function CancelSubscriptionClient({ subscription }: CancelSubscri
                 key={reason.id}
                 className={`flex cursor-pointer items-center gap-3 rounded-md border px-4 py-3 transition-colors ${
                   checked
-                    ? "border-[#2E00AB]/30 bg-[#F6F3FF]"
-                    : "border-[#E6DEFF] bg-white hover:bg-[#FAF8FF]"
+                    ? "border-[#152A51]/30 bg-[#F3F6F6]"
+                    : "border-[#E8EEED] bg-white hover:bg-[#F3F6F6]"
                 }`}
               >
                 <Checkbox
                   checked={checked}
                   onCheckedChange={() => toggleReason(reason.id)}
-                  className="border-[#2E00AB]/40 data-[state=checked]:bg-[#2E00AB] data-[state=checked]:text-white"
+                  className="border-[#152A51]/40 data-[state=checked]:bg-[#152A51] data-[state=checked]:text-white"
                 />
-                <span className="text-sm text-[#2E00AB]">{reason.label}</span>
+                <span className="text-sm text-[#152A51]">{reason.label}</span>
               </label>
             );
           })}
@@ -107,7 +107,7 @@ export default function CancelSubscriptionClient({ subscription }: CancelSubscri
               value={otherText}
               onChange={(event) => setOtherText(event.target.value)}
               placeholder="Tell us more (optional)"
-              className="border-[#E6DEFF] bg-[#FCFBFF] text-[#2E00AB] placeholder:text-[#2E00AB]/50"
+              className="border-[#E8EEED] bg-[#F3F6F6] text-[#152A51] placeholder:text-[#152A51]/50"
             />
           </div>
         ) : null}
@@ -124,7 +124,7 @@ export default function CancelSubscriptionClient({ subscription }: CancelSubscri
             variant="outline"
             onClick={handleKeepSubscription}
             disabled={isSubmitting}
-            className="h-11 border-[#2E00AB]/30 text-[#2E00AB] hover:bg-[#F6F3FF]"
+            className="h-11 border-[#152A51]/30 text-[#152A51] hover:bg-[#F3F6F6]"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
             Keep Subscription
@@ -133,7 +133,7 @@ export default function CancelSubscriptionClient({ subscription }: CancelSubscri
             type="button"
             onClick={handleContinueCancellation}
             disabled={isSubmitting}
-            className="h-11 bg-[#2E00AB] text-white hover:bg-[#2E00AB]/90"
+            className="h-11 bg-[#152A51] text-white hover:bg-[#152A51]/90"
           >
             {isSubmitting ? "Cancelling..." : "Continue Cancellation"}
             {!isSubmitting ? <ArrowRight className="ml-2 h-4 w-4" /> : null}

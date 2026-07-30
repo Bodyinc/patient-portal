@@ -55,7 +55,7 @@ export function SetPasswordForm({ next }: { next: string }) {
 
         <form onSubmit={onSubmit} className="space-y-5 text-left">
           <div>
-            <Label htmlFor="sp" className="mb-2 block text-[14px] font-semibold text-[#2E00AB]">
+            <Label htmlFor="sp" className="mb-2 block text-[14px] font-semibold text-[#152A51]">
               Password
             </Label>
 
@@ -73,7 +73,7 @@ export function SetPasswordForm({ next }: { next: string }) {
           </div>
 
           <div>
-            <Label htmlFor="sp2" className="mb-2 block text-[14px] font-semibold text-[#2E00AB]">
+            <Label htmlFor="sp2" className="mb-2 block text-[14px] font-semibold text-[#152A51]">
               Confirm Password
             </Label>
 
@@ -94,7 +94,7 @@ export function SetPasswordForm({ next }: { next: string }) {
             {busy ? "Saving..." : "Save & Continue →"}
           </Button>
 
-          <p className="break-words text-center text-sm leading-snug text-[#2E00AB] sm:text-base">
+          <p className="break-words text-center text-sm leading-snug text-[#152A51] sm:text-base">
             Need help?{" "}
             <button type="button" className="font-semibold underline underline-offset-4">
               Contact support

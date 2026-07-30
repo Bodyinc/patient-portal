@@ -44,7 +44,7 @@ function Fields({ amountCents }: { amountCents: number }) {
       <button
         type="submit"
         disabled={!stripe || submitting}
-        className="h-11 w-full rounded-lg bg-[#2E00AB] text-sm font-semibold text-white hover:bg-[#2E00AB]/90 disabled:opacity-60"
+        className="h-11 w-full rounded-lg bg-[#152A51] text-sm font-semibold text-white hover:bg-[#152A51]/90 disabled:opacity-60"
       >
         {submitting ? "Processing…" : `Pay ${money(amountCents)}`}
       </button>
@@ -60,8 +60,8 @@ export default function AdditionalPaymentForm({
   amountCents: number;
 }) {
   return (
-    <section className="rounded-xl border border-[#2E00AB]/15 bg-white p-4">
-      <h2 className="mb-3 text-sm font-semibold text-[#2E00AB]">Payment details</h2>
+    <section className="rounded-xl border border-[#152A51]/15 bg-white p-4">
+      <h2 className="mb-3 text-sm font-semibold text-[#152A51]">Payment details</h2>
       <Elements stripe={getStripeJs()} options={{ clientSecret, appearance: { theme: "stripe" } }}>
         <Fields amountCents={amountCents} />
       </Elements>

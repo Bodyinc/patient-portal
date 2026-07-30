@@ -110,7 +110,8 @@ export default function MedicationsPage() {
           </p>
         </div>
 
-        <div className="mx-auto flex min-h-0 w-full max-w-[860px] flex-1 flex-col gap-4 overflow-y-auto px-3 pb-2 scrollbar-hide sm:gap-5 sm:px-5">
+        {/* Updated max-w-[980px] and px-12 sm:px-16 to accommodate 856px card + 114px checkmark offset without clipping */}
+        <div className="mx-auto flex min-h-0 w-full max-w-[980px] flex-1 flex-col gap-4 overflow-y-auto px-10 pb-4 pt-2 scrollbar-hide sm:gap-5 sm:px-16">
           {isLoading ? (
             <p className="text-center text-sm text-[#152A51]/70">Loading medications…</p>
           ) : isError ? (

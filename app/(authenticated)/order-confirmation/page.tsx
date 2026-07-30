@@ -91,56 +91,56 @@ export default async function OrderConfirmationPage() {
   const email = profile?.email ?? user.email ?? "";
 
   return (
-    <main className="min-w-0 flex-1 bg-[#FAF8FF] p-4">
+    <main className="min-w-0 flex-1 bg-[#F3F6F6] p-4">
       <div className="mx-auto flex max-w-2xl flex-col items-center gap-6 py-6">
         <div className="flex flex-col items-center gap-3 text-center">
           <CheckCircle2 className="h-14 w-14 text-emerald-600" />
-          <h1 className="text-3xl font-semibold text-[#2E00AB]">Payment Successful</h1>
-          <p className="text-sm text-[#2E00AB]/75">
+          <h1 className="text-3xl font-semibold text-[#152A51]">Payment Successful</h1>
+          <p className="text-sm text-[#152A51]/75">
             Your treatment plan is confirmed. A receipt has been sent to your email.
           </p>
         </div>
 
-        <div className="w-full overflow-hidden rounded-2xl border border-[#2E00AB]/20 bg-white">
-          <div className="bg-[#EDE7FA] px-5 py-3">
-            <h2 className="text-lg font-semibold text-[#2E00AB]">Order Summary</h2>
+        <div className="w-full overflow-hidden rounded-2xl border border-[#152A51]/20 bg-white">
+          <div className="bg-[#E8EEED] px-5 py-3">
+            <h2 className="text-lg font-semibold text-[#152A51]">Order Summary</h2>
           </div>
           <div className="space-y-4 p-5 text-sm">
             <div className="flex justify-between">
-              <span className="text-[#2E00AB]/80">Medication</span>
-              <span className="font-medium text-[#2E00AB]">
+              <span className="text-[#152A51]/80">Medication</span>
+              <span className="font-medium text-[#152A51]">
                 {med?.name ?? "Selected Medication"}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-[#2E00AB]/80">Plan</span>
-              <span className="font-medium text-[#2E00AB]">{pkg?.name ?? "Treatment Plan"}</span>
+              <span className="text-[#152A51]/80">Plan</span>
+              <span className="font-medium text-[#152A51]">{pkg?.name ?? "Treatment Plan"}</span>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <span className="text-[#2E00AB]/80">Email</span>
+              <span className="text-[#152A51]/80">Email</span>
               <span className="flex min-w-0 items-center gap-2">
-                <span className="truncate font-medium text-[#2E00AB]">{email}</span>
+                <span className="truncate font-medium text-[#152A51]">{email}</span>
                 <Link
                   href="/change-email?redirect=/order-confirmation"
-                  className="shrink-0 text-xs font-medium text-[#2E00AB] underline"
+                  className="shrink-0 text-xs font-medium text-[#152A51] underline"
                 >
                   Edit
                 </Link>
               </span>
             </div>
             {planPrice != null ? (
-              <div className="flex justify-between border-t border-[#2E00AB]/10 pt-4">
-                <span className="text-[#2E00AB]/80">Plan price</span>
-                <span className="font-medium text-[#2E00AB]">${planPrice.toFixed(2)}</span>
+              <div className="flex justify-between border-t border-[#152A51]/10 pt-4">
+                <span className="text-[#152A51]/80">Plan price</span>
+                <span className="font-medium text-[#152A51]">${planPrice.toFixed(2)}</span>
               </div>
             ) : null}
             {planPrice != null ? (
               <div className="flex justify-between">
-                <span className="text-[#2E00AB]/80">Consultation fee</span>
+                <span className="text-[#152A51]/80">Consultation fee</span>
                 <span
                   className={
                     consultation > 0
-                      ? "font-medium text-[#2E00AB]"
+                      ? "font-medium text-[#152A51]"
                       : "font-semibold text-emerald-700"
                   }
                 >
@@ -150,10 +150,10 @@ export default async function OrderConfirmationPage() {
             ) : null}
             {planPrice != null ? (
               <div className="flex justify-between">
-                <span className="text-[#2E00AB]/80">Shipping</span>
+                <span className="text-[#152A51]/80">Shipping</span>
                 <span
                   className={
-                    shipping > 0 ? "font-medium text-[#2E00AB]" : "font-semibold text-emerald-700"
+                    shipping > 0 ? "font-medium text-[#152A51]" : "font-semibold text-emerald-700"
                   }
                 >
                   {shipping > 0 ? `$${shipping.toFixed(2)}` : "FREE"}
@@ -172,14 +172,14 @@ export default async function OrderConfirmationPage() {
                 <span className="font-medium">-${walletUsed.toFixed(2)}</span>
               </div>
             ) : null}
-            <div className="flex items-center justify-between border-t border-[#2E00AB]/10 pt-4">
-              <span className="text-base font-medium text-[#2E00AB]">Total Paid</span>
-              <span className="text-3xl font-semibold text-[#2E00AB]">
+            <div className="flex items-center justify-between border-t border-[#152A51]/10 pt-4">
+              <span className="text-base font-medium text-[#152A51]">Total Paid</span>
+              <span className="text-3xl font-semibold text-[#152A51]">
                 {totalPaid != null ? `$${totalPaid.toFixed(2)}` : "—"}
               </span>
             </div>
             {showRenewalNote ? (
-              <p className="rounded-lg bg-[#2E00AB]/5 px-3 py-2 text-xs leading-relaxed text-[#2E00AB]/80">
+              <p className="rounded-lg bg-[#152A51]/5 px-3 py-2 text-xs leading-relaxed text-[#152A51]/80">
                 This payment covers medication only. Starting with your next renewal, a $
                 {renewalShipping.toFixed(2)} shipping fee will be added to each automatic payment.
               </p>
@@ -190,13 +190,13 @@ export default async function OrderConfirmationPage() {
         <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-center">
           <Link
             href="/dashboard"
-            className="rounded-md bg-[#2E00AB] px-6 py-2.5 text-center text-sm font-medium text-white hover:bg-[#24008A]"
+            className="rounded-md bg-[#152A51] px-6 py-2.5 text-center text-sm font-medium text-white hover:bg-[#10213F]"
           >
             Go to Dashboard
           </Link>
           <Link
             href="/my-meds"
-            className="rounded-md border border-[#2E00AB]/40 px-6 py-2.5 text-center text-sm font-medium text-[#2E00AB]"
+            className="rounded-md border border-[#152A51]/40 px-6 py-2.5 text-center text-sm font-medium text-[#152A51]"
           >
             View Treatment Details
           </Link>

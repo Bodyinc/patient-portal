@@ -118,7 +118,7 @@ export default function ShopCheckoutClient({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <ShopHeader
         fullName={fullName}
         patientId={patientId}
@@ -130,8 +130,10 @@ export default function ShopCheckoutClient({
 
       {isUpgradeFromBilling ? (
         <section className="space-y-1 px-1">
-          <h1 className="text-xl font-semibold text-[#2E00AB]">Upgrade Subscription</h1>
-          <p className="text-sm text-[#2E00AB]/70">
+          <h1 className="text-xl font-medium tracking-[-0.5px] text-[#152A51] sm:text-2xl">
+            Upgrade Subscription
+          </h1>
+          <p className="text-sm text-[#152A51]/70">
             Choose a new plan for your treatment subscription.
           </p>
         </section>
@@ -167,7 +169,7 @@ export default function ShopCheckoutClient({
       />
 
       {error ? (
-        <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+        <p className="rounded-[16px] border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           {error}
         </p>
       ) : null}

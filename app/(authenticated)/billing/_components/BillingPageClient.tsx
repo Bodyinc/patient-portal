@@ -70,8 +70,8 @@ export default function BillingPageClient({
       />
 
       <section className="space-y-1 px-1 pt-1">
-        <h1 className="text-2xl font-semibold text-[#2E00AB]">Billing</h1>
-        <p className="text-sm text-[#2E00AB]/70">
+        <h1 className="text-2xl font-semibold text-[#152A51]">Billing</h1>
+        <p className="text-sm text-[#152A51]/70">
           Manage your payment methods, billing history, invoices, and subscriptions.
         </p>
       </section>

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Check } from "lucide-react";
 import { useMemo } from "react";
@@ -21,11 +21,11 @@ const HIGHLIGHT_BADGE_RE = /popular|highest|best|fastest|maximum|most/i;
 const DOSAGE_BADGE_RE = /\b(\d+(\.\d+)?\s*mg|size\s*\d|\d+(\.\d+)?\s*ml)\b/i;
 const MAX_SECONDARY_BADGES = 3;
 
-/** Figma card 856×355 — left image is roughly square within that height */
+/** Fixed dimensions for image panel on desktop to prevent variable card width/height */
 const IMAGE_PANEL_CLASS =
-  "relative isolate h-[220px] w-full shrink-0 overflow-hidden rounded-t-[35px] bg-[#5A778D] sm:h-full sm:w-[320px] sm:rounded-l-[35px] sm:rounded-tr-none";
+  "relative isolate aspect-[339/354.6] w-full shrink-0 overflow-hidden rounded-[35px] bg-[#5A778D] sm:aspect-none sm:h-[355px] sm:w-[320px]";
 
-/** Figma: price oval 259 × 74 */
+/** Figma: Price Oval */
 function PlansFromBadge({ fromPriceCents }: { fromPriceCents: number | null }) {
   if (fromPriceCents == null) {
     return (
@@ -71,7 +71,6 @@ export default function MedicationCard({
   onViewDetails,
 }: MedicationCardProps) {
   const hasVariants = medication.variants.length > 0;
-  // Cheapest variant is used for pricing + selection; dosage is chosen in details.
   const defaultVariantId = useMemo(() => {
     if (!hasVariants) return null;
     return [...medication.variants].sort(
@@ -107,12 +106,12 @@ export default function MedicationCard({
         }
       }}
       className={cn(
-        // Figma Rectangle 90: 856×355, radius 37, border 2 #E8EEED, shadow 0 15 40
-        "relative flex h-auto w-full max-w-[856px] cursor-pointer flex-col overflow-visible rounded-[37px] border-2 border-[#E8EEED] bg-white shadow-[0_15px_40px_rgba(59,71,89,0.10)] transition-all onboarding-font sm:h-[355px] sm:flex-row sm:items-stretch",
+        // Strict box model: full width (856px max), fixed height on sm, flex row stretch
+        "relative flex h-auto w-full max-w-[856px] mx-auto cursor-pointer flex-col overflow-visible rounded-[37px] border-2 border-[#E8EEED] bg-white shadow-[0_15px_40px_rgba(59,71,89,0.10)] transition-all onboarding-font sm:h-[355px] sm:flex-row sm:items-stretch shrink-0",
         selected && "ring-2 ring-[#6A9B9C]/25",
       )}
     >
-      {/* Left: product shot — zoomed enough to slice base at “Multiple dose”, keep slate bg visible */}
+      {/* Left: product shot */}
       <div className={IMAGE_PANEL_CLASS}>
         <MedicineImage
           src={medication.imageSrc}
@@ -129,8 +128,8 @@ export default function MedicationCard({
         </div>
       </div>
 
-      {/* Right: title, badge, description, controls */}
-      <div className="relative flex min-w-0 flex-1 flex-col justify-center gap-2.5 px-5 py-5 pr-12 sm:gap-3 sm:px-6 sm:py-6 sm:pr-14">
+      {/* Right: title, badges, description, controls */}
+      <div className="relative flex min-w-0 flex-1 flex-col justify-center gap-2.5 px-5 py-5 pr-14 sm:gap-3 sm:px-6 sm:py-6 sm:pr-16">
         {secondaryBadges.length > 0 ? (
           <div className="flex flex-wrap gap-1.5">
             {secondaryBadges.map((badge) => (
@@ -159,7 +158,7 @@ export default function MedicationCard({
           ) : null}
 
           {medication.description ? (
-            <p className="text-[13px] font-normal leading-snug text-[#152A51]/70 sm:text-[14px]">
+            <p className="line-clamp-3 text-[13px] font-normal leading-snug text-[#152A51]/70 sm:text-[14px]">
               {medication.description}
             </p>
           ) : null}
@@ -181,15 +180,15 @@ export default function MedicationCard({
         ) : null}
       </div>
 
-      {/* Selection indicator — overlaps card edge per Figma */}
+      {/* Figma Selection Ellipse (114px x 114px) overlapping right edge */}
       <div
         className={cn(
-          "absolute -right-3 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border-2 shadow-[0_2px_8px_rgba(0,0,0,0.12)] transition sm:-right-4 sm:h-10 sm:w-10",
-          selected ? "border-[#6A9B9C] bg-[#6A9B9C]" : "border-[#D5D9E0] bg-white",
+          "absolute -right-7 top-1/2 z-20 flex h-[80px] w-[80px] -translate-y-1/2 items-center justify-center rounded-full border-2 transition sm:-right-10 sm:h-[114px] sm:w-[114px]",
+          selected ? "border-white bg-[#6A9B9C]" : "border-[#E8EEED] bg-white",
         )}
         aria-hidden
       >
-        {selected ? <Check className="h-5 w-5 text-white stroke-[2.5]" /> : null}
+        {selected ? <Check className="h-10 w-10 text-white stroke-[3] sm:h-12 sm:w-12" /> : null}
       </div>
     </div>
   );

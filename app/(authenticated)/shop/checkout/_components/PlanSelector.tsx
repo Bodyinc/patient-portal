@@ -8,10 +8,12 @@ type PlanSelectorProps = {
 
 export default function PlanSelector({ plans, selectedPlan, onChange }: PlanSelectorProps) {
   return (
-    <section className="space-y-3 rounded-md border border-[#E6DEFF] bg-white p-4">
+    <section className="space-y-4 rounded-[24px] border border-[#E8EEED] bg-white p-4 sm:p-5">
       <div className="space-y-1">
-        <h2 className="text-3xl font-semibold text-[#2E00AB]">Choose Your Plan</h2>
-        <p className="text-sm text-[#2E00AB]/75">
+        <h2 className="text-xl font-medium tracking-[-0.4px] text-[#152A51] sm:text-[22px]">
+          Choose Your Plan
+        </h2>
+        <p className="text-sm text-[#152A51]/70">
           Select the membership plan that best fits your wellness goals.
         </p>
       </div>
@@ -23,15 +25,17 @@ export default function PlanSelector({ plans, selectedPlan, onChange }: PlanSele
             key={plan.id}
             type="button"
             onClick={() => onChange(plan.id)}
-            className={`w-full rounded-md border p-4 text-left transition ${
-              active ? "border-[#A895FF] bg-[#F6F3FF]" : "border-[#E6DEFF] bg-white"
+            className={`w-full rounded-[16px] border p-4 text-left transition ${
+              active
+                ? "border-[#6A9B9C] bg-[#F3F6F6] shadow-[0_2px_10px_rgba(21,42,81,0.05)]"
+                : "border-[#E8EEED] bg-white hover:bg-[#F8FAFA]"
             }`}
           >
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-start gap-3">
                 <span
                   className={`mt-0.5 inline-block h-5 w-5 rounded-full border ${
-                    active ? "border-[#2E00AB] bg-[#2E00AB]" : "border-[#CFC3FF]"
+                    active ? "border-[#6A9B9C] bg-[#6A9B9C]" : "border-[#BFCBCB]"
                   }`}
                 >
                   {active ? (
@@ -40,17 +44,21 @@ export default function PlanSelector({ plans, selectedPlan, onChange }: PlanSele
                 </span>
                 <div>
                   <div className="flex items-center gap-2">
-                    <p className="text-xl font-semibold text-[#2E00AB]">{plan.title}</p>
+                    <p className="text-[16px] font-medium text-[#152A51] sm:text-[17px]">
+                      {plan.title}
+                    </p>
                     {plan.badge ? (
-                      <span className="rounded-sm bg-[#6B4EFF]/10 px-1.5 py-0.5 text-[10px] font-medium text-[#6B4EFF]">
+                      <span className="rounded-full bg-[#E8EEED] px-2 py-1 text-[10px] font-medium text-[#152A51]">
                         {plan.badge}
                       </span>
                     ) : null}
                   </div>
-                  <p className="text-sm text-[#2E00AB]/75">{plan.subtitle}</p>
+                  <p className="text-sm text-[#152A51]/70">{plan.subtitle}</p>
                 </div>
               </div>
-              <p className="text-3xl font-semibold text-[#2E00AB]">{plan.priceLabel}</p>
+              <p className="shrink-0 text-xl font-medium tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
+                {plan.priceLabel}
+              </p>
             </div>
           </button>
         );

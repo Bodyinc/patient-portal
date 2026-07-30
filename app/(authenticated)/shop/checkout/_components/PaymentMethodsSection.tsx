@@ -15,7 +15,7 @@ export default function PaymentMethodsSection({
 }: PaymentMethodsSectionProps) {
   return (
     <section className="space-y-3">
-      <h3 className="text-2xl font-semibold text-[#2E00AB]">Payment History</h3>
+      <h3 className="text-2xl font-semibold text-[#152A51]">Payment History</h3>
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         {methods.map((method) => {
           const active = selectedMethod === method.id;
@@ -26,19 +26,19 @@ export default function PaymentMethodsSection({
               type="button"
               onClick={() => onSelect(method.id)}
               className={`rounded-md border p-4 text-left transition ${
-                active ? "border-[#A895FF] bg-[#F6F3FF]" : "border-[#E6DEFF] bg-white"
+                active ? "border-[#6A9B9C] bg-[#F3F6F6]" : "border-[#E8EEED] bg-white"
               }`}
             >
               <div className="flex items-center justify-between">
                 {icon === "card" ? (
-                  <CreditCard className="h-5 w-5 text-[#2E00AB]/80" />
+                  <CreditCard className="h-5 w-5 text-[#152A51]/80" />
                 ) : (
-                  <Plus className="h-5 w-5 text-[#2E00AB]/80" />
+                  <Plus className="h-5 w-5 text-[#152A51]/80" />
                 )}
               </div>
-              <p className="mt-4 text-xl font-semibold text-[#2E00AB]">{method.title}</p>
+              <p className="mt-4 text-xl font-semibold text-[#152A51]">{method.title}</p>
               {method.subtitle ? (
-                <p className="text-sm text-[#2E00AB]/70">{method.subtitle}</p>
+                <p className="text-sm text-[#152A51]/70">{method.subtitle}</p>
               ) : null}
             </button>
           );

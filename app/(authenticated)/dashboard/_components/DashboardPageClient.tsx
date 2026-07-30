@@ -7,16 +7,13 @@ import { isExternalMedicineImage } from "@/lib/intake/medicine-image";
 import type { DashboardPageDataDto } from "@/lib/dashboard/types";
 import { cn } from "@/lib/utils";
 
-import {
-  medicineImageFrameClass,
-  medicineImageFitClass,
-} from "../../../onboarding/_lib/onboarding-theme";
+import { medicineImageFrameClass } from "../../../onboarding/_lib/onboarding-theme";
 
 import BmiGauge from "../../../onboarding/_components/BmiGauge";
-
 import DashboardHeader from "../../_components/DashboardHeader";
+import MedicineImage from "../../../onboarding/_components/MedicineImage";
 
-/** Figma treatment image: 339 × 354.6 */
+/** Figma treatment image aspect ratio */
 const TREATMENT_IMAGE_ASPECT = "339 / 354.6";
 
 type DashboardPageClientProps = {
@@ -26,7 +23,6 @@ type DashboardPageClientProps = {
 export default function DashboardPageClient({ data }: DashboardPageClientProps) {
   const firstName = data.fullName.trim().split(/\s+/)[0] || "there";
   const treatmentImage = data.treatment?.imageSrc ?? null;
-  const treatmentExternal = treatmentImage ? isExternalMedicineImage(treatmentImage) : false;
 
   return (
     <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-4 sm:px-6 lg:px-6 xl:px-8">
@@ -84,13 +80,15 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
                   style={{ aspectRatio: TREATMENT_IMAGE_ASPECT }}
                 >
                   {treatmentImage ? (
-                    <Image
+                    <MedicineImage
                       src={treatmentImage}
                       alt={data.treatment.name}
+                      width={339}
+                      height={355}
                       fill
-                      sizes="(max-width: 640px) 220px, 180px"
-                      unoptimized={treatmentExternal}
-                      className={medicineImageFitClass}
+                      dbOnly
+                      fit="cover"
+                      position="top"
                     />
                   ) : null}
                 </div>

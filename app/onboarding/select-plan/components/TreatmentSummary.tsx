@@ -7,7 +7,6 @@ import MedicineImage from "../../_components/MedicineImage";
 import type { MedicineDto } from "@/lib/intake/types";
 import { DEFAULT_MEDICINE_IMAGE } from "@/lib/intake/medicine-image";
 import { cn } from "@/lib/utils";
-import { ONBOARDING } from "../../_lib/onboarding-theme";
 
 type TreatmentSummaryProps = {
   medicine: MedicineDto | null;
@@ -47,35 +46,39 @@ export default function TreatmentSummary({
 
       <div className="overflow-hidden rounded-[20px] border-2 border-[#E8EEED] bg-white shadow-[0_2px_12px_rgba(21,42,81,0.06)] sm:rounded-[24px]">
         <div className="flex flex-col sm:flex-row sm:items-stretch">
-          {/* Figma: slate frame, zoomed vial cropped at “Multiple dose” */}
+          {/* Figma Specs: Width ~147px, Height 154px, Radius 17px */}
           <div
-            className={cn(
-              "relative isolate h-[180px] w-full shrink-0 overflow-hidden sm:h-auto sm:min-h-[160px] sm:w-[160px] md:w-[180px]",
-              "rounded-t-[18px] sm:rounded-l-[22px] sm:rounded-tr-none",
-            )}
-            style={{ backgroundColor: ONBOARDING.medicineImageBg }}
+            className="
+              relative isolate
+              h-[154px] w-full
+              shrink-0
+              overflow-hidden
+              bg-[#5A778D]
+              rounded-[17px]
+              sm:w-[147px]
+              sm:rounded-[17px]
+            "
           >
             {imageFromDb ? (
               <MedicineImage
                 src={imageFromDb}
                 alt={medicine.name}
+                width={339}
+                height={355}
                 fill
-                width={180}
-                height={180}
                 dbOnly
-                fit="cover"
-                position="center 30%"
-                className="scale-[1.2]"
+                fit="contain"
+                position="top"
               />
             ) : null}
           </div>
 
-          <div className="flex min-w-0 flex-1 flex-col justify-center px-4 py-4 sm:px-5 sm:py-5">
-            <h3 className="text-[15px] font-medium leading-snug text-[#152A51] sm:text-[16px]">
+          <div className="flex min-w-0 flex-1 flex-col justify-center px-4 py-4 sm:px-6 sm:py-5">
+            <h3 className="text-[16px] font-semibold leading-snug tracking-[-0.3px] text-[#152A51] sm:text-[18px]">
               {medicine.name}
             </h3>
             {medicine.description ? (
-              <p className="mt-1.5 text-[13px] font-normal leading-snug text-[#152A51]/70 sm:line-clamp-3">
+              <p className="mt-1.5 text-[13px] font-normal leading-relaxed text-[#152A51]/70 sm:line-clamp-3 sm:text-[14px]">
                 {medicine.description}
               </p>
             ) : null}

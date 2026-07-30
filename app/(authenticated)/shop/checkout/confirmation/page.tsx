@@ -20,7 +20,7 @@ export default async function ShopCheckoutConfirmationPage({
 
   if (!orderId) {
     return (
-      <main className="min-w-0 flex-1 bg-[#FAF8FF] p-4">
+      <main className="min-w-0 flex-1 bg-[#F3F6F6] p-4">
         <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           Missing order id.
         </div>
@@ -43,12 +43,12 @@ export default async function ShopCheckoutConfirmationPage({
     const totalPaid = order.totalPaid ?? order.total;
 
     return (
-      <main className="min-w-0 flex-1 bg-[#FAF8FF] p-4">
-        <section className="mx-auto max-w-3xl space-y-4 rounded-2xl border border-[#E6DEFF] bg-white p-6">
-          <h1 className="text-3xl font-semibold text-[#2E00AB]">
+      <main className="min-w-0 flex-1 bg-[#F3F6F6] p-4">
+        <section className="mx-auto max-w-3xl space-y-4 rounded-2xl border border-[#E8EEED] bg-white p-6">
+          <h1 className="text-3xl font-semibold text-[#152A51]">
             {isPaid ? "Order Confirmed" : "Order Created"}
           </h1>
-          <p className="text-sm text-[#2E00AB]/75">
+          <p className="text-sm text-[#152A51]/75">
             {isPaid ? (
               <>Your payment was successful and your order is confirmed.</>
             ) : (
@@ -59,27 +59,27 @@ export default async function ShopCheckoutConfirmationPage({
             )}
           </p>
 
-          <div className="grid gap-2 rounded-md border border-[#EEE9FF] bg-[#FCFBFF] p-4 text-sm text-[#2E00AB]/80">
+          <div className="grid gap-2 rounded-md border border-[#E8EEED] bg-[#F3F6F6] p-4 text-sm text-[#152A51]/80">
             <p>
-              <span className="font-semibold text-[#2E00AB]">Order ID:</span> {order.id}
+              <span className="font-semibold text-[#152A51]">Order ID:</span> {order.id}
             </p>
             <p>
-              <span className="font-semibold text-[#2E00AB]">Product:</span> {order.productName}
+              <span className="font-semibold text-[#152A51]">Product:</span> {order.productName}
             </p>
             {order.variantName ? (
               <p>
-                <span className="font-semibold text-[#2E00AB]">Variant:</span> {order.variantName}
+                <span className="font-semibold text-[#152A51]">Variant:</span> {order.variantName}
               </p>
             ) : null}
             <p>
-              <span className="font-semibold text-[#2E00AB]">Plan:</span> {order.selectedPlanLabel}
+              <span className="font-semibold text-[#152A51]">Plan:</span> {order.selectedPlanLabel}
             </p>
             <p>
-              <span className="font-semibold text-[#2E00AB]">Status:</span> {statusLabel}
+              <span className="font-semibold text-[#152A51]">Status:</span> {statusLabel}
             </p>
-            <div className="mt-2 space-y-1 border-t border-[#EEE9FF] pt-3">
+            <div className="mt-2 space-y-1 border-t border-[#E8EEED] pt-3">
               <p className="flex justify-between">
-                <span className="font-semibold text-[#2E00AB]">Subtotal</span>
+                <span className="font-semibold text-[#152A51]">Subtotal</span>
                 <span>{formatUsd(order.subtotal)}</span>
               </p>
               {order.consultation > 0 ? (
@@ -111,11 +111,11 @@ export default async function ShopCheckoutConfirmationPage({
                   <span>-{formatUsd(walletApplied)}</span>
                 </p>
               ) : null}
-              <p className="flex justify-between border-t border-[#EEE9FF] pt-2 text-base">
-                <span className="font-semibold text-[#2E00AB]">
+              <p className="flex justify-between border-t border-[#E8EEED] pt-2 text-base">
+                <span className="font-semibold text-[#152A51]">
                   {isPaid ? "Total Paid" : "Total Due"}
                 </span>
-                <span className="font-semibold text-[#2E00AB]">{formatUsd(totalPaid)}</span>
+                <span className="font-semibold text-[#152A51]">{formatUsd(totalPaid)}</span>
               </p>
             </div>
           </div>
@@ -123,13 +123,13 @@ export default async function ShopCheckoutConfirmationPage({
           <div className="flex flex-wrap gap-2">
             <Link
               href="/shop"
-              className="rounded-md border border-[#2E00AB]/30 px-4 py-2 text-sm font-medium text-[#2E00AB]"
+              className="rounded-md border border-[#152A51]/30 px-4 py-2 text-sm font-medium text-[#152A51]"
             >
               Back to Shop
             </Link>
             <Link
               href="/dashboard"
-              className="rounded-md bg-[#2E00AB] px-4 py-2 text-sm font-medium text-white"
+              className="rounded-md bg-[#152A51] px-4 py-2 text-sm font-medium text-white"
             >
               Go to Dashboard
             </Link>
@@ -139,7 +139,7 @@ export default async function ShopCheckoutConfirmationPage({
     );
   } catch (error) {
     return (
-      <main className="min-w-0 flex-1 bg-[#FAF8FF] p-4">
+      <main className="min-w-0 flex-1 bg-[#F3F6F6] p-4">
         <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {error instanceof Error ? error.message : "Unable to load confirmation."}
         </div>

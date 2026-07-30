@@ -14,8 +14,8 @@ const ORDER_CONFIRMATION_REDIRECT = "/order-confirmation";
 
 function StatusScreen({ message }: { message: string }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#FAF8FF] p-6">
-      <p className="text-sm text-[#2E00AB]">{message}</p>
+    <div className="flex min-h-screen items-center justify-center bg-[#F3F6F6] p-6">
+      <p className="text-sm text-[#152A51]">{message}</p>
     </div>
   );
 }

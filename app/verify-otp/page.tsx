@@ -111,13 +111,13 @@ function VerifyOTPContent() {
           description={`Enter the ${OTP_LENGTH}-digit code sent to`}
         />
 
-        <p className="break-all text-base font-medium text-[#2E00AB] sm:text-lg lg:text-[22px]">
+        <p className="break-all text-base font-medium text-[#152A51] sm:text-lg lg:text-[22px]">
           {email}
         </p>
 
         <Link
           href={editEmailHref}
-          className="mt-4 inline-block text-base text-[#2E00AB] underline underline-offset-4 sm:text-[18px]"
+          className="mt-4 inline-block text-base text-[#152A51] underline underline-offset-4 sm:text-[18px]"
         >
           {isAccountEmailContext ? "Change email" : "Use a different email"}
         </Link>
@@ -135,7 +135,7 @@ function VerifyOTPContent() {
               <InputOTPSlot
                 key={index}
                 index={index}
-                className="h-10 w-6.5 rounded-[8px] border border-[#2E00AB]/40 bg-white text-lg font-semibold text-[#2E00AB] shadow-none outline-none first:rounded-[8px] first:border-l last:rounded-[8px] focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-[#2E00AB] after:hidden sm:h-[50px] sm:w-[50px] sm:text-[24px]"
+                className="h-10 w-6.5 rounded-[8px] border border-[#152A51]/40 bg-white text-lg font-semibold text-[#152A51] shadow-none outline-none first:rounded-[8px] first:border-l last:rounded-[8px] focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-[#152A51] after:hidden sm:h-[50px] sm:w-[50px] sm:text-[24px]"
               />
             ))}
           </InputOTP>
@@ -145,7 +145,7 @@ function VerifyOTPContent() {
           {busy ? "Verifying..." : "Verify"}
         </Button>
 
-        <p className="mt-6 text-base text-[#2E00AB] sm:text-[18px]">
+        <p className="mt-6 text-base text-[#152A51] sm:text-[18px]">
           Didn&apos;t receive the code?{" "}
           <button
             type="button"

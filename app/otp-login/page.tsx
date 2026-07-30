@@ -84,7 +84,7 @@ export default function OtpLoginPage() {
 
       <form onSubmit={onSubmit} className="space-y-6">
         <div className="space-y-2">
-          <Label htmlFor="otp-email" className="text-[14px] font-semibold text-[#2E00AB]">
+          <Label htmlFor="otp-email" className="text-[14px] font-semibold text-[#152A51]">
             Email Address
           </Label>
           <Input
@@ -104,9 +104,9 @@ export default function OtpLoginPage() {
         </Button>
       </form>
 
-      <p className="mt-6 text-center text-sm text-[#2E00AB]/80">
+      <p className="mt-6 text-center text-sm text-[#152A51]/80">
         Prefer password login?{" "}
-        <Link href="/auth" className="font-medium text-[#2E00AB] hover:underline">
+        <Link href="/auth" className="font-medium text-[#152A51] hover:underline">
           Back to login
         </Link>
       </p>

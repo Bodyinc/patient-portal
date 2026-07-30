@@ -19,7 +19,7 @@ export default function SelectedProductCard({ product }: { product: CheckoutProd
               fill
               sizes="56px"
               unoptimized={external}
-              className="object-contain p-2"
+              className="object-cover object-top scale-[1.18]"
             />
           ) : null}
         </div>

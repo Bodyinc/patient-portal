@@ -66,8 +66,8 @@ export default function OnboardingStepLayout({
         isCentered ? "shrink-0" : "flex min-h-0 flex-1 flex-col overflow-hidden",
       )
     : isCentered
-      ? "shrink-0 overflow-hidden rounded-2xl border-[#2E00AB]/20 p-4 shadow-none sm:p-5"
-      : "flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border-[#2E00AB]/20 p-3 shadow-none sm:p-4";
+      ? "shrink-0 overflow-hidden rounded-2xl border-[#152A51]/20 p-4 shadow-none sm:p-5"
+      : "flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border-[#152A51]/20 p-3 shadow-none sm:p-4";
 
   const contentClass = isCentered
     ? isBare
@@ -103,7 +103,7 @@ export default function OnboardingStepLayout({
               className={cn(
                 isBare
                   ? "text-[28px] font-medium leading-none tracking-[-0.5px] text-[#152A51] sm:text-[32px]"
-                  : "text-lg font-semibold text-[#2E00AB] sm:text-xl lg:text-2xl",
+                  : "text-lg font-semibold text-[#152A51] sm:text-xl lg:text-2xl",
                 titleClassName,
               )}
             >
@@ -114,7 +114,7 @@ export default function OnboardingStepLayout({
                 className={cn(
                   isBare
                     ? "mt-3.5 text-[14px] font-normal leading-snug text-[#152A51]/80"
-                    : "mt-1 text-sm text-[#2E00AB]/80 sm:text-base",
+                    : "mt-1 text-sm text-[#152A51]/80 sm:text-base",
                   descriptionClassName,
                 )}
               >

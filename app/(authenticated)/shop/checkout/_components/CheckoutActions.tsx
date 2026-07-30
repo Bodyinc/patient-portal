@@ -24,11 +24,11 @@ export default function CheckoutActions({
 
   return (
     <section className="space-y-4">
-      <label className="flex items-start gap-2 text-xs text-[#2E00AB]/80">
+      <label className="flex items-start gap-2 text-xs leading-relaxed text-[#152A51]/80">
         <Checkbox
           checked={termsAccepted}
           onCheckedChange={(checked) => onTermsChange(Boolean(checked))}
-          className="mt-0.5 border-[#2E00AB]/40 data-[state=checked]:bg-[#2E00AB]"
+          className="mt-0.5 border-[#6A9B9C]/60 data-[state=checked]:border-[#6A9B9C] data-[state=checked]:bg-[#6A9B9C]"
         />
         <span>
           I agree to the Terms of Service and Privacy Policy. I understand my subscription will
@@ -42,7 +42,7 @@ export default function CheckoutActions({
           type="button"
           variant="outline"
           onClick={() => router.push(backHref)}
-          className="h-11 border-[#2E00AB]/30 text-[#2E00AB]"
+          className="h-[46px] rounded-full border-[#152A51]/30 bg-white text-[#152A51] shadow-none hover:bg-[#F3F6F6]"
         >
           Back
         </Button>
@@ -50,7 +50,7 @@ export default function CheckoutActions({
           type="button"
           disabled={!termsAccepted || continueDisabled}
           onClick={onContinue}
-          className="h-11 bg-[#2E00AB] text-white hover:bg-[#2E00AB]/90"
+          className="h-[46px] rounded-full bg-[#E3E084] text-[#152A51] shadow-none hover:bg-[#D9D674]"
         >
           Continue to Payment
         </Button>
