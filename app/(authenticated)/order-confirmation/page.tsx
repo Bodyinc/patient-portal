@@ -190,7 +190,7 @@ export default async function OrderConfirmationPage() {
         <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-center">
           <Link
             href="/dashboard"
-            className="rounded-md bg-[#152A51] px-6 py-2.5 text-center text-sm font-medium text-white hover:bg-[#10213F]"
+            className="rounded-md bg-[#E3E084] px-6 py-2.5 text-center text-sm font-medium text-[#152A51] hover:bg-[#D9D674]"
           >
             Go to Dashboard
           </Link>

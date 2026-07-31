@@ -161,6 +161,7 @@ export default function PersonalInfoPage() {
           </Label>
           <Input
             id="fullName"
+            autoFocus
             value={form.fullName}
             onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
             placeholder="John Doe"

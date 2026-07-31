@@ -19,7 +19,7 @@ function DashboardActions() {
       <Button
         type="button"
         onClick={() => router.push("/dashboard")}
-        className="h-10 w-full rounded-md bg-[#152A51] px-6 hover:bg-[#10213F] sm:w-auto"
+        className="h-10 w-full rounded-md bg-[#E3E084] px-6 text-[#152A51] hover:bg-[#D9D674] sm:w-auto"
       >
         Go to Dashboard
         <ArrowRight className="ml-2 h-4 w-4" />
@@ -86,6 +86,7 @@ function SetPasswordForm({ onSuccess }: { onSuccess: () => void }) {
             id="onb-pw"
             type="password"
             autoComplete="new-password"
+            autoFocus
             placeholder="Create a password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}

@@ -74,6 +74,7 @@ function ChangeEmailContent() {
             id="change-email"
             type="email"
             autoComplete="email"
+            autoFocus
             placeholder="name@company.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}

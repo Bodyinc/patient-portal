@@ -26,6 +26,26 @@ function toDbImageSrc(imageUrl: string | null | undefined): string | null {
   return resolved;
 }
 
+function resolveCategoryImageSrc(
+  categoryImageUrl: string | null | undefined,
+  icon: string | null | undefined,
+): string | null {
+  const categoryImageTrimmed = categoryImageUrl?.trim();
+  if (categoryImageTrimmed) return categoryImageTrimmed;
+
+  const iconTrimmed = icon?.trim();
+  if (
+    iconTrimmed &&
+    (iconTrimmed.startsWith("http://") ||
+      iconTrimmed.startsWith("https://") ||
+      iconTrimmed.startsWith("/"))
+  ) {
+    return iconTrimmed;
+  }
+
+  return null;
+}
+
 async function fetchClaimedIntakeExtras(userId: string): Promise<{
   bmi: number | null;
   goals: DashboardGoalDto[];
@@ -51,7 +71,7 @@ async function fetchClaimedIntakeExtras(userId: string): Promise<{
   const [categoriesResult, medicineResult] = await Promise.all([
     supabaseAdmin
       .from("intake_session_categories")
-      .select("category_id, medication_categories(id, name, icon)")
+      .select("category_id, medication_categories(id, name, icon, image_url)")
       .eq("session_id", session.id),
     supabaseAdmin
       .from("intake_session_medicines")
@@ -66,7 +86,12 @@ async function fetchClaimedIntakeExtras(userId: string): Promise<{
     const category =
       (
         row as {
-          medication_categories?: { id: string; name: string; icon: string | null } | null;
+          medication_categories?: {
+            id: string;
+            name: string;
+            icon: string | null;
+            image_url: string | null;
+          } | null;
         }
       ).medication_categories ?? null;
     if (!category) return [];
@@ -74,7 +99,7 @@ async function fetchClaimedIntakeExtras(userId: string): Promise<{
       {
         id: category.id,
         name: category.name,
-        icon: category.icon?.startsWith("http") ? category.icon : null,
+        imageSrc: resolveCategoryImageSrc(category.image_url, category.icon),
       },
     ];
   });
@@ -94,8 +119,12 @@ async function fetchClaimedIntakeExtras(userId: string): Promise<{
   const treatment: DashboardTreatmentDto | null = medicine
     ? {
         medicineId: medicine.id,
+        packageId: null,
+        variantId: null,
         name: medicine.name,
-        description: medicine.short_description,
+        currentPlan: "—",
+        variantDose: "—",
+        nextRefillDate: null,
         imageSrc: toDbImageSrc(medicine.image_url),
       }
     : null;
@@ -112,9 +141,13 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
 
   const treatmentFromSub: DashboardTreatmentDto | null = currentMed
     ? {
-        medicineId: currentMed.medicineId ?? currentMed.subscriptionId,
+        medicineId: currentMed.medicineId,
+        packageId: currentMed.packageId,
+        variantId: currentMed.variantId,
         name: currentMed.medicationName,
-        description: currentMed.currentPlan,
+        currentPlan: currentMed.currentPlan,
+        variantDose: currentMed.variantName || currentMed.dosage || "—",
+        nextRefillDate: currentMed.nextRefillDate,
         imageSrc: toDbImageSrc(currentMed.imageSrc),
       }
     : null;

@@ -1,11 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import { Bell } from "lucide-react";
+import Link from "next/link";
 
 import { isExternalMedicineImage } from "@/lib/intake/medicine-image";
+import type { PortalOfferDto } from "@/lib/offers/types";
 
-import TopSearchBar from "../../_components/TopSearchBar";
+import NotificationBell from "../../_components/NotificationBell";
 
 type MyMedsHeaderProps = {
   fullName: string;
@@ -15,6 +16,7 @@ type MyMedsHeaderProps = {
   searchPending?: boolean;
   onSearchChange?: (value: string) => void;
   onSearchSubmit?: () => void;
+  offer?: PortalOfferDto | null;
 };
 
 function initialsFromName(name: string) {
@@ -24,35 +26,35 @@ function initialsFromName(name: string) {
   return `${parts[0].slice(0, 1)}${parts[parts.length - 1].slice(0, 1)}`.toUpperCase();
 }
 
+function offerTrailingCopy(offer: PortalOfferDto): string | null {
+  if (offer.couponCode) return `Use code ${offer.couponCode}`;
+  if (offer.badgeText) return offer.badgeText;
+  return null;
+}
+
 export default function MyMedsHeader({
   fullName,
   patientId,
   avatarUrl,
-  searchQuery,
-  searchPending = false,
-  onSearchChange,
-  onSearchSubmit,
+  offer = null,
 }: MyMedsHeaderProps) {
   const external = avatarUrl ? isExternalMedicineImage(avatarUrl) : false;
+  const trailing = offer ? offerTrailingCopy(offer) : null;
 
   return (
     <>
       <section className="mb-4 rounded-[20px] bg-[#F3F6F6] px-4 py-4 sm:px-6 sm:py-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-          <TopSearchBar
-            actionPath="/my-meds"
-            placeholder="Search medications or requests..."
-            defaultValue={searchQuery}
-            value={searchQuery}
-            onValueChange={onSearchChange}
-            onSubmit={onSearchSubmit}
-            isPending={searchPending}
-          />
+          <div>
+            <h1 className="text-xl font-medium tracking-[-0.5px] text-[#152A51] sm:text-2xl lg:text-[28px]">
+              My Meds
+            </h1>
+            <p className="text-sm text-[#152A51]/80 sm:text-[15px]">
+              Manage your medications, refill requests, and track your treatment progress.
+            </p>
+          </div>
           <div className="flex items-center justify-between gap-3 sm:justify-end sm:gap-4">
-            <div className="relative shrink-0">
-              <Bell className="h-5 w-5 text-[#152A51]" strokeWidth={1.8} />
-              <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[#6A9B9C]" />
-            </div>
+            <NotificationBell />
             <div className="flex min-w-0 items-center gap-3">
               {avatarUrl ? (
                 <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full sm:h-[42px] sm:w-[42px]">
@@ -83,18 +85,25 @@ export default function MyMedsHeader({
         </div>
       </section>
 
-      <section className="mb-4 flex flex-col gap-3 rounded-[16px] bg-[#E8EEED] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-5 sm:py-3.5">
-        <p className="text-sm font-medium leading-snug text-[#152A51] sm:text-[15px]">
-          Save up to $500 on eligible treatment plans —{" "}
-          <span className="font-medium">Limited-time offer</span>
-        </p>
-        <button
-          type="button"
-          className="h-10 w-full shrink-0 rounded-full bg-[#152A51] px-5 text-sm font-medium text-white hover:bg-[#152A51]/90 sm:w-auto"
-        >
-          View Treatment Details →
-        </button>
-      </section>
+      {offer ? (
+        <section className="mb-4 flex flex-col gap-3 rounded-[16px] bg-[#E8EEED] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-5 sm:py-3.5">
+          <p className="text-sm font-medium leading-snug text-[#152A51] sm:text-[15px]">
+            {offer.headline}
+            {trailing ? (
+              <>
+                {" "}
+                — <span className="font-medium">{trailing}</span>
+              </>
+            ) : null}
+          </p>
+          <Link
+            href={offer.ctaHref}
+            className="inline-flex h-10 w-full shrink-0 items-center justify-center rounded-full bg-[#152A51] px-5 text-sm font-medium text-white hover:bg-[#152A51]/90 sm:w-auto"
+          >
+            {offer.ctaLabel.includes("→") ? offer.ctaLabel : `${offer.ctaLabel} →`}
+          </Link>
+        </section>
+      ) : null}
     </>
   );
 }

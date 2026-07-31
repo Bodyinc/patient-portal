@@ -10,6 +10,7 @@ import {
   uploadProfileAvatar,
   type EditableProfileDto,
 } from "@/lib/actions/profile";
+import { PROFILE_AVATAR_MAX_BYTES, PROFILE_AVATAR_MAX_LABEL } from "@/lib/profile/avatar";
 import { isExternalMedicineImage } from "@/lib/intake/medicine-image";
 import { fieldControlClass, fieldLabelClass } from "../../../onboarding/_lib/onboarding-theme";
 
@@ -25,6 +26,7 @@ type Field = {
   kind?: "input" | "select-sex";
   readOnly?: boolean;
   hint?: string;
+  autoFocus?: boolean;
   action?: { label: string; href: string };
 };
 
@@ -77,6 +79,7 @@ function Section({
                 onChange={(e) => onChange(field.key, e.target.value)}
                 readOnly={field.readOnly}
                 disabled={field.readOnly}
+                autoFocus={field.autoFocus}
                 className={`w-full ${fieldControlClass} ${
                   field.readOnly ? "cursor-not-allowed opacity-60" : ""
                 }`}
@@ -117,21 +120,40 @@ export default function ProfileEditor({ initialProfile }: { initialProfile: Edit
   function onAvatarSelect(file: File | null) {
     if (!file) return;
 
+    if (!file.type.startsWith("image/")) {
+      toast.error("Only image files are allowed.");
+      return;
+    }
+
+    if (file.size > PROFILE_AVATAR_MAX_BYTES) {
+      toast.error(`Image exceeds ${PROFILE_AVATAR_MAX_LABEL}. Please choose a smaller photo.`);
+      return;
+    }
+
+    const previousPreview = form.avatarUrl;
     const localPreview = URL.createObjectURL(file);
     setAvatarPreview(localPreview);
 
     startUploadTransition(async () => {
-      const fd = new FormData();
-      fd.append("file", file);
-      const result = await uploadProfileAvatar(fd);
-      if (!result.ok) {
-        toast.error(result.message);
-        return;
-      }
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        const result = await uploadProfileAvatar(fd);
+        if (!result.ok) {
+          setAvatarPreview(previousPreview);
+          toast.error(result.message);
+          return;
+        }
 
-      setForm((prev) => ({ ...prev, avatarUrl: result.data.avatarUrl }));
-      setAvatarPreview(result.data.avatarUrl);
-      toast.success("Avatar uploaded");
+        setForm((prev) => ({ ...prev, avatarUrl: result.data.avatarUrl }));
+        setAvatarPreview(result.data.avatarUrl);
+        toast.success("Avatar uploaded");
+      } catch {
+        setAvatarPreview(previousPreview);
+        toast.error(`Image exceeds ${PROFILE_AVATAR_MAX_LABEL}. Please choose a smaller photo.`);
+      } finally {
+        URL.revokeObjectURL(localPreview);
+      }
     });
   }
 
@@ -207,7 +229,11 @@ export default function ProfileEditor({ initialProfile }: { initialProfile: Edit
                 accept="image/*"
                 className="hidden"
                 disabled={uploadingAvatar}
-                onChange={(e) => onAvatarSelect(e.target.files?.[0] ?? null)}
+                onChange={(e) => {
+                  const selected = e.target.files?.[0] ?? null;
+                  e.target.value = "";
+                  onAvatarSelect(selected);
+                }}
               />
             </label>
           </div>
@@ -218,7 +244,7 @@ export default function ProfileEditor({ initialProfile }: { initialProfile: Edit
           form={form}
           onChange={updateField}
           fields={[
-            { key: "fullName", label: "Full Name" },
+            { key: "fullName", label: "Full Name", autoFocus: true },
             { key: "sex", label: "Gender", kind: "select-sex" },
             { key: "dob", label: "Date of Birth", type: "date" },
           ]}

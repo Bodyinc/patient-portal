@@ -20,8 +20,16 @@ type ShopCheckoutClientProps = {
   patientId: string;
   avatarUrl: string | null;
   from?: string | null;
+  initialPackageId?: string | null;
   walletCreditCents?: number;
 };
+
+function checkoutBackHref(from: string | null | undefined): string {
+  if (from === "billing") return "/billing";
+  if (from === "my-meds") return "/my-meds";
+  if (from === "dashboard") return "/dashboard";
+  return "/shop";
+}
 
 export default function ShopCheckoutClient({
   bootstrap,
@@ -30,12 +38,19 @@ export default function ShopCheckoutClient({
   patientId,
   avatarUrl,
   from,
+  initialPackageId,
   walletCreditCents = 0,
 }: ShopCheckoutClientProps) {
   const isUpgradeFromBilling = from === "billing";
-  const backHref = isUpgradeFromBilling ? "/billing" : "/shop";
+  const isRefill = from === "dashboard" || from === "my-meds";
+  const backHref = checkoutBackHref(from);
   const [isCreating, startCreating] = useTransition();
-  const [selectedPlan, setSelectedPlan] = useState<CheckoutPlanId>(bootstrap.defaultSelectedPlan);
+  const [selectedPlan, setSelectedPlan] = useState<CheckoutPlanId>(() => {
+    if (initialPackageId && bootstrap.plans.some((plan) => plan.id === initialPackageId)) {
+      return initialPackageId;
+    }
+    return bootstrap.defaultSelectedPlan;
+  });
   const [promoCode, setPromoCode] = useState("");
   const [promoSavings, setPromoSavings] = useState(0);
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -135,6 +150,17 @@ export default function ShopCheckoutClient({
           </h1>
           <p className="text-sm text-[#152A51]/70">
             Choose a new plan for your treatment subscription.
+          </p>
+        </section>
+      ) : null}
+
+      {isRefill ? (
+        <section className="space-y-1 px-1">
+          <h1 className="text-xl font-medium tracking-[-0.5px] text-[#152A51] sm:text-2xl">
+            New Refill Request
+          </h1>
+          <p className="text-sm text-[#152A51]/70">
+            Confirm your plan and complete checkout to place your refill order.
           </p>
         </section>
       ) : null}

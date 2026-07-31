@@ -1,11 +1,11 @@
 "use client";
 
 import Image from "next/image";
-import { Bell } from "lucide-react";
 
 import { isExternalMedicineImage } from "@/lib/intake/medicine-image";
 import type { ShopSortOption } from "@/lib/shop/types";
 
+import NotificationBell from "../../_components/NotificationBell";
 import TopSearchBar from "../../_components/TopSearchBar";
 
 type ShopHeaderProps = {
@@ -58,10 +58,7 @@ export default function ShopHeader({
             }}
           />
           <div className="flex items-center justify-between gap-3 sm:justify-end sm:gap-4">
-            <div className="relative shrink-0">
-              <Bell className="h-5 w-5 text-[#152A51]" strokeWidth={1.8} />
-              <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[#6A9B9C]" />
-            </div>
+            <NotificationBell />
             <div className="flex min-w-0 items-center gap-3">
               {avatarUrl ? (
                 <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full sm:h-[42px] sm:w-[42px]">

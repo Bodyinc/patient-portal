@@ -3,6 +3,8 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import type { PortalOfferDto } from "@/lib/offers/types";
+
 import CurrentMedicationCard from "./CurrentMedicationCard";
 import DeliverySupportBanner from "./DeliverySupportBanner";
 import MedicationRequestsSection from "./MedicationRequestsSection";
@@ -18,6 +20,7 @@ type MyMedsPageClientProps = {
   referralCode: string;
   referralLink: string;
   rewardCents: number;
+  offer?: PortalOfferDto | null;
 };
 
 export default function MyMedsPageClient({
@@ -28,6 +31,7 @@ export default function MyMedsPageClient({
   referralCode,
   referralLink,
   rewardCents,
+  offer = null,
 }: MyMedsPageClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -55,7 +59,7 @@ export default function MyMedsPageClient({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 px-4">
       <MyMedsHeader
         fullName={fullName}
         patientId={patientId}
@@ -64,16 +68,8 @@ export default function MyMedsPageClient({
         searchPending={isPending}
         onSearchChange={setSearchQuery}
         onSearchSubmit={() => updateParams({ q: searchQuery })}
+        offer={offer}
       />
-
-      <section className="space-y-1 px-1">
-        <h1 className="text-xl font-medium tracking-[-0.5px] text-[#152A51] sm:text-2xl lg:text-[28px]">
-          My Meds
-        </h1>
-        <p className="text-sm text-[#152A51]/80 sm:text-[15px]">
-          Manage your medications, refill requests, and track your treatment progress.
-        </p>
-      </section>
 
       <MyMedsReferralCard
         referralCode={referralCode}

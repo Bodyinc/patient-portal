@@ -14,6 +14,12 @@ const supabaseHostname = getSupabaseHostname();
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Profile avatar uploads go through a Server Action; default limit is 1 MB.
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "3mb",
+    },
+  },
   images: {
     remotePatterns: supabaseHostname
       ? [

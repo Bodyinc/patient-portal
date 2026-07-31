@@ -129,6 +129,7 @@ function VerifyOTPContent() {
             value={otp}
             onChange={setOtp}
             inputMode="numeric"
+            autoFocus
             containerClassName="justify-center gap-0.5 sm:gap-2"
           >
             {Array.from({ length: OTP_LENGTH }, (_, index) => (

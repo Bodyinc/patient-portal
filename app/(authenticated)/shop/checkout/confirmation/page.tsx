@@ -61,7 +61,7 @@ export default async function ShopCheckoutConfirmationPage({
 
           <div className="grid gap-2 rounded-md border border-[#E8EEED] bg-[#F3F6F6] p-4 text-sm text-[#152A51]/80">
             <p>
-              <span className="font-semibold text-[#152A51]">Order ID:</span> {order.id}
+              <span className="font-semibold text-[#152A51]">Order ID:</span> {order.orderNumber}
             </p>
             <p>
               <span className="font-semibold text-[#152A51]">Product:</span> {order.productName}
@@ -129,7 +129,7 @@ export default async function ShopCheckoutConfirmationPage({
             </Link>
             <Link
               href="/dashboard"
-              className="rounded-md bg-[#152A51] px-4 py-2 text-sm font-medium text-white"
+              className="rounded-md bg-[#E3E084] px-4 py-2 text-sm font-medium text-[#152A51] hover:bg-[#D9D674]"
             >
               Go to Dashboard
             </Link>

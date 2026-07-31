@@ -34,6 +34,7 @@ import type {
 } from "@/lib/intake/types";
 import { normalizeQuestionType } from "@/lib/intake/questionnaire";
 import { resolveMedicineImageSrc } from "@/lib/intake/medicine-image";
+import { formatOrderId } from "@/lib/orders/order-id";
 import { classifyPatientEmail } from "@/lib/auth/patient-email";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { DOB_SCHEMA, OPTIONAL_PHONE_SCHEMA, PHONE_SCHEMA } from "@/lib/validation";
@@ -1260,6 +1261,80 @@ export async function completeIntakeSession(): Promise<IntakeActionResult<{ sess
   }
 
   return { ok: true, data: { sessionId: sessionResult.session.id } };
+}
+
+function formatOrderDate(iso: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(iso));
+}
+
+/**
+ * Order number + date chips on the onboarding confirmation page.
+ * Prefers the session payment id, then medication_request id, then session id.
+ * Allows completed sessions because confirmation marks the session complete on mount.
+ */
+export async function getOnboardingOrderMeta(): Promise<
+  IntakeActionResult<{ orderNumber: string; orderDate: string }>
+> {
+  const token = await getSessionTokenFromCookie();
+  if (!token) {
+    return { ok: false, code: "session_error", message: "No intake session" };
+  }
+
+  const { session, error } = await resolveIntakeSession(token, { allowCompleted: true });
+  if (!session || error) {
+    return { ok: false, code: "session_error", message: error ?? "Invalid session" };
+  }
+
+  const [paymentResult, requestResult] = await Promise.all([
+    supabaseAdmin
+      .from("payments")
+      .select("id, created_at")
+      .eq("session_id", session.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("medication_requests")
+      .select("id, created_at")
+      .eq("session_id", session.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  const payment = paymentResult.data;
+  if (payment) {
+    return {
+      ok: true,
+      data: {
+        orderNumber: formatOrderId(payment.id),
+        orderDate: formatOrderDate(payment.created_at),
+      },
+    };
+  }
+
+  const request = requestResult.data;
+  if (request) {
+    return {
+      ok: true,
+      data: {
+        orderNumber: formatOrderId(request.id),
+        orderDate: formatOrderDate(request.created_at),
+      },
+    };
+  }
+
+  return {
+    ok: true,
+    data: {
+      orderNumber: formatOrderId(session.id),
+      orderDate: formatOrderDate(session.updated_at ?? session.created_at),
+    },
+  };
 }
 
 export async function claimIntakeSession(userId: string): Promise<void> {

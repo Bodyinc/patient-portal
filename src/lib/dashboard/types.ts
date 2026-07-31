@@ -1,13 +1,17 @@
 export type DashboardGoalDto = {
   id: string;
   name: string;
-  icon: string | null;
+  imageSrc: string | null;
 };
 
 export type DashboardTreatmentDto = {
-  medicineId: string;
+  medicineId: string | null;
+  packageId: string | null;
+  variantId: string | null;
   name: string;
-  description: string | null;
+  currentPlan: string;
+  variantDose: string;
+  nextRefillDate: string | null;
   imageSrc: string | null;
 };
 

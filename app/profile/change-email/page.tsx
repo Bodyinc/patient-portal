@@ -52,6 +52,7 @@ function OtpBoxes({ value, onChange }: { value: string; onChange: (v: string) =>
         value={value}
         onChange={onChange}
         inputMode="numeric"
+        autoFocus
         containerClassName="justify-center gap-0.5 sm:gap-2"
       >
         {Array.from({ length: OTP_LENGTH }, (_, index) => (
@@ -301,6 +302,7 @@ export default function ProfileChangeEmailPage() {
                 id="new-email"
                 type="email"
                 autoComplete="email"
+                autoFocus
                 value={newEmail}
                 onChange={(e) => setNewEmail(e.target.value)}
                 placeholder="name@company.com"

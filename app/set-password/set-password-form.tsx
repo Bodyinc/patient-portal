@@ -63,6 +63,7 @@ export function SetPasswordForm({ next }: { next: string }) {
               id="sp"
               type="password"
               autoComplete="new-password"
+              autoFocus
               placeholder="Create a password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}

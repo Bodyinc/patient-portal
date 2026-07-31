@@ -143,6 +143,7 @@ export function ResetPasswordForm({ recovery, error }: ResetPasswordFormProps) {
                   id="np"
                   type="password"
                   autoComplete="new-password"
+                  autoFocus
                   placeholder="Enter your new password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { resolveMedicineImageSrc } from "@/lib/intake/medicine-image";
+import { formatOrderId } from "@/lib/orders/order-id";
 import { planTitleFromDuration } from "@/lib/pricing";
 import { getPlatformSettings, effectiveShippingCents } from "@/lib/settings/platform-settings";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -108,6 +109,7 @@ function normalizeStatus(status: string): string {
 
 function matchesPaymentQuery(payment: BillingPaymentDto, query: string): boolean {
   const haystack = [
+    payment.orderNumber,
     payment.description,
     payment.subscriptionName,
     payment.variantName ?? "",
@@ -260,6 +262,7 @@ export async function fetchBillingPayments(
 
     return {
       id: payment.id,
+      orderNumber: formatOrderId(payment.id),
       date: payment.created_at,
       description,
       subscriptionName,

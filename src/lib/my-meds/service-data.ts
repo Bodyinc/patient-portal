@@ -56,6 +56,7 @@ function parseDosage(importantInfo: Json | null): string {
 
 function matchesRequestQuery(request: MyMedsMedicationRequestDto, query: string): boolean {
   const haystack = [
+    request.orderNumber,
     request.medicationName,
     request.planName ?? "",
     request.statusLabel,
@@ -73,7 +74,7 @@ export async function fetchCurrentMedication(
   const { data: subscription, error } = await supabaseAdmin
     .from("subscriptions")
     .select(
-      "id, medicine_id, package_id, current_period_end, created_at, medicines(id, name, image_url, important_info), packages(id, name, duration_months)",
+      "id, medicine_id, package_id, current_period_end, created_at, medicines(id, name, image_url, important_info), packages(id, name, duration_months, variant_id, medicine_variants(id, name))",
     )
     .eq("user_id", userId)
     .in("status", ACTIVE_SUBSCRIPTION_STATUSES)
@@ -95,16 +96,28 @@ export async function fetchCurrentMedication(
       }
     ).medicines ?? null;
   const pkg =
-    (subscription as { packages?: { name: string; duration_months: number } | null }).packages ??
-    null;
+    (
+      subscription as {
+        packages?: {
+          id: string;
+          name: string;
+          duration_months: number;
+          variant_id: string | null;
+          medicine_variants?: { id: string; name: string } | null;
+        } | null;
+      }
+    ).packages ?? null;
 
   return {
     subscriptionId: subscription.id,
     medicineId: subscription.medicine_id,
+    packageId: subscription.package_id ?? pkg?.id ?? null,
+    variantId: pkg?.medicine_variants?.id ?? pkg?.variant_id ?? null,
     medicationName: medicine?.name ?? "Active Medication",
     currentPlan: pkg?.name ?? "Treatment Plan",
     quantitySupply: formatQuantitySupply(pkg?.duration_months),
     dosage: parseDosage(medicine?.important_info ?? null),
+    variantName: pkg?.medicine_variants?.name?.trim() || null,
     nextRefillDate: subscription.current_period_end,
     imageSrc: resolveMedicineImageSrc(medicine?.image_url ?? null),
   };
@@ -121,6 +134,7 @@ export async function fetchMedicationRequests(
   const orders = await fetchPatientOrders(userId);
   const allItems: MyMedsMedicationRequestDto[] = orders.map((o) => ({
     id: o.id,
+    orderNumber: o.orderNumber,
     medicationName: o.medicineName,
     planName: o.planName,
     status: o.status,

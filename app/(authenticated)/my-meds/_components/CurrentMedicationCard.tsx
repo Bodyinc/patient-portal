@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 
 import {
@@ -9,6 +10,7 @@ import {
   isExternalMedicineImage,
   resolveMedicineImageSrc,
 } from "@/lib/intake/medicine-image";
+import { buildShopCheckoutHref } from "@/lib/shop/checkout-href";
 import { cn } from "@/lib/utils";
 
 import type { MyMedsCurrentMedicationDto } from "./types";
@@ -40,8 +42,18 @@ function toDbImageSrc(imageSrc: string | null | undefined): string | null {
 }
 
 export default function CurrentMedicationCard({ medication }: CurrentMedicationCardProps) {
+  const router = useRouter();
+
   function handleRefillRequest() {
-    window.alert("Refill requests are coming soon.");
+    if (!medication?.medicineId) return;
+    router.push(
+      buildShopCheckoutHref({
+        medicineId: medication.medicineId,
+        variantId: medication.variantId,
+        packageId: medication.packageId,
+        from: "my-meds",
+      }),
+    );
   }
 
   if (!medication) {
@@ -65,6 +77,7 @@ export default function CurrentMedicationCard({ medication }: CurrentMedicationC
 
   const imageSrc = toDbImageSrc(medication.imageSrc);
   const external = imageSrc ? isExternalMedicineImage(imageSrc) : false;
+  const canRefill = Boolean(medication.medicineId);
 
   return (
     <section className="rounded-[24px] border border-[#E8EEED] bg-white p-4 sm:p-6">
@@ -123,7 +136,8 @@ export default function CurrentMedicationCard({ medication }: CurrentMedicationC
           <button
             type="button"
             onClick={handleRefillRequest}
-            className="inline-flex h-[46px] w-full items-center justify-center gap-2 rounded-full border border-[#152A51] px-5 text-sm font-medium text-[#152A51] hover:bg-[#F3F6F6] sm:w-fit"
+            disabled={!canRefill}
+            className="inline-flex h-[46px] w-full items-center justify-center gap-2 rounded-full border border-[#152A51] px-5 text-sm font-medium text-[#152A51] hover:bg-[#F3F6F6] disabled:cursor-not-allowed disabled:opacity-50 sm:w-fit"
           >
             New Refill Request
             <ArrowRight className="h-4 w-4" />

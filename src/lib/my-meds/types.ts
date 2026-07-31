@@ -1,10 +1,13 @@
 export type MyMedsCurrentMedicationDto = {
   subscriptionId: string;
   medicineId: string | null;
+  packageId: string | null;
+  variantId: string | null;
   medicationName: string;
   currentPlan: string;
   quantitySupply: string;
   dosage: string;
+  variantName: string | null;
   nextRefillDate: string | null;
   imageSrc: string;
 };
@@ -18,6 +21,7 @@ export type MyMedsTimelineStepDto = {
 
 export type MyMedsMedicationRequestDto = {
   id: string;
+  orderNumber: string;
   medicationName: string;
   planName: string | null;
   status: string;

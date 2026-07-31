@@ -91,6 +91,7 @@ export default function OtpLoginPage() {
             id="otp-email"
             type="email"
             autoComplete="email"
+            autoFocus
             placeholder="name@company.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}

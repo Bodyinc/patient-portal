@@ -110,6 +110,7 @@ export default function PaymentHistorySection({
           <Table>
             <TableHeader>
               <TableRow className="border-[#E8EEED] hover:bg-transparent">
+                <TableHead className="min-w-[110px] text-[#152A51]/70">Order</TableHead>
                 <TableHead className="min-w-[100px] text-[#152A51]/70">Date</TableHead>
                 <TableHead className="min-w-[160px] text-[#152A51]/70">Description</TableHead>
                 <TableHead className="hidden min-w-[100px] text-[#152A51]/70 sm:table-cell">
@@ -130,6 +131,9 @@ export default function PaymentHistorySection({
             <TableBody>
               {items.map((payment) => (
                 <TableRow key={payment.id} className="border-[#E8EEED] hover:bg-[#F3F6F6]/60">
+                  <TableCell className="text-sm font-medium text-[#152A51]">
+                    {payment.orderNumber ?? "—"}
+                  </TableCell>
                   <TableCell className="text-sm text-[#152A51]">
                     {formatDate(payment.date)}
                   </TableCell>

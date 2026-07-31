@@ -138,6 +138,7 @@ export default function BmiPage() {
                 min={1}
                 max={8}
                 inputMode="numeric"
+                autoFocus
                 value={heightFeet}
                 onChange={(e) => setHeightFeet(e.target.value)}
                 placeholder="Feet"

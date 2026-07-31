@@ -1,5 +1,6 @@
 import { requirePatientSession } from "@/lib/auth/require-patient";
 import { fetchMyMedsPageData } from "@/lib/my-meds/service-data";
+import { fetchActivePortalOffer } from "@/lib/offers/service-data";
 import { buildReferralLink, getReferralSummary } from "@/lib/referrals";
 import MyMedsPageClient from "./_components/MyMedsPageClient";
 
@@ -24,13 +25,14 @@ export default async function MyMedsPage({
   const query = (resolvedSearchParams.q ?? "").trim();
 
   try {
-    const [data, referral] = await Promise.all([
+    const [data, referral, offer] = await Promise.all([
       fetchMyMedsPageData(user.id, {
         page,
         pageSize: PAGE_SIZE,
         query,
       }),
       getReferralSummary(user.id),
+      fetchActivePortalOffer().catch(() => null),
     ]);
 
     return (
@@ -43,6 +45,7 @@ export default async function MyMedsPage({
           referralCode={referral?.code ?? "BODYINC"}
           referralLink={referral?.link ?? buildReferralLink("BODYINC")}
           rewardCents={referral?.rewardCents ?? 0}
+          offer={offer}
         />
       </main>
     );

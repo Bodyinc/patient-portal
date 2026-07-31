@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { PROFILE_AVATAR_MAX_BYTES, PROFILE_AVATAR_MAX_LABEL } from "@/lib/profile/avatar";
 import { OPTIONAL_DOB_SCHEMA, OPTIONAL_PHONE_SCHEMA } from "@/lib/validation";
 import type { Tables } from "@/lib/supabase/types";
 
@@ -182,9 +183,12 @@ export async function uploadProfileAvatar(
     return { ok: false, code: "invalid_type", message: "Only image files are allowed." };
   }
 
-  const maxSizeBytes = 5 * 1024 * 1024;
-  if (file.size > maxSizeBytes) {
-    return { ok: false, code: "file_too_large", message: "Image must be 5MB or smaller." };
+  if (file.size > PROFILE_AVATAR_MAX_BYTES) {
+    return {
+      ok: false,
+      code: "file_too_large",
+      message: `Image exceeds ${PROFILE_AVATAR_MAX_LABEL}. Please choose a smaller photo.`,
+    };
   }
 
   const ext = file.name.includes(".") ? (file.name.split(".").pop() ?? "png") : "png";

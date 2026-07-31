@@ -1,4 +1,5 @@
 import { resolveMedicineImageSrc } from "@/lib/intake/medicine-image";
+import { formatOrderId } from "@/lib/orders/order-id";
 import {
   fromPriceDollars,
   planSubtitleFromDuration,
@@ -371,6 +372,7 @@ export async function createShopCheckoutOrderData(options: {
 
   return {
     id: order.id,
+    orderNumber: formatOrderId(order.id),
     status: order.status,
     createdAt: order.created_at,
     productName: medicine.name,
@@ -450,6 +452,7 @@ export async function getShopCheckoutOrderByIdData(options: {
 
   return {
     id: order.id,
+    orderNumber: formatOrderId(order.id),
     status: order.status,
     createdAt: order.created_at,
     productName: medicine?.name ?? "Product",

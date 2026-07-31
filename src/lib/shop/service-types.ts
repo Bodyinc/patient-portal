@@ -73,6 +73,7 @@ export type ShopCheckoutOrderCreateInput = {
 
 export type ShopCheckoutOrderDto = {
   id: string;
+  orderNumber: string;
   status: string;
   createdAt: string;
   productName: string;

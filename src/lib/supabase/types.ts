@@ -958,6 +958,59 @@ export type Database = {
         };
         Relationships: [];
       };
+      portal_offers: {
+        Row: {
+          id: string;
+          promo_code_id: string | null;
+          headline: string;
+          badge_text: string | null;
+          cta_label: string;
+          cta_href: string;
+          is_active: boolean;
+          starts_at: string | null;
+          ends_at: string | null;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          promo_code_id?: string | null;
+          headline: string;
+          badge_text?: string | null;
+          cta_label?: string;
+          cta_href?: string;
+          is_active?: boolean;
+          starts_at?: string | null;
+          ends_at?: string | null;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          promo_code_id?: string | null;
+          headline?: string;
+          badge_text?: string | null;
+          cta_label?: string;
+          cta_href?: string;
+          is_active?: boolean;
+          starts_at?: string | null;
+          ends_at?: string | null;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "portal_offers_promo_code_id_fkey";
+            columns: ["promo_code_id"];
+            isOneToOne: false;
+            referencedRelation: "promo_codes";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       promo_codes: {
         Row: {
           id: string;

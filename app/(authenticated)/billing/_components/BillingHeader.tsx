@@ -1,7 +1,6 @@
 "use client";
 
-import { Bell } from "lucide-react";
-
+import NotificationBell from "../../_components/NotificationBell";
 import TopSearchBar from "../../_components/TopSearchBar";
 
 type BillingHeaderProps = {
@@ -37,7 +36,7 @@ export default function BillingHeader({
             isPending={searchPending}
           />
           <div className="flex items-center gap-3 self-end sm:self-auto">
-            <Bell className="h-4 w-4 text-[#152A51]" />
+            <NotificationBell iconClassName="h-4 w-4 text-[#152A51]" />
             <div className="flex items-center gap-2">
               {avatarUrl ? (
                 <img src={avatarUrl} alt={fullName} className="h-9 w-9 rounded-md object-cover" />

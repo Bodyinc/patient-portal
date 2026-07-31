@@ -77,6 +77,7 @@ export default function MedicationRequestsSection({
           <Table>
             <TableHeader>
               <TableRow className="border-[#E8EEED] hover:bg-transparent">
+                <TableHead className="min-w-[120px] text-[#152A51]/70">Order</TableHead>
                 <TableHead className="min-w-[160px] text-[#152A51]/70">Medicine</TableHead>
                 <TableHead className="min-w-[140px] text-[#152A51]/70">Plan</TableHead>
                 <TableHead className="min-w-[130px] text-[#152A51]/70">Status</TableHead>
@@ -88,6 +89,9 @@ export default function MedicationRequestsSection({
             <TableBody>
               {items.map((request) => (
                 <TableRow key={request.id} className="border-[#E8EEED] hover:bg-[#F3F6F6]/60">
+                  <TableCell className="text-sm font-medium text-[#152A51]">
+                    {request.orderNumber ?? "—"}
+                  </TableCell>
                   <TableCell className="text-sm font-medium text-[#152A51]">
                     {request.medicationName}
                   </TableCell>
@@ -164,6 +168,11 @@ export default function MedicationRequestsSection({
           <DialogHeader>
             <DialogTitle className="text-[#152A51]">
               {active?.medicationName}
+              {active?.orderNumber ? (
+                <span className="block text-sm font-normal text-[#152A51]/60">
+                  {active.orderNumber}
+                </span>
+              ) : null}
               {active?.planName ? (
                 <span className="block text-sm font-normal text-[#152A51]/60">
                   {active.planName}

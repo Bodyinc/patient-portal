@@ -23,6 +23,7 @@ export type BillingSubscriptionDto = {
 
 export type BillingPaymentDto = {
   id: string;
+  orderNumber: string;
   date: string;
   description: string;
   subscriptionName: string;

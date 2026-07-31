@@ -1,10 +1,12 @@
 import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { formatOrderId } from "@/lib/orders/order-id";
 import { buildTimeline, patientStatusLabel, type TimelineStep } from "./status";
 
 export type PatientOrderDto = {
   id: string;
+  orderNumber: string;
   medicineName: string;
   planName: string | null;
   kind: string;
@@ -99,6 +101,7 @@ export async function fetchPatientOrders(userId: string): Promise<PatientOrderDt
 
     return {
       id: r.id,
+      orderNumber: formatOrderId(r.id),
       medicineName: (r.medicine_id && medMap.get(r.medicine_id)) || "Medication",
       planName: (r.package_id && pkgMap.get(r.package_id)) || null,
       kind: r.kind,

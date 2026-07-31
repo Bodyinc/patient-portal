@@ -134,6 +134,7 @@ function LoginForm() {
           id="login-email"
           type="email"
           autoComplete="email"
+          autoFocus
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="name@company.com"

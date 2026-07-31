@@ -175,6 +175,7 @@ export default function DeliveryAddressPage() {
             <Input
               id="streetAddress"
               autoComplete="address-line1"
+              autoFocus
               value={form.streetAddress}
               onChange={(e) => setField("streetAddress", e.target.value)}
               placeholder="123, Main Street"
