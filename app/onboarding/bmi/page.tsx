@@ -8,7 +8,7 @@ import { Ruler, Weight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { saveIntakeBmi } from "@/lib/actions/intake";
+import { saveIntakeBmi, evaluateMedicineEligibility } from "@/lib/actions/intake";
 
 import BmiGauge from "../_components/BmiGauge";
 import OnboardingStepLayout from "../_components/OnboardingStepLayout";
@@ -31,6 +31,11 @@ export default function BmiPage() {
   const router = useRouter();
   const { state, updateState, hydrated } = useOnboarding();
   const [saving, setSaving] = useState(false);
+  const [ineligibleReason, setIneligibleReason] = useState<string | null>(
+    state.eligibilityResult === "ineligible" && Object.keys(state.questionnaireAnswers).length === 0
+      ? "Based on your profile, you are not eligible for this treatment."
+      : null,
+  );
   const [heightFeet, setHeightFeet] = useState(
     state.heightFeet !== null ? String(state.heightFeet) : "",
   );
@@ -83,15 +88,44 @@ export default function BmiPage() {
     }
 
     setSaving(true);
+    setIneligibleReason(null);
+
     const result = await saveIntakeBmi({
       heightFeet: feet,
       heightInches: inches,
       weightLbs: weight,
     });
-    setSaving(false);
 
     if (!result.ok) {
+      setSaving(false);
       toast.error(result.message);
+      return;
+    }
+
+    // Category rules (BMI / age / sex / state) before questionnaire — no point asking
+    // clinical questions if the patient already fails hard eligibility.
+    const eligibility = await evaluateMedicineEligibility(null);
+    setSaving(false);
+
+    if (!eligibility.ok) {
+      toast.error(eligibility.message);
+      return;
+    }
+
+    if (eligibility.data.result === "ineligible") {
+      const reason =
+        eligibility.data.reason ??
+        "Based on your profile, you are not eligible for this treatment.";
+      setIneligibleReason(reason);
+      toast.error(reason);
+      updateState({
+        heightFeet: feet,
+        heightInches: inches,
+        weightLbs: weight,
+        bmi: result.data.bmi,
+        eligibilityResult: "ineligible",
+        questionnaireComplete: false,
+      });
       return;
     }
 
@@ -100,6 +134,7 @@ export default function BmiPage() {
       heightInches: inches,
       weightLbs: weight,
       bmi: result.data.bmi,
+      eligibilityResult: eligibility.data.result,
     };
     updateState(patch);
     const next = getNextStepPath("/onboarding/bmi", { ...state, ...patch });
@@ -140,7 +175,10 @@ export default function BmiPage() {
                 inputMode="numeric"
                 autoFocus
                 value={heightFeet}
-                onChange={(e) => setHeightFeet(e.target.value)}
+                onChange={(e) => {
+                  setIneligibleReason(null);
+                  setHeightFeet(e.target.value);
+                }}
                 placeholder="Feet"
                 aria-label="Height (feet)"
                 className={cn(fieldControlClass, "pl-9 pr-12")}
@@ -161,7 +199,10 @@ export default function BmiPage() {
                 max={11}
                 inputMode="numeric"
                 value={heightInches}
-                onChange={(e) => setHeightInches(e.target.value)}
+                onChange={(e) => {
+                  setIneligibleReason(null);
+                  setHeightInches(e.target.value);
+                }}
                 placeholder="Inches"
                 aria-label="Height (inches)"
                 className={cn(fieldControlClass, "pl-9 pr-12")}
@@ -189,7 +230,10 @@ export default function BmiPage() {
               max={1500}
               inputMode="decimal"
               value={weightLbs}
-              onChange={(e) => setWeightLbs(e.target.value)}
+              onChange={(e) => {
+                setIneligibleReason(null);
+                setWeightLbs(e.target.value);
+              }}
               placeholder="Weight"
               className={cn(fieldControlClass, "pl-9 pr-12")}
             />
@@ -200,6 +244,15 @@ export default function BmiPage() {
         </div>
 
         {bmi !== null ? <BmiGauge bmi={bmi} category={bmiCategory} /> : null}
+
+        {ineligibleReason ? (
+          <div className="rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-4 text-center">
+            <p className="text-sm font-medium text-amber-900">{ineligibleReason}</p>
+            <p className="mt-1 text-sm text-amber-800">
+              Update your measurements, go back to change demographics, or choose a different goal.
+            </p>
+          </div>
+        ) : null}
       </div>
     </OnboardingStepLayout>
   );

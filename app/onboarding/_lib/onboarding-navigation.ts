@@ -75,11 +75,17 @@ function isBmiComplete(state: OnboardingState) {
   );
 }
 
+function hasQuestionnaireAnswers(state: OnboardingState) {
+  return Object.keys(state.questionnaireAnswers).length > 0;
+}
+
 export function getNextStepPath(currentPath: string, state: OnboardingState): string | null {
   const current = getStepByPath(currentPath);
   if (!current) return null;
 
   if (current.id === "bmi") {
+    // Category eligibility is checked on the BMI step — do not advance if ineligible.
+    if (state.eligibilityResult === "ineligible") return null;
     return includesQuestionnaire(state) ? "/onboarding/questionnaire" : "/onboarding/personal-info";
   }
 
@@ -115,6 +121,11 @@ export function getEarliestIncompleteStep(state: OnboardingState): string {
   if (!state.goalId) return "/onboarding/goal";
   if (!state.state || !state.sex || !state.dob) return "/onboarding/demographics";
   if (!isBmiComplete(state)) return "/onboarding/bmi";
+
+  // Category ineligible before any questionnaire answers — keep them on BMI.
+  if (state.eligibilityResult === "ineligible" && !hasQuestionnaireAnswers(state)) {
+    return "/onboarding/bmi";
+  }
 
   if (includesQuestionnaire(state) && !isQuestionnaireComplete(state)) {
     return "/onboarding/questionnaire";
