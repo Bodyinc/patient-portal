@@ -9,9 +9,9 @@ export default function SelectedProductCard({ product }: { product: CheckoutProd
   const external = imageSrc ? isExternalMedicineImage(imageSrc) : false;
 
   return (
-    <section className="rounded-[24px] border border-[#E8EEED] bg-white p-4 sm:p-5">
-      <div className="flex items-center gap-3 sm:gap-4">
-        <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-[14px] bg-[#5D7293]">
+    <section className="rounded-[24px] border border-[#E8EEED] bg-white ">
+      <div className="flex items-center gap-3  sm:gap-4">
+        <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-[14px] bg-[#5D7293]">
           {imageSrc ? (
             <Image
               src={imageSrc}

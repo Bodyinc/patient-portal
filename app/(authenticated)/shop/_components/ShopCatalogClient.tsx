@@ -2,9 +2,9 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 
+import type { PortalOfferDto } from "@/lib/offers/types";
 import { getShopCatalogFromService } from "@/lib/shop/client";
 import type { ShopCategoryDto, ShopMedicinesListDto, ShopSortOption } from "@/lib/shop/types";
 import { buildShopHref } from "./shop-query";
@@ -21,7 +21,7 @@ type ShopCatalogClientProps = {
   fullName: string;
   patientId: string;
   avatarUrl: string | null;
-  topContent?: ReactNode;
+  offer?: PortalOfferDto | null;
 };
 
 function parseSort(value: string | null): ShopSortOption {
@@ -38,7 +38,7 @@ export default function ShopCatalogClient({
   fullName,
   patientId,
   avatarUrl,
-  topContent,
+  offer = null,
 }: ShopCatalogClientProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -121,6 +121,7 @@ export default function ShopCatalogClient({
         currentCategorySlug={category}
         sortBy={sortBy}
         searchPending={isPending}
+        offer={offer}
         onSearchChange={(value) => {
           setSearchInput(value);
           setPage(1);
@@ -130,8 +131,6 @@ export default function ShopCatalogClient({
           setPage(1);
         }}
       />
-
-      {topContent}
 
       <section className="space-y-4 rounded-[24px] border border-[#E8EEED] bg-white p-4 sm:p-6">
         <h2 className="text-lg font-medium tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
@@ -147,14 +146,14 @@ export default function ShopCatalogClient({
             }}
             isPending={isPending}
           />
-          <ShopSortBar
+          {/* <ShopSortBar
             sortBy={sortBy}
             onSelectSort={(nextSort) => {
               setSortBy(nextSort);
               setPage(1);
             }}
             isPending={isPending}
-          />
+          /> */}
         </div>
         {isPending ? (
           <div className="rounded-[14px] border border-[#E8EEED] bg-[#F3F6F6] px-3 py-2 text-xs text-[#152A51]/80">

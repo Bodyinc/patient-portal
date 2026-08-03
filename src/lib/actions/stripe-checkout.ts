@@ -120,6 +120,10 @@ export async function createOnboardingSubscription(
     },
   });
 
+  if (!clientSecret) {
+    return { ok: false, message: "Unable to start payment. Please try again." };
+  }
+
   await supabaseAdmin
     .from("intake_sessions")
     .update({
@@ -151,14 +155,20 @@ export async function getCheckoutDiscount(input: {
   packageId: string;
   code?: string | null;
   allowAuto: boolean;
+  /** Optional override when the client already knows the plan price (dollars → cents). */
+  subtotalCents?: number;
 }): Promise<{ discountCents: number; label: string } | null> {
-  const { data: pkg } = await supabaseAdmin
-    .from("packages")
-    .select("price")
-    .eq("id", input.packageId)
-    .maybeSingle();
-  if (!pkg) return null;
-  const subtotalCents = Math.round(Number(pkg.price) * 100);
+  let subtotalCents = input.subtotalCents;
+  if (subtotalCents == null || !Number.isFinite(subtotalCents) || subtotalCents < 0) {
+    const { data: pkg } = await supabaseAdmin
+      .from("packages")
+      .select("price")
+      .eq("id", input.packageId)
+      .maybeSingle();
+    if (!pkg) return null;
+    subtotalCents = Math.round(Number(pkg.price) * 100);
+  }
+
   const d = await resolveCheckoutDiscount({
     code: input.code,
     subtotalCents,

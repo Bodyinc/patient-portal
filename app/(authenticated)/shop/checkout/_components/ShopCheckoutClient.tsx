@@ -1,14 +1,15 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
 import ShopHeader from "../../_components/ShopHeader";
 import CheckoutActions from "./CheckoutActions";
 import OrderSummaryCard from "./OrderSummaryCard";
+import PaymentModal from "./PaymentModal";
 import PlanSelector from "./PlanSelector";
 import ReferralCard from "./ReferralCard";
 import SelectedProductCard from "./SelectedProductCard";
-import StripePaymentForm from "./StripePaymentForm";
 import { getCheckoutDiscount } from "@/lib/actions/stripe-checkout";
 import { getShopOrderFees } from "@/lib/actions/fees";
 import type { CheckoutBootstrap, CheckoutPlanId } from "./types";
@@ -22,6 +23,7 @@ type ShopCheckoutClientProps = {
   from?: string | null;
   initialPackageId?: string | null;
   walletCreditCents?: number;
+  savedCardLabel?: string | null;
 };
 
 function checkoutBackHref(from: string | null | undefined): string {
@@ -40,7 +42,9 @@ export default function ShopCheckoutClient({
   from,
   initialPackageId,
   walletCreditCents = 0,
+  savedCardLabel = null,
 }: ShopCheckoutClientProps) {
+  const router = useRouter();
   const isUpgradeFromBilling = from === "billing";
   const isRefill = from === "dashboard" || from === "my-meds";
   const backHref = checkoutBackHref(from);
@@ -53,6 +57,7 @@ export default function ShopCheckoutClient({
   });
   const [promoCode, setPromoCode] = useState("");
   const [promoSavings, setPromoSavings] = useState(0);
+  const [appliedPromoLabel, setAppliedPromoLabel] = useState<string | null>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [payment, setPayment] = useState<{ clientSecret: string; returnUrl: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -81,8 +86,6 @@ export default function ShopCheckoutClient({
     [bootstrap.product.baseMonthlyPrice, selectedPlanMeta],
   );
   const totalBeforeCredit = Math.max(0, subtotal - promoSavings + shipping + consultation);
-  // Stripe consumes wallet credit automatically at payment; mirror it here so the
-  // displayed total matches the actual charge.
   const walletApplied = Math.min(walletCreditCents / 100, totalBeforeCredit);
   const total = Math.max(0, totalBeforeCredit - walletApplied);
   const selectedPackageId =
@@ -102,6 +105,7 @@ export default function ShopCheckoutClient({
 
     startCreating(async () => {
       setError(null);
+      setPayment(null);
       try {
         const response = await fetch("/api/stripe/subscription", {
           method: "POST",
@@ -113,13 +117,24 @@ export default function ShopCheckoutClient({
           }),
         });
         const data = (await response.json()) as {
-          clientSecret?: string;
+          clientSecret?: string | null;
           orderId?: string;
+          paid?: boolean;
           error?: string;
         };
-        if (!response.ok || !data.clientSecret || !data.orderId) {
+        if (!response.ok || !data.orderId) {
           throw new Error(data.error ?? "Unable to start checkout.");
         }
+
+        if (data.paid) {
+          router.push(`/shop/checkout/confirmation?orderId=${encodeURIComponent(data.orderId)}`);
+          return;
+        }
+
+        if (!data.clientSecret) {
+          throw new Error("Unable to start payment. Please try again.");
+        }
+
         setPayment({
           clientSecret: data.clientSecret,
           returnUrl: `${window.location.origin}/shop/checkout/confirmation?orderId=${encodeURIComponent(
@@ -133,84 +148,125 @@ export default function ShopCheckoutClient({
   }
 
   return (
-    <div className="space-y-4">
-      <ShopHeader
-        fullName={fullName}
-        patientId={patientId}
-        avatarUrl={avatarUrl}
-        searchQuery=""
-        currentCategorySlug={null}
-        sortBy="popular"
-      />
+    <div className="flex min-h-0 flex-1 flex-col gap-3 lg:overflow-hidden">
+      <div className="shrink-0">
+        <ShopHeader
+          fullName={fullName}
+          patientId={patientId}
+          avatarUrl={avatarUrl}
+          searchQuery=""
+          currentCategorySlug={null}
+          sortBy="popular"
+          title={
+            isUpgradeFromBilling
+              ? "Upgrade Subscription"
+              : isRefill
+                ? "New Refill Request"
+                : "Checkout"
+          }
+          subtitle={
+            isUpgradeFromBilling
+              ? "Choose a new plan for your treatment subscription."
+              : isRefill
+                ? "Confirm your plan and complete checkout to place your refill order."
+                : "Choose your plan and complete payment."
+          }
+        />
+      </div>
 
-      {isUpgradeFromBilling ? (
-        <section className="space-y-1 px-1">
-          <h1 className="text-xl font-medium tracking-[-0.5px] text-[#152A51] sm:text-2xl">
-            Upgrade Subscription
-          </h1>
-          <p className="text-sm text-[#152A51]/70">
-            Choose a new plan for your treatment subscription.
-          </p>
-        </section>
-      ) : null}
+      <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] lg:overflow-hidden">
+        <div className="min-h-0 space-y-3 lg:overflow-y-auto lg:pr-1">
+          <SelectedProductCard product={bootstrap.product} />
+          <PlanSelector
+            plans={bootstrap.plans}
+            selectedPlan={selectedPlan}
+            onChange={(planId) => {
+              setSelectedPlan(planId);
+              setPayment(null);
+              if (appliedPromoLabel) {
+                setAppliedPromoLabel(null);
+                setPromoSavings(0);
+              }
+            }}
+          />
+          <ReferralCard
+            referralHint={bootstrap.referralHint}
+            promoCode={promoCode}
+            appliedLabel={appliedPromoLabel}
+            onPromoCodeChange={(value) => {
+              setPromoCode(value);
+              if (appliedPromoLabel) {
+                setAppliedPromoLabel(null);
+                setPromoSavings(0);
+              }
+            }}
+            onApply={async () => {
+              if (!selectedPackageId) {
+                return {
+                  ok: false as const,
+                  message: "Select a plan before applying a promo code.",
+                };
+              }
 
-      {isRefill ? (
-        <section className="space-y-1 px-1">
-          <h1 className="text-xl font-medium tracking-[-0.5px] text-[#152A51] sm:text-2xl">
-            New Refill Request
-          </h1>
-          <p className="text-sm text-[#152A51]/70">
-            Confirm your plan and complete checkout to place your refill order.
-          </p>
-        </section>
-      ) : null}
+              const d = await getCheckoutDiscount({
+                packageId: selectedPackageId,
+                code: promoCode,
+                allowAuto: false,
+                subtotalCents: Math.round(subtotal * 100),
+              });
 
-      <SelectedProductCard product={bootstrap.product} />
-      <PlanSelector
-        plans={bootstrap.plans}
-        selectedPlan={selectedPlan}
-        onChange={setSelectedPlan}
-      />
-      <ReferralCard
-        referralHint={bootstrap.referralHint}
-        promoCode={promoCode}
-        onPromoCodeChange={setPromoCode}
-        onApply={async () => {
-          if (!selectedPackageId) return;
-          const d = await getCheckoutDiscount({
-            packageId: selectedPackageId,
-            code: promoCode,
-            allowAuto: false,
-          });
-          setPromoSavings(d ? d.discountCents / 100 : 0);
-        }}
-      />
-      <OrderSummaryCard
-        subtotal={subtotal}
-        promoSavings={promoSavings}
-        walletApplied={walletApplied}
-        shipping={shipping}
-        consultation={consultation}
-        total={total}
-      />
+              if (!d) {
+                setPromoSavings(0);
+                setAppliedPromoLabel(null);
+                return { ok: false as const, message: "Invalid or expired promo code" };
+              }
 
-      {error ? (
-        <p className="rounded-[16px] border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          {error}
-        </p>
-      ) : null}
+              setPromoCode(promoCode.trim().toUpperCase());
+              setPromoSavings(d.discountCents / 100);
+              setAppliedPromoLabel(d.label);
+              return { ok: true as const, label: d.label };
+            }}
+          />
+        </div>
+
+        <div className="flex min-h-0 flex-col gap-3 lg:overflow-y-auto">
+          <OrderSummaryCard
+            subtotal={subtotal}
+            promoSavings={promoSavings}
+            walletApplied={walletApplied}
+            shipping={shipping}
+            consultation={consultation}
+            total={total}
+          />
+
+          {error ? (
+            <p className="rounded-[16px] border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {error}
+            </p>
+          ) : null}
+
+          <CheckoutActions
+            termsAccepted={termsAccepted}
+            onTermsChange={setTermsAccepted}
+            continueDisabled={isCreating}
+            onContinue={handleContinue}
+            backHref={backHref}
+            savedCardLabel={savedCardLabel}
+            continueLabel={savedCardLabel ? "Pay now" : "Continue to Payment"}
+          />
+        </div>
+      </div>
 
       {payment ? (
-        <StripePaymentForm clientSecret={payment.clientSecret} returnUrl={payment.returnUrl} />
-      ) : (
-        <CheckoutActions
-          termsAccepted={termsAccepted}
-          onTermsChange={setTermsAccepted}
-          continueDisabled={isCreating}
-          onContinue={handleContinue}
-          backHref={backHref}
+        <PaymentModal
+          open
+          clientSecret={payment.clientSecret}
+          returnUrl={payment.returnUrl}
+          onOpenChange={(open) => {
+            if (!open) setPayment(null);
+          }}
         />
-      )}
+      ) : null}
     </div>
   );
 }

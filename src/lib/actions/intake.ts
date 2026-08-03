@@ -1337,6 +1337,66 @@ export async function getOnboardingOrderMeta(): Promise<
   };
 }
 
+/**
+ * Order summary card on onboarding confirmation. Must allow completed sessions because
+ * the page marks the session complete on mount (getIntakeSummary would then return null).
+ */
+export async function getOnboardingOrderSummary(): Promise<
+  IntakeActionResult<{
+    medicineName: string | null;
+    variantName: string | null;
+    packageName: string | null;
+    packagePrice: number | null;
+    totalPaid: number | null;
+    email: string | null;
+  }>
+> {
+  const token = await getSessionTokenFromCookie();
+  if (!token) {
+    return { ok: false, code: "session_error", message: "No intake session" };
+  }
+
+  const { session, error } = await resolveIntakeSession(token, { allowCompleted: true });
+  if (!session || error) {
+    return { ok: false, code: "session_error", message: error ?? "Invalid session" };
+  }
+
+  const [summary, paymentResult] = await Promise.all([
+    buildIntakeSummary(session.id, session),
+    supabaseAdmin
+      .from("payments")
+      .select("amount_cents")
+      .eq("session_id", session.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  if (!summary) {
+    return { ok: false, code: "not_found", message: "Order summary unavailable" };
+  }
+
+  const paidCents = paymentResult.data?.amount_cents;
+  const totalPaid =
+    paidCents != null
+      ? Number(paidCents) / 100
+      : summary.packagePrice != null
+        ? Number(summary.packagePrice)
+        : null;
+
+  return {
+    ok: true,
+    data: {
+      medicineName: summary.medicineName,
+      variantName: summary.variantName,
+      packageName: summary.packageName,
+      packagePrice: summary.packagePrice,
+      totalPaid,
+      email: summary.email?.trim() || null,
+    },
+  };
+}
+
 export async function claimIntakeSession(userId: string): Promise<void> {
   // Referral attach must never break signup, and runs before the intake-token check
   // so direct signups (no onboarding session) still get linked to their referrer.

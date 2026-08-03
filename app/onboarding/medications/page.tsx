@@ -146,6 +146,7 @@ export default function MedicationsPage() {
                 key={medication.id}
                 medication={medication}
                 selected={selected === medication.id}
+                activeVariantId={selected === medication.id ? selectedVariantId : null}
                 accentIndex={index}
                 onSelect={selectMedication}
                 onViewDetails={setDetailsMedicationId}
@@ -156,9 +157,14 @@ export default function MedicationsPage() {
       </OnboardingFrame>
 
       <MedicationDetailsDialog
-        key={detailsMedicationId ?? "none"}
+        key={`${detailsMedicationId ?? "none"}-${
+          detailsMedicationId && selected === detailsMedicationId ? (selectedVariantId ?? "") : ""
+        }`}
         medication={detailsMedication}
         open={Boolean(detailsMedicationId)}
+        initialVariantId={
+          detailsMedicationId && selected === detailsMedicationId ? selectedVariantId : null
+        }
         onOpenChange={(open) => {
           if (!open) setDetailsMedicationId(null);
         }}

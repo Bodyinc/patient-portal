@@ -80,11 +80,7 @@ export default function CurrentMedicationCard({ medication }: CurrentMedicationC
   const canRefill = Boolean(medication.medicineId);
 
   return (
-    <section className="rounded-[24px] border border-[#E8EEED] bg-white p-4 sm:p-6">
-      <h2 className="mb-4 text-lg font-medium tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
-        Current Medication Requests
-      </h2>
-
+    <section className="rounded-[24px] border border-[#E8EEED] bg-white ">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-stretch lg:gap-6">
         <div
           className={cn(
@@ -106,6 +102,9 @@ export default function CurrentMedicationCard({ medication }: CurrentMedicationC
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col justify-between gap-5">
+          <h2 className="mb-4 text-lg pt-4 font-medium tracking-[-0.3px] text-[#152A51] sm:text-[28px]">
+            Current Medication Requests
+          </h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <p className="text-xs text-[#152A51]/60 sm:text-sm">Medication Name</p>
@@ -120,9 +119,9 @@ export default function CurrentMedicationCard({ medication }: CurrentMedicationC
               </p>
             </div>
             <div>
-              <p className="text-xs text-[#152A51]/60 sm:text-sm">Quantity / Supply</p>
+              <p className="text-xs text-[#152A51]/60 sm:text-sm">Dose</p>
               <p className="mt-1 text-sm font-medium text-[#152A51] sm:text-[15px]">
-                {medication.quantitySupply}
+                {medication.variantName || medication.dosage || "—"}
               </p>
             </div>
             <div>
@@ -137,7 +136,7 @@ export default function CurrentMedicationCard({ medication }: CurrentMedicationC
             type="button"
             onClick={handleRefillRequest}
             disabled={!canRefill}
-            className="inline-flex h-[46px] w-full items-center justify-center gap-2 rounded-full border border-[#152A51] px-5 text-sm font-medium text-[#152A51] hover:bg-[#F3F6F6] disabled:cursor-not-allowed disabled:opacity-50 sm:w-fit"
+            className="inline-flex h-[46px] w-full mb-8 items-center justify-center gap-2 rounded-full border border-[#152A51] px-5 text-sm font-medium text-[#152A51] hover:bg-[#F3F6F6] disabled:cursor-not-allowed disabled:opacity-50 sm:w-fit"
           >
             New Refill Request
             <ArrowRight className="h-4 w-4" />

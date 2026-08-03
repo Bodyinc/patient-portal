@@ -75,14 +75,15 @@ export default function GoalPage() {
         checkoutConfirmed: false,
       };
       updateState(patch);
-      await Promise.all([
+      const next = getNextStepPath("/onboarding/goal", { ...state, ...patch });
+      if (next) await pushOnboardingRoute(router, next);
+      // Warm later-step caches without blocking demographics.
+      void Promise.all([
         prefetchMedicinesForCategory(queryClient, selected),
         result.data.requiresQuestionnaire
           ? prefetchQuestionnaireForCategory(queryClient, selected)
           : Promise.resolve(),
       ]);
-      const next = getNextStepPath("/onboarding/goal", { ...state, ...patch });
-      if (next) await pushOnboardingRoute(router, next);
     } catch (err) {
       const message =
         err instanceof Error

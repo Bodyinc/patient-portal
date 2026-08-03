@@ -20,7 +20,7 @@ export default function DeliverySupportBanner() {
         </div>
 
         <Link
-          href="/settings"
+          href="mailto:admin@bodyinc.com"
           className="inline-flex h-10 w-full items-center justify-center rounded-full border border-[#152A51] px-5 text-sm font-medium text-[#152A51] hover:bg-white sm:w-auto"
         >
           Contact Support

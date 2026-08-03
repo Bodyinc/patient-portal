@@ -1,17 +1,19 @@
 ﻿"use client";
 
 import { Check } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import MedicineImage from "./MedicineImage";
 import type { MedicineDto } from "@/lib/intake/types";
 import { formatMonthly } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
-import { MEDICATION_BADGE_ACCENTS, ONBOARDING } from "../_lib/onboarding-theme";
+import { fieldControlClass, MEDICATION_BADGE_ACCENTS, ONBOARDING } from "../_lib/onboarding-theme";
 
 type MedicationCardProps = {
   medication: MedicineDto;
   selected?: boolean;
+  /** When this medicine is the page selection, keep card variant/price in sync. */
+  activeVariantId?: string | null;
   accentIndex?: number;
   onSelect?: (id: string, variantId: string | null) => void;
   onViewDetails?: (id: string) => void;
@@ -66,6 +68,7 @@ function featureBadges(medication: MedicineDto): string[] {
 export default function MedicationCard({
   medication,
   selected = false,
+  activeVariantId = null,
   accentIndex = 0,
   onSelect,
   onViewDetails,
@@ -78,8 +81,20 @@ export default function MedicationCard({
     )[0].id;
   }, [hasVariants, medication.variants]);
 
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(defaultVariantId);
+
+  useEffect(() => {
+    setSelectedVariantId(defaultVariantId);
+  }, [defaultVariantId]);
+
+  useEffect(() => {
+    if (!activeVariantId) return;
+    if (!medication.variants.some((v) => v.id === activeVariantId)) return;
+    setSelectedVariantId(activeVariantId);
+  }, [activeVariantId, medication.variants]);
+
   const selectedVariant = hasVariants
-    ? (medication.variants.find((v) => v.id === defaultVariantId) ?? null)
+    ? (medication.variants.find((v) => v.id === selectedVariantId) ?? null)
     : null;
   const displayFromPriceCents =
     (hasVariants ? selectedVariant?.fromPriceCents : null) ?? medication.fromPriceCents;
@@ -94,20 +109,24 @@ export default function MedicationCard({
     MEDICATION_BADGE_ACCENTS[accentIndex % MEDICATION_BADGE_ACCENTS.length] ??
     ONBOARDING.badgeOrchid;
 
+  function chooseMedication(variantId: string | null = selectedVariantId) {
+    onSelect?.(medication.id, hasVariants ? variantId : null);
+  }
+
   return (
     <div
       role="button"
       tabIndex={0}
-      onClick={() => onSelect?.(medication.id, defaultVariantId)}
+      onClick={() => chooseMedication()}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          onSelect?.(medication.id, defaultVariantId);
+          chooseMedication();
         }
       }}
       className={cn(
         // Strict box model: full width (856px max), fixed height on sm, flex row stretch
-        "relative flex h-auto w-full max-w-[856px] mx-auto cursor-pointer flex-col overflow-visible rounded-[37px] border-2 border-[#E8EEED] bg-white shadow-[0_15px_40px_rgba(59,71,89,0.10)] transition-all onboarding-font sm:h-[355px] sm:flex-row sm:items-stretch shrink-0",
+        "relative mx-auto flex h-auto w-full max-w-[856px] shrink-0 cursor-pointer flex-col overflow-visible rounded-[37px] border-2 border-[#E8EEED] bg-white shadow-[0_15px_40px_rgba(59,71,89,0.10)] transition-all onboarding-font sm:h-[355px] sm:flex-row sm:items-stretch",
         selected && "ring-2 ring-[#6A9B9C]/25",
       )}
     >
@@ -164,6 +183,30 @@ export default function MedicationCard({
           ) : null}
         </div>
 
+        {hasVariants ? (
+          <div className="max-w-[240px] pt-0.5" onClick={(e) => e.stopPropagation()}>
+            <label className="mb-1.5 block text-[12px] font-normal text-[#152A51]/70">
+              Select option
+            </label>
+            <select
+              value={selectedVariantId ?? ""}
+              onChange={(e) => {
+                const nextVariantId = e.target.value;
+                setSelectedVariantId(nextVariantId);
+                chooseMedication(nextVariantId);
+              }}
+              className={cn("w-full text-[13px] sm:text-[14px]", fieldControlClass)}
+            >
+              {medication.variants.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.name}
+                  {v.fromPriceCents == null ? " — coming soon" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
+
         {onViewDetails ? (
           <div className="pt-0.5">
             <button
@@ -177,6 +220,14 @@ export default function MedicationCard({
               View Details
             </button>
           </div>
+        ) : null}
+
+        {medication.notice.trim() ? (
+          <p className="mt-1 text-[11px] font-normal leading-snug text-[#152A51]/55 sm:text-[12px]">
+            {medication.notice.startsWith("Note:")
+              ? medication.notice
+              : `Note: ${medication.notice}`}
+          </p>
         ) : null}
       </div>
 

@@ -5,9 +5,13 @@ import type { BillingSubscriptionDto } from "./types";
 
 type SubscriptionsSectionProps = {
   subscriptions: BillingSubscriptionDto[];
+  onCancel: (subscription: BillingSubscriptionDto) => void;
 };
 
-export default function SubscriptionsSection({ subscriptions }: SubscriptionsSectionProps) {
+export default function SubscriptionsSection({
+  subscriptions,
+  onCancel,
+}: SubscriptionsSectionProps) {
   const activeCount = subscriptions.length;
 
   return (
@@ -32,7 +36,11 @@ export default function SubscriptionsSection({ subscriptions }: SubscriptionsSec
       ) : (
         <div className="space-y-3">
           {subscriptions.map((subscription) => (
-            <SubscriptionRow key={subscription.id} subscription={subscription} />
+            <SubscriptionRow
+              key={subscription.id}
+              subscription={subscription}
+              onCancel={onCancel}
+            />
           ))}
         </div>
       )}

@@ -14,19 +14,17 @@ type OfferRow = {
   promo_code_id: string | null;
   starts_at: string | null;
   ends_at: string | null;
-  promo_codes?: {
-    code: string;
-    is_active: boolean;
-    redeem_by: string | null;
-    max_redemptions: number | null;
-    times_redeemed: number;
-  } | null;
 };
 
-function isPromoDisplayable(
-  promo: NonNullable<OfferRow["promo_codes"]> | null | undefined,
-): boolean {
-  if (!promo) return true;
+type PromoRow = {
+  code: string;
+  is_active: boolean;
+  redeem_by: string | null;
+  max_redemptions: number | null;
+  times_redeemed: number;
+};
+
+function isPromoDisplayable(promo: PromoRow): boolean {
   if (!promo.is_active) return false;
   if (promo.redeem_by && new Date(promo.redeem_by) <= new Date()) return false;
   if (promo.max_redemptions != null && (promo.times_redeemed ?? 0) >= promo.max_redemptions) {
@@ -60,11 +58,10 @@ function isWithinOfferWindow(
 
 /** Active marketing offer for the portal banner, or null when none should show. */
 export async function fetchActivePortalOffer(): Promise<PortalOfferDto | null> {
+  // Avoid embedding promo_codes here — a join failure previously wiped the whole banner.
   const { data, error } = await supabaseAdmin
     .from("portal_offers")
-    .select(
-      "headline, badge_text, cta_label, cta_href, promo_code_id, starts_at, ends_at, promo_codes(code, is_active, redeem_by, max_redemptions, times_redeemed)",
-    )
+    .select("headline, badge_text, cta_label, cta_href, promo_code_id, starts_at, ends_at")
     .eq("is_active", true)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: false })
@@ -78,18 +75,48 @@ export async function fetchActivePortalOffer(): Promise<PortalOfferDto | null> {
   const nowMs = Date.now();
   const rows = (data ?? []) as OfferRow[];
 
-  const row = rows.find((candidate) => {
-    if (!isWithinOfferWindow(candidate.starts_at, candidate.ends_at, nowMs)) return false;
-    return isPromoDisplayable(candidate.promo_codes ?? null);
-  });
-  if (!row) return null;
+  if (rows.length === 0) {
+    console.info("[portal_offers] no active rows (is_active = true)");
+    return null;
+  }
+
+  const row = rows.find((candidate) =>
+    isWithinOfferWindow(candidate.starts_at, candidate.ends_at, nowMs),
+  );
+
+  if (!row) {
+    console.info("[portal_offers] active rows exist but none are in date window", {
+      now: new Date(nowMs).toISOString(),
+      candidates: rows.map((r) => ({
+        headline: r.headline,
+        starts_at: r.starts_at,
+        ends_at: r.ends_at,
+      })),
+    });
+    return null;
+  }
 
   const headline = row.headline.trim();
   if (!headline) return null;
 
+  let couponCode: string | null = null;
+  if (row.promo_code_id) {
+    const { data: promo, error: promoError } = await supabaseAdmin
+      .from("promo_codes")
+      .select("code, is_active, redeem_by, max_redemptions, times_redeemed")
+      .eq("id", row.promo_code_id)
+      .maybeSingle();
+
+    if (promoError) {
+      console.error("[portal_offers] promo lookup failed:", promoError.message);
+    } else if (promo && isPromoDisplayable(promo as PromoRow)) {
+      couponCode = promo.code?.trim() || null;
+    }
+  }
+
   return {
     headline,
-    couponCode: row.promo_codes?.code?.trim() || null,
+    couponCode,
     badgeText: row.badge_text?.trim() || null,
     ctaLabel: row.cta_label.trim() || "View Treatment Details",
     ctaHref: row.cta_href.trim() || "/shop",

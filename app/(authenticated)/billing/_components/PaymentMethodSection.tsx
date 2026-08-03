@@ -141,7 +141,7 @@ export default function PaymentMethodSection() {
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[85vh] overflow-y-auto overscroll-contain">
           <DialogHeader>
             <DialogTitle>Update card on file</DialogTitle>
             <DialogDescription>

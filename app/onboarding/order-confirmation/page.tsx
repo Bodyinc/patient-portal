@@ -22,18 +22,16 @@ export default function OrderConfirmationPage() {
   }, []);
 
   return (
-    <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-6 overflow-y-auto scrollbar-hide py-4">
-      <ConfirmationHeader />
-
-      {/* Flex layout with items-start forces columns to maintain their natural content height */}
-      <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
-        {/* Left Column - password setup first, then dashboard actions after success */}
-        <div className="flex w-full flex-1 flex-col gap-6">
+    <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col overflow-y-auto scrollbar-hide px-4 py-6 sm:px-6 sm:py-8">
+      <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between lg:gap-10">
+        {/* Left: confirmation copy + password / dashboard actions */}
+        <div className="flex min-w-0 flex-1 flex-col items-center gap-6 text-center lg:pt-4">
+          <ConfirmationHeader />
           <ConfirmationPasswordGate />
         </div>
 
-        {/* Right Column - Fixed desktop width for the summary card */}
-        <div className="w-full shrink-0 md:w-[380px]">
+        {/* Right: order summary */}
+        <div className="mx-auto w-full max-w-[400px] shrink-0 lg:mx-0 lg:w-[380px]">
           <OrderSummary />
         </div>
       </div>

@@ -2,10 +2,13 @@
 
 import { useRouter } from "next/navigation";
 
+import { buildShopCheckoutHref } from "@/lib/shop/checkout-href";
+
 import type { BillingSubscriptionDto } from "./types";
 
 type SubscriptionRowProps = {
   subscription: BillingSubscriptionDto;
+  onCancel: (subscription: BillingSubscriptionDto) => void;
 };
 
 function formatDate(value: string | null): string {
@@ -24,16 +27,19 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-export default function SubscriptionRow({ subscription }: SubscriptionRowProps) {
+export default function SubscriptionRow({ subscription, onCancel }: SubscriptionRowProps) {
   const router = useRouter();
 
   function handleUpgrade() {
     if (!subscription.medicineId) return;
-    router.push(`/shop/checkout?id=${encodeURIComponent(subscription.medicineId)}&from=billing`);
-  }
-
-  function handleCancel() {
-    router.push(`/billing/cancel?subscriptionId=${encodeURIComponent(subscription.id)}`);
+    router.push(
+      buildShopCheckoutHref({
+        medicineId: subscription.medicineId,
+        variantId: subscription.variantId,
+        packageId: subscription.packageId,
+        from: "billing",
+      }),
+    );
   }
 
   return (
@@ -43,7 +49,7 @@ export default function SubscriptionRow({ subscription }: SubscriptionRowProps) 
           <img
             src={subscription.imageSrc}
             alt={subscription.medicineName}
-            className="h-14 w-14 shrink-0 rounded-md border border-[#E8EEED] object-cover"
+            className="h-20 w-20 shrink-0 rounded-md border border-[#E8EEED] object-cover"
           />
           <div className="min-w-0">
             <h3 className="text-base font-semibold text-[#152A51]">{subscription.medicineName}</h3>
@@ -96,7 +102,7 @@ export default function SubscriptionRow({ subscription }: SubscriptionRowProps) 
           </button>
           <button
             type="button"
-            onClick={handleCancel}
+            onClick={() => onCancel(subscription)}
             disabled={subscription.cancelAtPeriodEnd}
             className="w-full rounded-md border border-[#D5DFDE] bg-white px-4 py-2 text-sm text-[#152A51]/80 hover:bg-[#F3F6F6] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
           >

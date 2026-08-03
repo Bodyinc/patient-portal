@@ -36,7 +36,7 @@ export default async function BillingPage({
     ]);
 
     return (
-      <main className="min-w-0 flex-1 bg-[#F3F6F6] p-3 sm:p-4">
+      <main className="min-w-0 flex-1 bg-white p-3 sm:p-4">
         <BillingPageClient
           data={data}
           fullName={user.user_metadata?.full_name ?? "Patient"}
@@ -49,7 +49,7 @@ export default async function BillingPage({
     );
   } catch (error) {
     return (
-      <main className="min-w-0 flex-1 bg-[#F3F6F6] p-4">
+      <main className="min-w-0 flex-1 bg-white p-4">
         <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {error instanceof Error ? error.message : "Unable to load billing data."}
         </div>

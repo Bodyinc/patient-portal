@@ -20,13 +20,25 @@ export async function resolvePromoByCode(
   if (!code) return null;
   const normalized = code.trim().toUpperCase();
   if (!normalized) return null;
-  const { data } = await supabaseAdmin
+
+  // Exact match first (codes are normally stored uppercase).
+  const { data: exact } = await supabaseAdmin
     .from("promo_codes")
     .select("*")
     .eq("code", normalized)
     .maybeSingle();
-  if (!data || !isRedeemable(data)) return null;
-  return data;
+  if (exact && isRedeemable(exact)) return exact;
+
+  // Case-insensitive fallback for codes stored with mixed casing in admin.
+  const { data: rows } = await supabaseAdmin
+    .from("promo_codes")
+    .select("*")
+    .ilike("code", normalized)
+    .limit(5);
+  const match = (rows ?? []).find(
+    (row) => row.code.trim().toUpperCase() === normalized && isRedeemable(row),
+  );
+  return match ?? null;
 }
 
 export async function resolveAutoApplyPromo(): Promise<PromoCodeRow | null> {

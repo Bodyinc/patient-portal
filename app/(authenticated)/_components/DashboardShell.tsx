@@ -41,7 +41,9 @@ export default function DashboardShell({ children }: DashboardShellProps) {
       </aside>
 
       {/* Dashboard area scrolls independently when content overflows */}
-      <div className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden">{children}</div>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
+        {children}
+      </div>
     </div>
   );
 }

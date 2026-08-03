@@ -20,6 +20,7 @@ type MedicationDetailsDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelect: (id: string, variantId: string | null) => void;
+  initialVariantId?: string | null;
 };
 
 const IMAGE_ASPECT = "339 / 354.6";
@@ -29,15 +30,19 @@ export default function MedicationDetailsDialog({
   open,
   onOpenChange,
   onSelect,
+  initialVariantId = null,
 }: MedicationDetailsDialogProps) {
   const variants = useMemo(() => medication?.variants ?? [], [medication?.variants]);
   const hasVariants = variants.length > 0;
   const defaultVariantId = useMemo(() => {
     if (!hasVariants) return null;
+    if (initialVariantId && variants.some((v) => v.id === initialVariantId)) {
+      return initialVariantId;
+    }
     return [...variants].sort(
       (a, b) => (a.fromPriceCents ?? Infinity) - (b.fromPriceCents ?? Infinity),
     )[0].id;
-  }, [hasVariants, variants]);
+  }, [hasVariants, variants, initialVariantId]);
   const [variantId, setVariantId] = useState<string | null>(defaultVariantId);
 
   if (!medication) return null;

@@ -1,16 +1,17 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import BillingHeader from "./BillingHeader";
-import BillingReferralCard from "./BillingReferralCard";
+import CancelSubscriptionModal from "./CancelSubscriptionModal";
+// import BillingReferralCard from "./BillingReferralCard";
 import PaymentHistorySection from "./PaymentHistorySection";
 import PaymentMethodSection from "./PaymentMethodSection";
 import RefundRequestsSection from "./RefundRequestsSection";
 import SubscriptionsSection from "./SubscriptionsSection";
 import WalletCard from "./WalletCard";
-import type { BillingPageDataDto } from "./types";
+import type { BillingPageDataDto, BillingSubscriptionDto } from "./types";
 import type { ReferralSummary } from "@/lib/referrals";
 import type { WalletSummary } from "@/lib/wallet";
 
@@ -35,7 +36,18 @@ export default function BillingPageClient({
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [searchQuery, setSearchQuery] = useState(data.payments.query);
+  const [cancelling, setCancelling] = useState<BillingSubscriptionDto | null>(null);
   const cancelled = searchParams.get("cancelled") === "1";
+  const cancelSubscriptionId = searchParams.get("cancel");
+
+  useEffect(() => {
+    if (!cancelSubscriptionId) return;
+    const match = data.subscriptions.find((sub) => sub.id === cancelSubscriptionId);
+    if (match && !match.cancelAtPeriodEnd) {
+      setCancelling(match);
+    }
+    router.replace("/billing", { scroll: false });
+  }, [cancelSubscriptionId, data.subscriptions, router]);
 
   function updateParams(next: { page?: number; q?: string }) {
     const params = new URLSearchParams(searchParams.toString());
@@ -69,13 +81,6 @@ export default function BillingPageClient({
         onSearchSubmit={() => updateParams({ q: searchQuery })}
       />
 
-      <section className="space-y-1 px-1 pt-1">
-        <h1 className="text-2xl font-semibold text-[#152A51]">Billing</h1>
-        <p className="text-sm text-[#152A51]/70">
-          Manage your payment methods, billing history, invoices, and subscriptions.
-        </p>
-      </section>
-
       {cancelled ? (
         <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
           Your subscription will cancel at the end of the current billing period.
@@ -83,8 +88,7 @@ export default function BillingPageClient({
       ) : null}
 
       {wallet ? <WalletCard wallet={wallet} /> : null}
-      {referral ? <BillingReferralCard referral={referral} /> : null}
-      <SubscriptionsSection subscriptions={data.subscriptions} />
+      <SubscriptionsSection subscriptions={data.subscriptions} onCancel={setCancelling} />
       <PaymentMethodSection />
       <PaymentHistorySection
         payments={data.payments}
@@ -92,6 +96,17 @@ export default function BillingPageClient({
         onChangePage={(page) => updateParams({ page })}
       />
       <RefundRequestsSection requests={data.refundRequests} />
+
+      {cancelling ? (
+        <CancelSubscriptionModal
+          open
+          subscriptionId={cancelling.id}
+          medicineName={cancelling.medicineName}
+          onOpenChange={(open) => {
+            if (!open) setCancelling(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

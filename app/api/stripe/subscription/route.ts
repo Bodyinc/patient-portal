@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getOrCreateStripeCustomer } from "@/lib/stripe/customers";
+import { formatSavedCardLabel, getDefaultPaymentMethod } from "@/lib/stripe/payment-methods";
 import { createSubscriptionForPrice } from "@/lib/stripe/subscriptions";
 import { resolveCheckoutDiscount, incrementPromoRedemption } from "@/lib/stripe/promos";
 import { computeShopOrderFees } from "@/lib/shop/order-fees";
@@ -121,6 +122,8 @@ export async function POST(request: Request) {
       name: (user.user_metadata?.full_name as string | undefined) ?? null,
     });
 
+    const savedPaymentMethod = await getDefaultPaymentMethod(customerId);
+
     // Consultation is one-time; shipping is a recurring subscription item (below) so it is
     // NOT added here as a one-time fee.
     const oneTimeFees: Array<{ amountCents: number; description: string }> = [];
@@ -134,7 +137,7 @@ export async function POST(request: Request) {
       });
     }
 
-    const { subscriptionId, clientSecret } = await createSubscriptionForPrice({
+    const { subscriptionId, clientSecret, paid } = await createSubscriptionForPrice({
       customerId,
       priceId: pkg.stripe_price_id,
       description: subscriptionDescription,
@@ -142,6 +145,7 @@ export async function POST(request: Request) {
       // Shop orders pay shipping on the first invoice and every renewal.
       recurringShippingCents: shippingCents,
       shippingOnFirstInvoice: true,
+      defaultPaymentMethodId: savedPaymentMethod?.id ?? null,
       metadata: {
         order_id: order.id,
         user_id: user.id,
@@ -156,7 +160,10 @@ export async function POST(request: Request) {
 
     await supabaseAdmin
       .from("shop_checkout_orders")
-      .update({ stripe_subscription_id: subscriptionId })
+      .update({
+        stripe_subscription_id: subscriptionId,
+        ...(paid ? { status: "paid" } : {}),
+      })
       .eq("id", order.id);
 
     await supabaseAdmin.from("subscriptions").upsert(
@@ -167,12 +174,20 @@ export async function POST(request: Request) {
         stripe_price_id: pkg.stripe_price_id,
         package_id: pkg.id,
         medicine_id: medicineId,
-        status: "incomplete",
+        status: paid ? "active" : "incomplete",
       },
       { onConflict: "stripe_subscription_id" },
     );
 
-    return NextResponse.json({ clientSecret, orderId: order.id }, { status: 201 });
+    return NextResponse.json(
+      {
+        orderId: order.id,
+        clientSecret: clientSecret ?? null,
+        paid,
+        savedCardLabel: savedPaymentMethod ? formatSavedCardLabel(savedPaymentMethod) : null,
+      },
+      { status: 201 },
+    );
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unable to start checkout." },

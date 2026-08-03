@@ -2,38 +2,54 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Mail } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { getOnboardingOrderSummary } from "@/lib/actions/intake";
 import { hasPassword, setInitialPassword } from "@/lib/actions/patient-auth";
 import { fieldControlClass } from "../../_lib/onboarding-theme";
 
-function DashboardActions() {
+function EmailSentBadge({ email }: { email: string }) {
+  return (
+    <div className="inline-flex max-w-full items-center gap-2 rounded-full bg-[#E8EEED] px-4 py-2 text-[13px] text-[#152A51]">
+      <Mail className="h-4 w-4 shrink-0 text-[#152A51]/70" aria-hidden />
+      <span className="min-w-0 truncate">
+        Confirmation email sent to <span className="font-medium">{email}</span>
+      </span>
+    </div>
+  );
+}
+
+function DashboardActions({ email }: { email: string | null }) {
   const router = useRouter();
 
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
-      <Button
-        type="button"
-        onClick={() => router.push("/dashboard")}
-        className="h-10 w-full rounded-md bg-[#E3E084] px-6 text-[#152A51] hover:bg-[#D9D674] sm:w-auto"
-      >
-        Go to Dashboard
-        <ArrowRight className="ml-2 h-4 w-4" />
-      </Button>
+    <div className="flex w-full max-w-xl flex-col items-center gap-5">
+      {email ? <EmailSentBadge email={email} /> : null}
 
-      <Button
-        type="button"
-        variant="outline"
-        onClick={() => router.push("/my-meds")}
-        className="h-10 w-full rounded-md border-[#152A51]/40 px-6 text-[#152A51] sm:w-auto"
-      >
-        View Treatment Details
-        <ArrowRight className="ml-2 h-4 w-4" />
-      </Button>
+      <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-center">
+        <Button
+          type="button"
+          onClick={() => router.push("/dashboard")}
+          className="h-[46px] w-full rounded-full bg-[#E3E084] px-6 text-[14px] font-medium text-[#152A51] shadow-none hover:bg-[#D9D674] sm:w-auto"
+        >
+          Go to Dashboard
+          <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => router.push("/my-meds")}
+          className="h-[46px] w-full rounded-full border-[#152A51]/30 bg-white px-6 text-[14px] font-medium text-[#152A51] shadow-none hover:bg-[#F3F6F6] sm:w-auto"
+        >
+          View Treatment Details
+          <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+      </div>
     </div>
   );
 }
@@ -69,7 +85,7 @@ function SetPasswordForm({ onSuccess }: { onSuccess: () => void }) {
   }
 
   return (
-    <div className="w-full overflow-hidden rounded-2xl border border-[#152A51]/20 bg-white onboarding-font">
+    <div className="w-full max-w-xl overflow-hidden rounded-2xl border border-[#152A51]/20 bg-white text-left onboarding-font">
       <div className="bg-[#E8EEED] px-5 py-3">
         <h2 className="text-[16px] font-semibold text-[#152A51] sm:text-lg">Secure Your Account</h2>
         <p className="mt-1 text-[12px] text-[#152A51]/70 sm:text-[13px]">
@@ -124,16 +140,18 @@ function SetPasswordForm({ onSuccess }: { onSuccess: () => void }) {
 }
 
 /**
- * One-time password setup after checkout. Dashboard actions appear only after success.
- * No update-password form — password can be set exactly once here.
+ * One-time password setup after checkout. Dashboard actions + email badge appear after success.
  */
 export default function ConfirmationPasswordGate() {
   const [passwordSet, setPasswordSet] = useState<boolean | null>(null);
+  const [email, setEmail] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
-    void hasPassword().then((set) => {
-      if (active) setPasswordSet(set);
+    void Promise.all([hasPassword(), getOnboardingOrderSummary()]).then(([set, summary]) => {
+      if (!active) return;
+      setPasswordSet(set);
+      if (summary.ok) setEmail(summary.data.email);
     });
     return () => {
       active = false;
@@ -142,14 +160,14 @@ export default function ConfirmationPasswordGate() {
 
   if (passwordSet === null) {
     return (
-      <div className="rounded-2xl border border-[#152A51]/15 bg-white px-5 py-4 text-sm text-[#152A51]/70">
+      <div className="w-full max-w-xl rounded-2xl border border-[#152A51]/15 bg-white px-5 py-4 text-sm text-[#152A51]/70">
         Preparing your account…
       </div>
     );
   }
 
   if (passwordSet) {
-    return <DashboardActions />;
+    return <DashboardActions email={email} />;
   }
 
   return (

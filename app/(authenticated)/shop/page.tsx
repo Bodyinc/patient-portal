@@ -1,9 +1,8 @@
 import { requirePatientSession } from "@/lib/auth/require-patient";
-import { buildReferralLink, getReferralSummary } from "@/lib/referrals";
+import { fetchActivePortalOffer } from "@/lib/offers/service-data";
 import { fetchShopCatalogData, fetchShopCategoriesData } from "@/lib/shop/service-data";
 import type { ShopSortOption } from "@/lib/shop/types";
 import ShopCatalogClient from "./_components/ShopCatalogClient";
-import ShopReferralCard from "./_components/ShopReferralCard";
 
 const PAGE_SIZE = 6;
 
@@ -40,9 +39,7 @@ export default async function ShopPage({
   const searchQuery = (resolvedSearchParams.q ?? "").trim();
 
   try {
-    // Direct data-layer calls — the previous version fetched this app's own API
-    // routes over HTTP, paying two extra localhost round trips per page view.
-    const [categories, list, referral] = await Promise.all([
+    const [categories, list, offer] = await Promise.all([
       fetchShopCategoriesData(),
       fetchShopCatalogData({
         categorySlug: category,
@@ -51,11 +48,14 @@ export default async function ShopPage({
         pageSize: PAGE_SIZE,
         searchQuery,
       }),
-      getReferralSummary(user.id),
+      fetchActivePortalOffer().catch((err) => {
+        console.error("[portal_offers] Shop load failed:", err);
+        return null;
+      }),
     ]);
 
     return (
-      <main className="mx-auto w-full max-w-[1440px] flex-1 overflow-x-hidden px-4 py-4 sm:px-6 lg:px-1">
+      <main className="mx-auto w-full max-w-[1440px] flex-1 overflow-x-hidden px-4 py-4 sm:px-4 lg:px-4">
         <div className="space-y-4">
           <ShopCatalogClient
             categories={categories}
@@ -64,24 +64,7 @@ export default async function ShopPage({
             fullName={fullName}
             patientId={patientId}
             avatarUrl={(user.user_metadata?.avatar_url as string | null | undefined) ?? null}
-            topContent={
-              <>
-                <section className="space-y-1 px-1">
-                  <h1 className="text-xl font-medium tracking-[-0.5px] text-[#152A51] sm:text-2xl lg:text-[28px]">
-                    Shop
-                  </h1>
-                  <p className="text-sm text-[#152A51]/80 sm:text-[15px]">
-                    Browse medications and healthcare products available for your treatment journey.
-                  </p>
-                </section>
-
-                <ShopReferralCard
-                  referralCode={referral?.code ?? "BODYINC"}
-                  referralLink={referral?.link ?? buildReferralLink("BODYINC")}
-                  rewardCents={referral?.rewardCents ?? 0}
-                />
-              </>
-            }
+            offer={offer}
           />
         </div>
       </main>

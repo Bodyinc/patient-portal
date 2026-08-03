@@ -128,11 +128,12 @@ type EmbeddedMedicine = {
   short_description: string | null;
   image_url: string | null;
 };
-type EmbeddedVariant = { name: string } | null;
+type EmbeddedVariant = { id: string; name: string } | null;
 type EmbeddedPackage = {
   name: string;
   price: number;
   duration_months: number;
+  variant_id: string | null;
   medicine_variants?: EmbeddedVariant;
 };
 
@@ -141,7 +142,7 @@ export async function fetchBillingSubscriptions(userId: string): Promise<Billing
   const { data: subscriptions, error } = await supabaseAdmin
     .from("subscriptions")
     .select(
-      "id, medicine_id, package_id, status, current_period_end, cancel_at_period_end, created_at, medicines(name, short_description, image_url), packages(name, price, duration_months, medicine_variants(name))",
+      "id, medicine_id, package_id, status, current_period_end, cancel_at_period_end, created_at, medicines(name, short_description, image_url), packages(name, price, duration_months, variant_id, medicine_variants(id, name))",
     )
     .eq("user_id", userId)
     .in("status", ACTIVE_SUBSCRIPTION_STATUSES)
@@ -158,11 +159,14 @@ export async function fetchBillingSubscriptions(userId: string): Promise<Billing
     const medicine = (subscription as { medicines?: EmbeddedMedicine | null }).medicines ?? null;
     const pkg = (subscription as { packages?: EmbeddedPackage | null }).packages ?? null;
     const variantName = pkg?.medicine_variants?.name ?? null;
+    const variantId = pkg?.medicine_variants?.id ?? pkg?.variant_id ?? null;
     const planDollars = Number(pkg?.price ?? 0);
 
     return {
       id: subscription.id,
       medicineId: subscription.medicine_id,
+      packageId: subscription.package_id,
+      variantId,
       medicineName: medicine?.name ?? "Treatment Subscription",
       description:
         medicine?.short_description ??

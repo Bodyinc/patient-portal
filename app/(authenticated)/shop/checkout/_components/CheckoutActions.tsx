@@ -11,6 +11,8 @@ type CheckoutActionsProps = {
   continueDisabled?: boolean;
   onContinue: () => void;
   backHref?: string;
+  continueLabel?: string;
+  savedCardLabel?: string | null;
 };
 
 export default function CheckoutActions({
@@ -19,11 +21,19 @@ export default function CheckoutActions({
   continueDisabled = false,
   onContinue,
   backHref = "/shop",
+  continueLabel = "Continue to Payment",
+  savedCardLabel = null,
 }: CheckoutActionsProps) {
   const router = useRouter();
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-3">
+      {savedCardLabel ? (
+        <p className="rounded-[14px] border border-[#E8EEED] bg-[#F3F6F6] px-3 py-2 text-xs text-[#152A51]/80">
+          Paying with <span className="font-medium text-[#152A51]">{savedCardLabel}</span>
+        </p>
+      ) : null}
+
       <label className="flex items-start gap-2 text-xs leading-relaxed text-[#152A51]/80">
         <Checkbox
           checked={termsAccepted}
@@ -52,7 +62,7 @@ export default function CheckoutActions({
           onClick={onContinue}
           className="h-[46px] rounded-full bg-[#E3E084] text-[#152A51] shadow-none hover:bg-[#D9D674]"
         >
-          Continue to Payment
+          {continueDisabled ? "Processing…" : continueLabel}
         </Button>
       </div>
     </section>

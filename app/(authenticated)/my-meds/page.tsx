@@ -32,7 +32,10 @@ export default async function MyMedsPage({
         query,
       }),
       getReferralSummary(user.id),
-      fetchActivePortalOffer().catch(() => null),
+      fetchActivePortalOffer().catch((err) => {
+        console.error("[portal_offers] My Meds load failed:", err);
+        return null;
+      }),
     ]);
 
     return (

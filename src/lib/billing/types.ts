@@ -10,6 +10,8 @@ export type BillingCancelSubscriptionDto = {
 export type BillingSubscriptionDto = {
   id: string;
   medicineId: string | null;
+  packageId: string | null;
+  variantId: string | null;
   medicineName: string;
   description: string;
   variantName: string | null;

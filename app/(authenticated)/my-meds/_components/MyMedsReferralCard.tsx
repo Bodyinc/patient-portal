@@ -49,7 +49,7 @@ export default function MyMedsReferralCard({
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-          <span className="rounded-full border border-dashed border-[#E8EEED] bg-[#F3F6F6] px-4 py-2 text-xs font-medium text-[#152A51]">
+          {/* <span className="rounded-full border border-dashed border-[#E8EEED] bg-[#F3F6F6] px-4 py-2 text-xs font-medium text-[#152A51]">
             {referralCode}
           </span>
           <button
@@ -58,7 +58,7 @@ export default function MyMedsReferralCard({
             className="h-10 rounded-full border border-[#E8EEED] bg-white px-4 text-xs font-medium text-[#152A51] hover:bg-[#F3F6F6]"
           >
             {copied === "code" ? "Copied" : copied === "error" ? "Copy failed" : "Copy Code"}
-          </button>
+          </button> */}
           <button
             type="button"
             onClick={() => handleCopy(referralLink, "link")}
