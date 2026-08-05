@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { sendIncompleteOrderReminders, sendRefillReminders } from "@/lib/email/reminders";
+import {
+  sendIncompleteOrderReminders,
+  sendOrderStatusEmails,
+  sendRefillReminders,
+} from "@/lib/email/reminders";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +22,8 @@ export async function GET(request: Request) {
   try {
     const incompleteOrders = await sendIncompleteOrderReminders();
     const refills = await sendRefillReminders();
-    return NextResponse.json({ ok: true, incompleteOrders, refills });
+    const orderStatuses = await sendOrderStatusEmails();
+    return NextResponse.json({ ok: true, incompleteOrders, refills, orderStatuses });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Reminder run failed." },

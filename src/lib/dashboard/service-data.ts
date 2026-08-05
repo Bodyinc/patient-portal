@@ -2,7 +2,7 @@ import "server-only";
 
 import { calculateBmiFromMetric } from "@/lib/intake/conversions";
 import { DEFAULT_MEDICINE_IMAGE, resolveMedicineImageSrc } from "@/lib/intake/medicine-image";
-import { fetchCurrentMedication } from "@/lib/my-meds/service-data";
+import { fetchActiveMedications } from "@/lib/my-meds/service-data";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 import type { DashboardGoalDto, DashboardPageDataDto, DashboardTreatmentDto } from "./types";
@@ -133,12 +133,13 @@ async function fetchClaimedIntakeExtras(userId: string): Promise<{
 }
 
 export async function fetchDashboardPageData(userId: string): Promise<DashboardPageDataDto> {
-  const [{ data: profile }, currentMed, intake] = await Promise.all([
+  const [{ data: profile }, activeMeds, intake] = await Promise.all([
     supabaseAdmin.from("profiles").select("full_name, avatar_url").eq("id", userId).maybeSingle(),
-    fetchCurrentMedication(userId).catch(() => null),
+    fetchActiveMedications(userId).catch(() => []),
     fetchClaimedIntakeExtras(userId),
   ]);
 
+  const currentMed = activeMeds[0] ?? null;
   const treatmentFromSub: DashboardTreatmentDto | null = currentMed
     ? {
         medicineId: currentMed.medicineId,
@@ -163,5 +164,6 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
     bmiCategory: getBmiCategory(intake.bmi),
     goals: intake.goals,
     treatment,
+    activeTreatmentCount: activeMeds.length,
   };
 }

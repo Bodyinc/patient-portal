@@ -148,7 +148,7 @@ export default function ShopCheckoutClient({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 lg:overflow-hidden">
+    <div className="flex min-h-0 px-4 flex-1 flex-col gap-3 lg:overflow-hidden">
       <div className="shrink-0">
         <ShopHeader
           fullName={fullName}

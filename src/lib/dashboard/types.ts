@@ -23,4 +23,6 @@ export type DashboardPageDataDto = {
   bmiCategory: string;
   goals: DashboardGoalDto[];
   treatment: DashboardTreatmentDto | null;
+  /** Number of active/trialing/past_due subscriptions for “view all” hint. */
+  activeTreatmentCount: number;
 };

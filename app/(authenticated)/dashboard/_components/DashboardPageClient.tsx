@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 
@@ -147,6 +148,18 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
                     New Refill Request
                     <ArrowRight className="h-4 w-4" />
                   </button>
+
+                  {data.activeTreatmentCount > 1 ? (
+                    <p className="text-sm text-[#152A51]/70">
+                      You have {data.activeTreatmentCount} active treatments.{" "}
+                      <Link
+                        href="/my-meds"
+                        className="font-medium text-[#152A51] underline underline-offset-2 hover:text-[#152A51]/80"
+                      >
+                        View all on My Meds
+                      </Link>
+                    </p>
+                  ) : null}
                 </div>
               </div>
             </section>

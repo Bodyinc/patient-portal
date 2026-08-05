@@ -74,7 +74,7 @@ export async function setDefaultPaymentMethod(params: {
   customerId: string;
   paymentMethodId: string;
   userId: string;
-}): Promise<void> {
+}): Promise<SavedPaymentMethodSummary> {
   const { customerId, paymentMethodId, userId } = params;
 
   await stripe.customers.update(customerId, {
@@ -97,6 +97,13 @@ export async function setDefaultPaymentMethod(params: {
       // Best effort — the customer-level default still applies to new invoices.
     }
   }
+
+  const pm = await stripe.paymentMethods.retrieve(paymentMethodId);
+  return {
+    id: pm.id,
+    brand: pm.card?.brand ?? null,
+    last4: pm.card?.last4 ?? null,
+  };
 }
 
 export function formatSavedCardLabel(pm: SavedPaymentMethodSummary): string {

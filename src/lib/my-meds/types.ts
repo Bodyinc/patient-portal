@@ -12,6 +12,20 @@ export type MyMedsCurrentMedicationDto = {
   imageSrc: string;
 };
 
+export type MyMedsPastMedicationDto = {
+  subscriptionId: string;
+  medicineId: string | null;
+  packageId: string | null;
+  variantId: string | null;
+  medicationName: string;
+  currentPlan: string;
+  variantName: string | null;
+  dosage: string;
+  imageSrc: string;
+  endedAt: string | null;
+  statusLabel: string;
+};
+
 export type MyMedsTimelineStepDto = {
   key: string;
   label: string;
@@ -49,6 +63,7 @@ export type MyMedsMedicationRequestsListDto = {
 };
 
 export type MyMedsPageDataDto = {
-  currentMedication: MyMedsCurrentMedicationDto | null;
+  activeMedications: MyMedsCurrentMedicationDto[];
+  pastMedications: MyMedsPastMedicationDto[];
   requests: MyMedsMedicationRequestsListDto;
 };

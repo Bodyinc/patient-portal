@@ -20,7 +20,9 @@ import {
 } from "../../../onboarding/_lib/onboarding-theme";
 
 type CurrentMedicationCardProps = {
-  medication: MyMedsCurrentMedicationDto | null;
+  medication: MyMedsCurrentMedicationDto;
+  /** When true, omit the section heading (used inside an Active Treatments list). */
+  hideTitle?: boolean;
 };
 
 /** Figma treatment image: 339 × 354.6 — used as aspect; scales down responsively */
@@ -41,11 +43,33 @@ function toDbImageSrc(imageSrc: string | null | undefined): string | null {
   return resolved;
 }
 
-export default function CurrentMedicationCard({ medication }: CurrentMedicationCardProps) {
+export function ActiveMedicationsEmptyState() {
+  return (
+    <section className="rounded-[24px] border border-[#E8EEED] bg-white p-4 sm:p-6">
+      <h2 className="mb-4 text-lg font-medium tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
+        Active Treatments
+      </h2>
+      <div className="rounded-[16px] border border-dashed border-[#E8EEED] bg-[#F3F6F6] px-4 py-8 text-center">
+        <p className="text-sm text-[#152A51]/70">No active treatments yet.</p>
+        <Link
+          href="/shop"
+          className="mt-4 inline-flex h-[46px] items-center rounded-full bg-[#E3E084] px-6 text-sm font-medium text-[#152A51] hover:bg-[#D9D674]"
+        >
+          Browse Shop
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+export default function CurrentMedicationCard({
+  medication,
+  hideTitle = false,
+}: CurrentMedicationCardProps) {
   const router = useRouter();
 
   function handleRefillRequest() {
-    if (!medication?.medicineId) return;
+    if (!medication.medicineId) return;
     router.push(
       buildShopCheckoutHref({
         medicineId: medication.medicineId,
@@ -56,31 +80,12 @@ export default function CurrentMedicationCard({ medication }: CurrentMedicationC
     );
   }
 
-  if (!medication) {
-    return (
-      <section className="rounded-[24px] border border-[#E8EEED] bg-white p-4 sm:p-6">
-        <h2 className="mb-4 text-lg font-medium tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
-          Current Medication Requests
-        </h2>
-        <div className="rounded-[16px] border border-dashed border-[#E8EEED] bg-[#F3F6F6] px-4 py-8 text-center">
-          <p className="text-sm text-[#152A51]/70">No active medication requests.</p>
-          <Link
-            href="/shop"
-            className="mt-4 inline-flex h-[46px] items-center rounded-full bg-[#E3E084] px-6 text-sm font-medium text-[#152A51] hover:bg-[#D9D674]"
-          >
-            Browse Shop
-          </Link>
-        </div>
-      </section>
-    );
-  }
-
   const imageSrc = toDbImageSrc(medication.imageSrc);
   const external = imageSrc ? isExternalMedicineImage(imageSrc) : false;
   const canRefill = Boolean(medication.medicineId);
 
   return (
-    <section className="rounded-[24px] border border-[#E8EEED] bg-white ">
+    <article className="rounded-[24px] border border-[#E8EEED] bg-white">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-stretch lg:gap-6">
         <div
           className={cn(
@@ -101,10 +106,14 @@ export default function CurrentMedicationCard({ medication }: CurrentMedicationC
           ) : null}
         </div>
 
-        <div className="flex min-w-0 flex-1 flex-col justify-between gap-5">
-          <h2 className="mb-4 text-lg pt-4 font-medium tracking-[-0.3px] text-[#152A51] sm:text-[28px]">
-            Current Medication Requests
-          </h2>
+        <div className="flex min-w-0 flex-1 flex-col justify-between gap-5 px-4 pb-4 sm:px-5 sm:pb-5">
+          {!hideTitle ? (
+            <h2 className="pt-4 text-lg font-medium tracking-[-0.3px] text-[#152A51] sm:text-[28px]">
+              Active Treatment
+            </h2>
+          ) : (
+            <div className="pt-4" />
+          )}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <p className="text-xs text-[#152A51]/60 sm:text-sm">Medication Name</p>
@@ -136,13 +145,13 @@ export default function CurrentMedicationCard({ medication }: CurrentMedicationC
             type="button"
             onClick={handleRefillRequest}
             disabled={!canRefill}
-            className="inline-flex h-[46px] w-full mb-8 items-center justify-center gap-2 rounded-full border border-[#152A51] px-5 text-sm font-medium text-[#152A51] hover:bg-[#F3F6F6] disabled:cursor-not-allowed disabled:opacity-50 sm:w-fit"
+            className="mb-4 inline-flex h-[46px] w-full items-center justify-center gap-2 rounded-full border border-[#152A51] px-5 text-sm font-medium text-[#152A51] hover:bg-[#F3F6F6] disabled:cursor-not-allowed disabled:opacity-50 sm:w-fit"
           >
             New Refill Request
             <ArrowRight className="h-4 w-4" />
           </button>
         </div>
       </div>
-    </section>
+    </article>
   );
 }

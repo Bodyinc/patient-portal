@@ -6,10 +6,32 @@ import { recordPayment } from "./record-payment";
 import { stripe } from "./server";
 import { sendTransactionalEmail } from "@/lib/email/send";
 import { paymentReceiptEmail, refundNotificationEmail } from "@/lib/email/payment-emails";
+import {
+  additionalPaymentReceivedEmail,
+  cancellationScheduledEmail,
+  paymentFailedAdminEmail,
+  paymentFailedEmail,
+  subscriptionEndedEmail,
+} from "@/lib/email/lifecycle-emails";
+import { markEmailSent, wasEmailSent } from "@/lib/email/idempotency";
+import {
+  adminNotifyEmail,
+  appUrl,
+  patientEmailByStripeCustomer,
+  patientEmailByUserId,
+} from "@/lib/email/recipients";
 import { maybeConvertReferral } from "@/lib/referrals";
 import { incrementPromoRedemption } from "@/lib/stripe/promos";
 import { recordInvoiceWalletDebit } from "@/lib/wallet";
 import type { Json } from "@/lib/supabase/types";
+
+type SubRowSnapshot = {
+  id: string;
+  user_id: string | null;
+  medicine_id: string | null;
+  cancel_at_period_end: boolean | null;
+  status: string | null;
+};
 
 // Field locations vary across Stripe API versions; read defensively.
 function periodEndIso(sub: Stripe.Subscription): string | null {
@@ -52,9 +74,89 @@ function customerId(source: { customer?: string | { id?: string } | null }): str
   return c?.id ?? null;
 }
 
+async function medicineNameById(medicineId: string | null | undefined): Promise<string | null> {
+  if (!medicineId) return null;
+  const { data } = await supabaseAdmin
+    .from("medicines")
+    .select("name")
+    .eq("id", medicineId)
+    .maybeSingle();
+  return data?.name ?? null;
+}
+
+async function notifyCancellationScheduled(
+  sub: Stripe.Subscription,
+  existing: SubRowSnapshot | null,
+): Promise<void> {
+  if (!sub.cancel_at_period_end) return;
+  if (existing?.cancel_at_period_end) return;
+
+  const key = `cancellation_scheduled`;
+  if (await wasEmailSent(key, sub.id)) return;
+
+  const userId = existing?.user_id ?? sub.metadata?.user_id ?? null;
+  const patient =
+    (await patientEmailByUserId(userId)) ??
+    (await patientEmailByStripeCustomer(customerId(sub)).then((email) =>
+      email ? { email, fullName: null as string | null } : null,
+    ));
+  if (!patient) return;
+
+  const medicineName = await medicineNameById(
+    existing?.medicine_id ?? sub.metadata?.medicine_id ?? null,
+  );
+  const { subject, html } = cancellationScheduledEmail({
+    fullName: patient.fullName,
+    medicineName,
+    periodEnd: periodEndIso(sub),
+    billingUrl: `${appUrl()}/billing`,
+  });
+  if (await sendTransactionalEmail({ to: patient.email, subject, html })) {
+    await markEmailSent(key, sub.id);
+  }
+}
+
+async function notifySubscriptionEnded(
+  sub: Stripe.Subscription,
+  existing: SubRowSnapshot | null,
+): Promise<void> {
+  const ended = sub.status === "canceled" || Boolean(sub.ended_at);
+  if (!ended) return;
+  if (existing?.status === "canceled") return;
+
+  const key = "subscription_ended";
+  if (await wasEmailSent(key, sub.id)) return;
+
+  const userId = existing?.user_id ?? sub.metadata?.user_id ?? null;
+  const patient =
+    (await patientEmailByUserId(userId)) ??
+    (await patientEmailByStripeCustomer(customerId(sub)).then((email) =>
+      email ? { email, fullName: null as string | null } : null,
+    ));
+  if (!patient) return;
+
+  const medicineName = await medicineNameById(
+    existing?.medicine_id ?? sub.metadata?.medicine_id ?? null,
+  );
+  const { subject, html } = subscriptionEndedEmail({
+    fullName: patient.fullName,
+    medicineName,
+    shopUrl: `${appUrl()}/shop`,
+  });
+  if (await sendTransactionalEmail({ to: patient.email, subject, html })) {
+    await markEmailSent(key, sub.id);
+  }
+}
+
 async function upsertSubscription(sub: Stripe.Subscription): Promise<void> {
   const meta = sub.metadata ?? {};
   const priceId = sub.items?.data?.[0]?.price?.id ?? null;
+
+  const { data: existing } = await supabaseAdmin
+    .from("subscriptions")
+    .select("id, user_id, medicine_id, cancel_at_period_end, status")
+    .eq("stripe_subscription_id", sub.id)
+    .maybeSingle();
 
   // Only the volatile fields are updated on existing rows, so the user_id/session_id set
   // at checkout (guest subs carry no user_id in metadata) are never clobbered back to null.
@@ -72,15 +174,22 @@ async function upsertSubscription(sub: Stripe.Subscription): Promise<void> {
     .eq("stripe_subscription_id", sub.id)
     .select("id");
 
-  if (updated && updated.length > 0) return;
+  if (!updated || updated.length === 0) {
+    await supabaseAdmin.from("subscriptions").insert({
+      stripe_subscription_id: sub.id,
+      ...volatile,
+      user_id: meta.user_id || null,
+      session_id: meta.intake_session_id || null,
+      package_id: meta.package_id || null,
+      medicine_id: meta.medicine_id || null,
+    });
+  }
 
-  await supabaseAdmin.from("subscriptions").insert({
-    stripe_subscription_id: sub.id,
-    ...volatile,
-    user_id: meta.user_id || null,
-    session_id: meta.intake_session_id || null,
-    package_id: meta.package_id || null,
-    medicine_id: meta.medicine_id || null,
+  void notifyCancellationScheduled(sub, existing ?? null).catch((error) => {
+    console.error("[email] cancellation scheduled notify failed:", error);
+  });
+  void notifySubscriptionEnded(sub, existing ?? null).catch((error) => {
+    console.error("[email] subscription ended notify failed:", error);
   });
 }
 
@@ -211,10 +320,50 @@ async function handleInvoicePaid(
   // (see migration 20260725110000 / 20260725120000), so it is not duplicated here.
 }
 
+async function notifyPaymentFailed(invoice: Stripe.Invoice, userId: string | null): Promise<void> {
+  const amountCents = invoice.amount_due ?? 0;
+  if (amountCents <= 0) return;
+
+  const description =
+    invoice.lines?.data?.map((l) => l.description).find(Boolean) ?? "Body Inc subscription";
+
+  const patient =
+    (await patientEmailByUserId(userId)) ??
+    (invoice.customer_email
+      ? { email: invoice.customer_email, fullName: null as string | null }
+      : null) ??
+    (await patientEmailByStripeCustomer(customerId(invoice)).then((email) =>
+      email ? { email, fullName: null as string | null } : null,
+    ));
+
+  if (patient) {
+    const { subject, html } = paymentFailedEmail({
+      fullName: patient.fullName,
+      amountCents,
+      currency: invoice.currency ?? "usd",
+      description,
+      billingUrl: `${appUrl()}/billing`,
+    });
+    await sendTransactionalEmail({ to: patient.email, subject, html });
+  }
+
+  const adminTo = adminNotifyEmail();
+  if (adminTo) {
+    const { subject, html } = paymentFailedAdminEmail({
+      patientEmail: patient?.email ?? invoice.customer_email ?? null,
+      amountCents,
+      currency: invoice.currency ?? "usd",
+      stripeInvoiceId: invoice.id,
+    });
+    await sendTransactionalEmail({ to: adminTo, subject, html });
+  }
+}
+
 async function handleInvoiceFailed(invoice: Stripe.Invoice): Promise<void> {
   const subId = invoiceSubscriptionId(invoice);
   const piId = invoicePaymentIntentId(invoice);
 
+  let userId: string | null = null;
   if (invoice.id) {
     const { data: subRow } = subId
       ? await supabaseAdmin
@@ -224,8 +373,10 @@ async function handleInvoiceFailed(invoice: Stripe.Invoice): Promise<void> {
           .maybeSingle()
       : { data: null };
 
+    userId = subRow?.user_id ?? null;
+
     await recordPayment({
-      user_id: subRow?.user_id ?? null,
+      user_id: userId,
       session_id: subRow?.session_id ?? null,
       plan_id: subRow?.package_id ?? null,
       stripe_subscription_id: subId,
@@ -245,6 +396,10 @@ async function handleInvoiceFailed(invoice: Stripe.Invoice): Promise<void> {
       .update({ status: "past_due" })
       .eq("stripe_subscription_id", subId);
   }
+
+  void notifyPaymentFailed(invoice, userId).catch((error) => {
+    console.error("[email] payment failed notify failed:", error);
+  });
 }
 
 function chargePaymentIntentId(charge: Stripe.Charge): string | null {
@@ -408,6 +563,20 @@ async function handleAdditionalPaymentSucceeded(pi: Stripe.PaymentIntent): Promi
     status: "approved",
     actor_role: "system",
     note: "Additional payment received.",
+  });
+
+  void (async () => {
+    const patient = await patientEmailByUserId(row.user_id);
+    if (!patient) return;
+    const { subject, html } = additionalPaymentReceivedEmail({
+      fullName: patient.fullName,
+      amountCents: row.amount_cents,
+      currency: row.currency ?? "usd",
+      myMedsUrl: `${appUrl()}/my-meds`,
+    });
+    await sendTransactionalEmail({ to: patient.email, subject, html });
+  })().catch((error) => {
+    console.error("[email] additional payment notify failed:", error);
   });
 }
 

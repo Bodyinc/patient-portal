@@ -10,6 +10,10 @@ import type Stripe from "stripe";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { cancelSubscriptionAtPeriodEnd } from "@/lib/stripe/subscriptions";
+import { sendTransactionalEmail } from "@/lib/email/send";
+import { cancellationScheduledEmail } from "@/lib/email/lifecycle-emails";
+import { markEmailSent, wasEmailSent } from "@/lib/email/idempotency";
+import { appUrl, patientEmailByUserId } from "@/lib/email/recipients";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -60,7 +64,9 @@ export async function POST(request: Request) {
 
   const { data: subscription, error: subError } = await supabaseAdmin
     .from("subscriptions")
-    .select("id, stripe_subscription_id, status, cancel_at_period_end, current_period_end")
+    .select(
+      "id, stripe_subscription_id, status, cancel_at_period_end, current_period_end, medicine_id",
+    )
     .eq("id", subscriptionId)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -126,6 +132,33 @@ export async function POST(request: Request) {
     if (updateError) {
       return NextResponse.json({ error: updateError.message }, { status: 500 });
     }
+
+    void (async () => {
+      const stripeSubId = subscription.stripe_subscription_id;
+      if (!stripeSubId || (await wasEmailSent("cancellation_scheduled", stripeSubId))) return;
+      const patient = await patientEmailByUserId(user.id);
+      if (!patient) return;
+      let medicineName: string | null = null;
+      if (subscription.medicine_id) {
+        const { data: med } = await supabaseAdmin
+          .from("medicines")
+          .select("name")
+          .eq("id", subscription.medicine_id)
+          .maybeSingle();
+        medicineName = med?.name ?? null;
+      }
+      const { subject, html } = cancellationScheduledEmail({
+        fullName: patient.fullName,
+        medicineName,
+        periodEnd: currentPeriodEnd,
+        billingUrl: `${appUrl()}/billing`,
+      });
+      if (await sendTransactionalEmail({ to: patient.email, subject, html })) {
+        await markEmailSent("cancellation_scheduled", stripeSubId);
+      }
+    })().catch((err) => {
+      console.error("[email] cancel subscription notify failed:", err);
+    });
 
     return NextResponse.json({
       ok: true,

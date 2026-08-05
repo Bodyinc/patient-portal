@@ -5,11 +5,12 @@ import { useState, useTransition } from "react";
 
 import type { PortalOfferDto } from "@/lib/offers/types";
 
-import CurrentMedicationCard from "./CurrentMedicationCard";
+import CurrentMedicationCard, { ActiveMedicationsEmptyState } from "./CurrentMedicationCard";
 import DeliverySupportBanner from "./DeliverySupportBanner";
 import MedicationRequestsSection from "./MedicationRequestsSection";
 import MyMedsHeader from "./MyMedsHeader";
 import MyMedsReferralCard from "./MyMedsReferralCard";
+import PastTreatmentsSection from "./PastTreatmentsSection";
 import type { MyMedsPageDataDto } from "./types";
 
 type MyMedsPageClientProps = {
@@ -76,7 +77,30 @@ export default function MyMedsPageClient({
         referralLink={referralLink}
         rewardCents={rewardCents}
       />
-      <CurrentMedicationCard medication={data.currentMedication} />
+
+      {data.activeMedications.length === 0 ? (
+        <ActiveMedicationsEmptyState />
+      ) : (
+        <section className="space-y-3">
+          <h2 className="px-1 text-lg font-medium tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
+            Active Treatments
+            {data.activeMedications.length > 1 ? (
+              <span className="ml-2 text-sm font-normal text-[#152A51]/60">
+                ({data.activeMedications.length})
+              </span>
+            ) : null}
+          </h2>
+          {data.activeMedications.map((medication) => (
+            <CurrentMedicationCard
+              key={medication.subscriptionId}
+              medication={medication}
+              hideTitle
+            />
+          ))}
+        </section>
+      )}
+
+      <PastTreatmentsSection medications={data.pastMedications} />
       <DeliverySupportBanner />
       <MedicationRequestsSection
         requests={data.requests}

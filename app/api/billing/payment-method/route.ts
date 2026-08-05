@@ -2,7 +2,14 @@ import { NextResponse } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
 import { getOrCreateStripeCustomer } from "@/lib/stripe/customers";
-import { createSetupIntent, setDefaultPaymentMethod } from "@/lib/stripe/payment-methods";
+import {
+  createSetupIntent,
+  formatSavedCardLabel,
+  setDefaultPaymentMethod,
+} from "@/lib/stripe/payment-methods";
+import { sendTransactionalEmail } from "@/lib/email/send";
+import { cardUpdatedEmail } from "@/lib/email/lifecycle-emails";
+import { appUrl, patientEmailByUserId } from "@/lib/email/recipients";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,11 +62,25 @@ export async function PUT(request: Request) {
   }
 
   try {
-    await setDefaultPaymentMethod({
+    const card = await setDefaultPaymentMethod({
       customerId: result.customerId,
       paymentMethodId,
       userId: result.user.id,
     });
+
+    void (async () => {
+      const patient = await patientEmailByUserId(result.user.id);
+      if (!patient) return;
+      const { subject, html } = cardUpdatedEmail({
+        fullName: patient.fullName,
+        cardLabel: formatSavedCardLabel(card),
+        billingUrl: `${appUrl()}/billing`,
+      });
+      await sendTransactionalEmail({ to: patient.email, subject, html });
+    })().catch((err) => {
+      console.error("[email] card updated notify failed:", err);
+    });
+
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json(

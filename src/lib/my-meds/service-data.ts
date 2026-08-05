@@ -9,9 +9,39 @@ import type {
   MyMedsMedicationRequestDto,
   MyMedsMedicationRequestsListDto,
   MyMedsPageDataDto,
+  MyMedsPastMedicationDto,
 } from "./types";
 
 const ACTIVE_SUBSCRIPTION_STATUSES = ["active", "trialing", "past_due"];
+
+const SUBSCRIPTION_SELECT =
+  "id, medicine_id, package_id, status, current_period_end, created_at, updated_at, medicines(id, name, image_url, important_info), packages(id, name, duration_months, variant_id, medicine_variants(id, name))";
+
+type EmbeddedMedicine = {
+  name: string;
+  image_url: string | null;
+  important_info: Json | null;
+} | null;
+
+type EmbeddedPackage = {
+  id: string;
+  name: string;
+  duration_months: number;
+  variant_id: string | null;
+  medicine_variants?: { id: string; name: string } | null;
+} | null;
+
+type SubscriptionRow = {
+  id: string;
+  medicine_id: string | null;
+  package_id: string | null;
+  status: string;
+  current_period_end: string | null;
+  created_at: string;
+  updated_at: string;
+  medicines?: EmbeddedMedicine;
+  packages?: EmbeddedPackage;
+};
 
 function formatQuantitySupply(durationMonths: number | null | undefined): string {
   if (!durationMonths || durationMonths <= 0) return "30 Days";
@@ -67,46 +97,17 @@ function matchesRequestQuery(request: MyMedsMedicationRequestDto, query: string)
   return haystack.includes(query.toLowerCase());
 }
 
-export async function fetchCurrentMedication(
-  userId: string,
-): Promise<MyMedsCurrentMedicationDto | null> {
-  // Embedded select: subscription + medicine + package in one round trip (was 2 waves).
-  const { data: subscription, error } = await supabaseAdmin
-    .from("subscriptions")
-    .select(
-      "id, medicine_id, package_id, current_period_end, created_at, medicines(id, name, image_url, important_info), packages(id, name, duration_months, variant_id, medicine_variants(id, name))",
-    )
-    .eq("user_id", userId)
-    .in("status", ACTIVE_SUBSCRIPTION_STATUSES)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+function statusLabelForPast(status: string): string {
+  if (status === "canceled" || status === "cancelled") return "Canceled";
+  if (status === "incomplete_expired") return "Expired";
+  if (status === "unpaid") return "Ended";
+  if (status === "incomplete") return "Incomplete";
+  return "Ended";
+}
 
-  if (error) throw new Error(error.message);
-  if (!subscription) return null;
-
-  const medicine =
-    (
-      subscription as {
-        medicines?: {
-          name: string;
-          image_url: string | null;
-          important_info: string | null;
-        } | null;
-      }
-    ).medicines ?? null;
-  const pkg =
-    (
-      subscription as {
-        packages?: {
-          id: string;
-          name: string;
-          duration_months: number;
-          variant_id: string | null;
-          medicine_variants?: { id: string; name: string } | null;
-        } | null;
-      }
-    ).packages ?? null;
+function mapActiveMedication(subscription: SubscriptionRow): MyMedsCurrentMedicationDto {
+  const medicine = subscription.medicines ?? null;
+  const pkg = subscription.packages ?? null;
 
   return {
     subscriptionId: subscription.id,
@@ -121,6 +122,78 @@ export async function fetchCurrentMedication(
     nextRefillDate: subscription.current_period_end,
     imageSrc: resolveMedicineImageSrc(medicine?.image_url ?? null),
   };
+}
+
+function mapPastMedication(subscription: SubscriptionRow): MyMedsPastMedicationDto {
+  const medicine = subscription.medicines ?? null;
+  const pkg = subscription.packages ?? null;
+
+  return {
+    subscriptionId: subscription.id,
+    medicineId: subscription.medicine_id,
+    packageId: subscription.package_id ?? pkg?.id ?? null,
+    variantId: pkg?.medicine_variants?.id ?? pkg?.variant_id ?? null,
+    medicationName: medicine?.name ?? "Previous Medication",
+    currentPlan: pkg?.name ?? "Treatment Plan",
+    variantName: pkg?.medicine_variants?.name?.trim() || null,
+    dosage: parseDosage(medicine?.important_info ?? null),
+    imageSrc: resolveMedicineImageSrc(medicine?.image_url ?? null),
+    endedAt: subscription.current_period_end ?? subscription.updated_at,
+    statusLabel: statusLabelForPast(subscription.status),
+  };
+}
+
+/** Newest active subscription only — used by Dashboard treatment block. */
+export async function fetchCurrentMedication(
+  userId: string,
+): Promise<MyMedsCurrentMedicationDto | null> {
+  const active = await fetchActiveMedications(userId);
+  return active[0] ?? null;
+}
+
+export async function fetchActiveMedications(
+  userId: string,
+): Promise<MyMedsCurrentMedicationDto[]> {
+  const { data: subscriptions, error } = await supabaseAdmin
+    .from("subscriptions")
+    .select(SUBSCRIPTION_SELECT)
+    .eq("user_id", userId)
+    .in("status", ACTIVE_SUBSCRIPTION_STATUSES)
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
+  if (!subscriptions?.length) return [];
+
+  return (subscriptions as SubscriptionRow[]).map(mapActiveMedication);
+}
+
+export async function fetchPastMedications(
+  userId: string,
+  activeMedicineIds: Set<string> = new Set(),
+): Promise<MyMedsPastMedicationDto[]> {
+  // Load all non-active via client-side filter — PostgREST `not.in` string quoting is brittle.
+  const { data: subscriptions, error } = await supabaseAdmin
+    .from("subscriptions")
+    .select(SUBSCRIPTION_SELECT)
+    .eq("user_id", userId)
+    .order("updated_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
+  if (!subscriptions?.length) return [];
+
+  const activeStatusSet = new Set(ACTIVE_SUBSCRIPTION_STATUSES);
+  const seenMedicineIds = new Set<string>(activeMedicineIds);
+  const past: MyMedsPastMedicationDto[] = [];
+
+  for (const row of subscriptions as SubscriptionRow[]) {
+    if (activeStatusSet.has(row.status)) continue;
+    const medicineId = row.medicine_id;
+    if (medicineId && seenMedicineIds.has(medicineId)) continue;
+    if (medicineId) seenMedicineIds.add(medicineId);
+    past.push(mapPastMedication(row));
+  }
+
+  return past;
 }
 
 export async function fetchMedicationRequests(
@@ -176,10 +249,41 @@ export async function fetchMyMedsPageData(
   userId: string,
   options: { page?: number; pageSize?: number; query?: string } = {},
 ): Promise<MyMedsPageDataDto> {
-  const [currentMedication, requests] = await Promise.all([
-    fetchCurrentMedication(userId),
+  const [subscriptionsResult, requests] = await Promise.all([
+    supabaseAdmin
+      .from("subscriptions")
+      .select(SUBSCRIPTION_SELECT)
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false }),
     fetchMedicationRequests(userId, options),
   ]);
 
-  return { currentMedication, requests };
+  if (subscriptionsResult.error) throw new Error(subscriptionsResult.error.message);
+
+  const rows = (subscriptionsResult.data ?? []) as SubscriptionRow[];
+  const activeStatusSet = new Set(ACTIVE_SUBSCRIPTION_STATUSES);
+
+  const activeMedications = rows
+    .filter((row) => activeStatusSet.has(row.status))
+    .map(mapActiveMedication);
+
+  const activeMedicineIds = new Set(
+    activeMedications.map((med) => med.medicineId).filter((id): id is string => Boolean(id)),
+  );
+
+  const seenMedicineIds = new Set<string>(activeMedicineIds);
+  const pastMedications: MyMedsPastMedicationDto[] = [];
+  // Prefer newest ended treatments first (updated_at), independent of created_at order above.
+  const pastRows = [...rows]
+    .filter((row) => !activeStatusSet.has(row.status))
+    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+
+  for (const row of pastRows) {
+    const medicineId = row.medicine_id;
+    if (medicineId && seenMedicineIds.has(medicineId)) continue;
+    if (medicineId) seenMedicineIds.add(medicineId);
+    pastMedications.push(mapPastMedication(row));
+  }
+
+  return { activeMedications, pastMedications, requests };
 }

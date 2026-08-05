@@ -3,6 +3,9 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { fetchRefundRequests } from "@/lib/billing/service-data";
+import { sendTransactionalEmail } from "@/lib/email/send";
+import { refundRequestAdminEmail, refundRequestReceivedEmail } from "@/lib/email/lifecycle-emails";
+import { adminNotifyEmail, appUrl, patientEmailByUserId } from "@/lib/email/recipients";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,7 +41,7 @@ export async function POST(request: Request) {
 
   const { data: payment, error: paymentError } = await supabaseAdmin
     .from("payments")
-    .select("id, amount_cents, status, stripe_subscription_id")
+    .select("id, amount_cents, currency, status, stripe_subscription_id")
     .eq("id", paymentId)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -102,6 +105,39 @@ export async function POST(request: Request) {
       { status: duplicate ? 409 : 500 },
     );
   }
+
+  void (async () => {
+    const patient = await patientEmailByUserId(user.id);
+    if (!patient) return;
+
+    const currency = payment.currency || "usd";
+    const { subject, html } = refundRequestReceivedEmail({
+      fullName: patient.fullName,
+      amountCents: payment.amount_cents,
+      currency,
+      billingUrl: `${appUrl()}/billing`,
+    });
+    await sendTransactionalEmail({ to: patient.email, subject, html });
+
+    const adminTo = adminNotifyEmail();
+    if (adminTo) {
+      const adminMail = refundRequestAdminEmail({
+        patientEmail: patient.email,
+        patientName: patient.fullName,
+        amountCents: payment.amount_cents,
+        currency,
+        reason,
+        paymentId: payment.id,
+      });
+      await sendTransactionalEmail({
+        to: adminTo,
+        subject: adminMail.subject,
+        html: adminMail.html,
+      });
+    }
+  })().catch((err) => {
+    console.error("[email] refund request notify failed:", err);
+  });
 
   return NextResponse.json({ ok: true });
 }
