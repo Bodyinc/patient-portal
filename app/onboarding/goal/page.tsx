@@ -75,15 +75,15 @@ export default function GoalPage() {
         checkoutConfirmed: false,
       };
       updateState(patch);
+      // Start prefetch WHILE this page is still mounted. Prefetching after navigate abandons
+      // the server-action Promise (never settles), and React Query then hangs forever on
+      // fetchStatus:"fetching" when the questionnaire page mounts.
+      void prefetchMedicinesForCategory(queryClient, selected);
+      if (result.data.requiresQuestionnaire) {
+        void prefetchQuestionnaireForCategory(queryClient, selected);
+      }
       const next = getNextStepPath("/onboarding/goal", { ...state, ...patch });
       if (next) await pushOnboardingRoute(router, next);
-      // Warm later-step caches without blocking demographics.
-      void Promise.all([
-        prefetchMedicinesForCategory(queryClient, selected),
-        result.data.requiresQuestionnaire
-          ? prefetchQuestionnaireForCategory(queryClient, selected)
-          : Promise.resolve(),
-      ]);
     } catch (err) {
       const message =
         err instanceof Error

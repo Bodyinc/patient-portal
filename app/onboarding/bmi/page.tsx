@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Ruler, Weight } from "lucide-react";
 
@@ -9,10 +10,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { saveIntakeBmi, evaluateMedicineEligibility } from "@/lib/actions/intake";
+import { intakeQueryKeys } from "@/lib/intake/query-keys";
 
 import BmiGauge from "../_components/BmiGauge";
 import OnboardingStepLayout from "../_components/OnboardingStepLayout";
 import { calculateBmi, getBmiCategory } from "../_lib/bmi";
+import { prefetchQuestionnaireForCategory } from "../_lib/intake-query";
 import {
   getNextStepPath,
   getPrevStepPath,
@@ -29,6 +32,7 @@ const fieldControlClass =
 
 export default function BmiPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { state, updateState, hydrated } = useOnboarding();
   const [saving, setSaving] = useState(false);
   const [ineligibleReason, setIneligibleReason] = useState<string | null>(
@@ -52,6 +56,20 @@ export default function BmiPage() {
     setHeightInches(state.heightInches !== null ? String(state.heightInches) : "");
     setWeightLbs(state.weightLbs !== null ? String(state.weightLbs) : "");
   }, [hydrated, state.heightFeet, state.heightInches, state.weightLbs]);
+
+  // Warm the questionnaire cache while the patient fills BMI. Cancel any hung in-flight
+  // prefetch left over from the goal step first so we don't inherit a never-settling Promise.
+  useEffect(() => {
+    if (!hydrated || !state.goalId || !state.requiresQuestionnaire) return;
+    const key = intakeQueryKeys.questionnaire(state.goalId);
+    const qState = queryClient.getQueryState(key);
+    void (async () => {
+      if (qState?.fetchStatus === "fetching" && !qState.dataUpdatedAt) {
+        await queryClient.cancelQueries({ queryKey: key });
+      }
+      void prefetchQuestionnaireForCategory(queryClient, state.goalId!);
+    })();
+  }, [hydrated, state.goalId, state.requiresQuestionnaire, queryClient]);
 
   const bmi = useMemo(() => {
     const feet = Number(heightFeet);

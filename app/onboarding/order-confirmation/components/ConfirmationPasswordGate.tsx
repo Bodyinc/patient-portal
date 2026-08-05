@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Mail } from "lucide-react";
 import { toast } from "sonner";
@@ -8,8 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getOnboardingOrderSummary } from "@/lib/actions/intake";
-import { hasPassword, setInitialPassword } from "@/lib/actions/patient-auth";
+import { setInitialPassword } from "@/lib/actions/patient-auth";
 import { fieldControlClass } from "../../_lib/onboarding-theme";
 
 function EmailSentBadge({ email }: { email: string }) {
@@ -139,24 +138,21 @@ function SetPasswordForm({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
+type ConfirmationPasswordGateProps = {
+  /** null while the confirmation data is still loading. */
+  passwordSet: boolean | null;
+  email: string | null;
+};
+
 /**
  * One-time password setup after checkout. Dashboard actions + email badge appear after success.
  */
-export default function ConfirmationPasswordGate() {
-  const [passwordSet, setPasswordSet] = useState<boolean | null>(null);
-  const [email, setEmail] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    void Promise.all([hasPassword(), getOnboardingOrderSummary()]).then(([set, summary]) => {
-      if (!active) return;
-      setPasswordSet(set);
-      if (summary.ok) setEmail(summary.data.email);
-    });
-    return () => {
-      active = false;
-    };
-  }, []);
+export default function ConfirmationPasswordGate({
+  passwordSet: initialPasswordSet,
+  email,
+}: ConfirmationPasswordGateProps) {
+  const [overridePasswordSet, setOverridePasswordSet] = useState(false);
+  const passwordSet = overridePasswordSet ? true : initialPasswordSet;
 
   if (passwordSet === null) {
     return (
@@ -173,7 +169,7 @@ export default function ConfirmationPasswordGate() {
   return (
     <SetPasswordForm
       onSuccess={() => {
-        setPasswordSet(true);
+        setOverridePasswordSet(true);
       }}
     />
   );

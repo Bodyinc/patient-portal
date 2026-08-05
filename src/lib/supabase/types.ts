@@ -214,6 +214,7 @@ export type Database = {
         Row: {
           id: string;
           is_active: boolean;
+          is_default: boolean;
           state: string | null;
           license_states: string[];
           practice_states: string[];
@@ -224,6 +225,7 @@ export type Database = {
         Insert: {
           id: string;
           is_active?: boolean;
+          is_default?: boolean;
           state?: string | null;
           license_states?: string[];
           practice_states?: string[];
@@ -234,6 +236,7 @@ export type Database = {
         Update: {
           id?: string;
           is_active?: boolean;
+          is_default?: boolean;
           state?: string | null;
           license_states?: string[];
           practice_states?: string[];

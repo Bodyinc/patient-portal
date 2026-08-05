@@ -1,45 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { getOnboardingOrderSummary } from "@/lib/actions/intake";
-import { getPublicFees } from "@/lib/actions/fees";
+import type { ConfirmationData } from "../types";
 
-type OrderSummaryData = {
-  medicineName: string | null;
-  variantName: string | null;
-  packageName: string | null;
-  packagePrice: number | null;
-  totalPaid: number | null;
-  email: string | null;
+type OrderSummaryProps = {
+  data: ConfirmationData | null;
+  loaded: boolean;
 };
 
-export default function OrderSummary() {
-  const [summary, setSummary] = useState<OrderSummaryData | null>(null);
-  const [loaded, setLoaded] = useState(false);
-  const [renewalShippingCents, setRenewalShippingCents] = useState(0);
-
-  useEffect(() => {
-    let active = true;
-    void getOnboardingOrderSummary().then((result) => {
-      if (!active) return;
-      if (result.ok) setSummary(result.data);
-      setLoaded(true);
-    });
-    void getPublicFees().then((f) => {
-      if (active) setRenewalShippingCents(f.shippingFeeCents);
-    });
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const medicationName = summary?.medicineName?.trim() || "Selected Medication";
-  const variantName = summary?.variantName?.trim() || null;
-  const planLabel = summary?.packageName?.trim() || "Treatment Plan";
-  const totalPaid = summary?.totalPaid;
+export default function OrderSummary({ data, loaded }: OrderSummaryProps) {
+  const medicationName = data?.medicineName?.trim() || "Selected Medication";
+  const variantName = data?.variantName?.trim() || null;
+  const planLabel = data?.packageName?.trim() || "Treatment Plan";
+  const totalPaid = data?.totalPaid;
+  const renewalShippingCents = data?.renewalShippingCents ?? 0;
 
   return (
     <Card className="h-fit w-full overflow-hidden rounded-2xl border border-[#152A51]/20 bg-white shadow-none">

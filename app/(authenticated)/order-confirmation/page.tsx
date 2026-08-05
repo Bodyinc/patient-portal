@@ -11,32 +11,37 @@ export default async function OrderConfirmationPage() {
   const { user } = await requirePatientSession();
 
   // Self-heal: pull the latest state from Stripe so the order is confirmed even if the
-  // webhook was delayed or not running.
+  // webhook was delayed or not running. Short-circuits (no Stripe call) once the sub is active
+  // and the payment is recorded, so repeat visits render straight from the DB.
   await reconcileLatestSubscriptionForUser(user.id);
 
-  const { data: sub } = await supabaseAdmin
-    .from("subscriptions")
-    .select(
-      "package_id, medicine_id, created_at, packages(name, price, duration_months), medicines(name)",
-    )
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  // The three reads below are independent — run them in one parallel wave.
+  const [{ data: sub }, { data: pay }, settings, { data: profile }] = await Promise.all([
+    supabaseAdmin
+      .from("subscriptions")
+      .select(
+        "package_id, medicine_id, created_at, packages(name, price, duration_months), medicines(name)",
+      )
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("payments")
+      .select("amount_cents, raw_event")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    getPlatformSettings(),
+    supabaseAdmin.from("profiles").select("email").eq("id", user.id).maybeSingle(),
+  ]);
 
   const pkg = (
     sub as { packages?: { name: string; price: number; duration_months: number } } | null
   )?.packages;
   const med = (sub as { medicines?: { name: string } } | null)?.medicines;
 
-  // Show the real charged amount from the payment; fall back to a computed estimate.
-  const { data: pay } = await supabaseAdmin
-    .from("payments")
-    .select("amount_cents, raw_event")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
   const totalPaid = pay
     ? Number(pay.amount_cents) / 100
     : pkg
@@ -79,15 +84,9 @@ export default async function OrderConfirmationPage() {
 
   // First onboarding order never carries shipping; surface the renewal shipping fee so the
   // patient knows it applies from the next automatic payment onward.
-  const settings = await getPlatformSettings();
   const renewalShipping = effectiveShippingCents(settings) / 100;
   const showRenewalNote = shipping === 0 && renewalShipping > 0;
 
-  const { data: profile } = await supabaseAdmin
-    .from("profiles")
-    .select("email")
-    .eq("id", user.id)
-    .maybeSingle();
   const email = profile?.email ?? user.email ?? "";
 
   return (

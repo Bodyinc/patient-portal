@@ -18,7 +18,6 @@ import { intakeQueryKeys } from "@/lib/intake/query-keys";
 import type { IntakeSummaryDto, QuestionnaireAnswerValue } from "@/lib/intake/types";
 import { legacyAnswersToValues } from "@/lib/intake/questionnaire";
 
-import { debugLog } from "./debug-log";
 import {
   canAccessStep,
   getEarliestIncompleteStep,
@@ -219,29 +218,8 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
 
     const canAccess = canAccessStep(pathname, state);
     const earliest = getEarliestIncompleteStep(state);
-    debugLog({
-      runId: "post-fix-3",
-      hypothesisId: "C",
-      location: "onboarding-store.tsx:guard",
-      message: "Step guard evaluated",
-      data: {
-        pathname,
-        canAccess,
-        earliest,
-        goalId: state.goalId,
-        requiresQuestionnaire: state.requiresQuestionnaire,
-        questionnaireComplete: state.questionnaireComplete,
-      },
-    });
 
     if (!canAccess && !isOnboardingNavigationPending()) {
-      debugLog({
-        runId: "post-fix-3",
-        hypothesisId: "C",
-        location: "onboarding-store.tsx:guard-redirect",
-        message: "Guard redirecting",
-        data: { from: pathname, to: earliest },
-      });
       replaceOnboardingRoute(router, earliest);
     }
   }, [hydrated, pathname, router, state]);

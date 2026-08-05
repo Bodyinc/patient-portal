@@ -5,6 +5,7 @@ import { formatOrderId } from "@/lib/orders/order-id";
 import { planTitleFromDuration } from "@/lib/pricing";
 import { getPlatformSettings, effectiveShippingCents } from "@/lib/settings/platform-settings";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { maybeReconcileIncompleteSubscription } from "@/lib/stripe/reconcile";
 import type { Json } from "@/lib/supabase/types";
 import type {
   BillingCancelSubscriptionDto,
@@ -328,6 +329,8 @@ export async function fetchBillingPageData(
   userId: string,
   options: { page?: number; pageSize?: number; query?: string } = {},
 ): Promise<BillingPageDataDto> {
+  await maybeReconcileIncompleteSubscription(userId);
+
   // All three sections in one parallel wave; refund state is merged into the
   // payment rows afterwards instead of gating them behind a sequential fetch.
   const [refundRequests, subscriptions, payments] = await Promise.all([

@@ -5,8 +5,6 @@ import { Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-import { debugLog } from "../_lib/debug-log";
-
 type OnboardingFooterProps = {
   onBack?: () => void;
   onContinue?: () => void;
@@ -49,28 +47,7 @@ export default function OnboardingFooter({
     <Button
       type="button"
       onClick={() => {
-        debugLog({
-          runId: "post-fix-3",
-          hypothesisId: "A",
-          location: "OnboardingFooter.tsx:continue",
-          message: "Continue clicked",
-          data: { hasHandler: Boolean(onContinue), continueDisabled },
-        });
-        void Promise.resolve(onContinue?.()).catch((reason: unknown) => {
-          debugLog({
-            runId: "post-fix-3",
-            hypothesisId: "B",
-            location: "OnboardingFooter.tsx:continue-reject",
-            message: "onContinue promise rejected",
-            data: {
-              reasonType: reason === null ? "null" : typeof reason,
-              reasonString: String(reason),
-              isEvent: typeof Event !== "undefined" && reason instanceof Event,
-              eventType:
-                typeof Event !== "undefined" && reason instanceof Event ? reason.type : undefined,
-            },
-          });
-        });
+        void Promise.resolve(onContinue?.()).catch(() => {});
       }}
       disabled={continueDisabled}
       className={

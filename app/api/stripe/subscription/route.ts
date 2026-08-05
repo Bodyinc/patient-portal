@@ -50,13 +50,23 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { data: pkg, error: pkgError } = await supabaseAdmin
-      .from("packages")
-      .select(
-        "id, medicine_id, variant_id, name, price, duration_months, is_active, stripe_price_id, medicines(name), medicine_variants(name)",
-      )
-      .eq("id", packageId)
-      .maybeSingle();
+    // These three reads are independent — package details, order fees, and the Stripe customer
+    // all only depend on inputs we already have, so fetch them in one parallel wave.
+    const [{ data: pkg, error: pkgError }, fees, customerId] = await Promise.all([
+      supabaseAdmin
+        .from("packages")
+        .select(
+          "id, medicine_id, variant_id, name, price, duration_months, is_active, stripe_price_id, medicines(name), medicine_variants(name)",
+        )
+        .eq("id", packageId)
+        .maybeSingle(),
+      computeShopOrderFees(user.id, medicineId),
+      getOrCreateStripeCustomer({
+        userId: user.id,
+        email: user.email ?? null,
+        name: (user.user_metadata?.full_name as string | undefined) ?? null,
+      }),
+    ]);
 
     if (pkgError) {
       return NextResponse.json(
@@ -74,6 +84,8 @@ export async function POST(request: Request) {
       );
     }
 
+    const { shippingCents, consultationCents } = fees;
+
     const medicineName =
       (pkg as { medicines?: { name: string } | null }).medicines?.name ?? "Treatment";
     const variantName =
@@ -83,15 +95,14 @@ export async function POST(request: Request) {
     const subscriptionDescription = `${medicineName}${variantName ? ` — ${variantName}` : ""} · ${planLabel}`;
 
     const subtotalCents = Math.round(Number(pkg.price) * 100);
-    const discount = await resolveCheckoutDiscount({
-      code: body.promoCode,
-      subtotalCents,
-      allowAuto: false,
-    });
-    const discountCents = discount?.discountCents ?? 0;
     const selectedPlanCode = pkg.duration_months === 1 ? "monthly" : "quarterly";
 
-    const { shippingCents, consultationCents } = await computeShopOrderFees(user.id, medicineId);
+    // Discount needs the plan subtotal; the saved card needs the customer — both are ready now.
+    const [discount, savedPaymentMethod] = await Promise.all([
+      resolveCheckoutDiscount({ code: body.promoCode, subtotalCents, allowAuto: false }),
+      getDefaultPaymentMethod(customerId),
+    ]);
+    const discountCents = discount?.discountCents ?? 0;
 
     const { data: order, error: orderError } = await supabaseAdmin
       .from("shop_checkout_orders")
@@ -115,14 +126,6 @@ export async function POST(request: Request) {
     if (orderError || !order) {
       throw new Error(orderError?.message ?? "Unable to create order.");
     }
-
-    const customerId = await getOrCreateStripeCustomer({
-      userId: user.id,
-      email: user.email ?? null,
-      name: (user.user_metadata?.full_name as string | undefined) ?? null,
-    });
-
-    const savedPaymentMethod = await getDefaultPaymentMethod(customerId);
 
     // Consultation is one-time; shipping is a recurring subscription item (below) so it is
     // NOT added here as a one-time fee.
@@ -156,28 +159,29 @@ export async function POST(request: Request) {
       },
     });
 
-    if (discount) await incrementPromoRedemption(discount.promo.id);
-
-    await supabaseAdmin
-      .from("shop_checkout_orders")
-      .update({
-        stripe_subscription_id: subscriptionId,
-        ...(paid ? { status: "paid" } : {}),
-      })
-      .eq("id", order.id);
-
-    await supabaseAdmin.from("subscriptions").upsert(
-      {
-        user_id: user.id,
-        stripe_subscription_id: subscriptionId,
-        stripe_customer_id: customerId,
-        stripe_price_id: pkg.stripe_price_id,
-        package_id: pkg.id,
-        medicine_id: medicineId,
-        status: paid ? "active" : "incomplete",
-      },
-      { onConflict: "stripe_subscription_id" },
-    );
+    // These three writes are independent of each other — run them together.
+    await Promise.all([
+      discount ? incrementPromoRedemption(discount.promo.id) : Promise.resolve(),
+      supabaseAdmin
+        .from("shop_checkout_orders")
+        .update({
+          stripe_subscription_id: subscriptionId,
+          ...(paid ? { status: "paid" } : {}),
+        })
+        .eq("id", order.id),
+      supabaseAdmin.from("subscriptions").upsert(
+        {
+          user_id: user.id,
+          stripe_subscription_id: subscriptionId,
+          stripe_customer_id: customerId,
+          stripe_price_id: pkg.stripe_price_id,
+          package_id: pkg.id,
+          medicine_id: medicineId,
+          status: paid ? "active" : "incomplete",
+        },
+        { onConflict: "stripe_subscription_id" },
+      ),
+    ]);
 
     return NextResponse.json(
       {

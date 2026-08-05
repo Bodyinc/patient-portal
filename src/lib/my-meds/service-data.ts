@@ -3,6 +3,7 @@ import "server-only";
 import { resolveMedicineImageSrc } from "@/lib/intake/medicine-image";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { fetchPatientOrders } from "@/lib/orders/service-data";
+import { maybeReconcileIncompleteSubscription } from "@/lib/stripe/reconcile";
 import type { Json } from "@/lib/supabase/types";
 import type {
   MyMedsCurrentMedicationDto,
@@ -154,6 +155,8 @@ export async function fetchCurrentMedication(
 export async function fetchActiveMedications(
   userId: string,
 ): Promise<MyMedsCurrentMedicationDto[]> {
+  await maybeReconcileIncompleteSubscription(userId);
+
   const { data: subscriptions, error } = await supabaseAdmin
     .from("subscriptions")
     .select(SUBSCRIPTION_SELECT)
@@ -249,6 +252,8 @@ export async function fetchMyMedsPageData(
   userId: string,
   options: { page?: number; pageSize?: number; query?: string } = {},
 ): Promise<MyMedsPageDataDto> {
+  await maybeReconcileIncompleteSubscription(userId);
+
   const [subscriptionsResult, requests] = await Promise.all([
     supabaseAdmin
       .from("subscriptions")

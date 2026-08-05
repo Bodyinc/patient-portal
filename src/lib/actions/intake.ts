@@ -19,7 +19,11 @@ import {
   type IntakeSessionRow,
 } from "@/lib/intake/session";
 import { linkOnboardingStripeToUser } from "@/lib/stripe/customers";
+import { reconcileLatestSubscriptionForUser } from "@/lib/stripe/reconcile";
+import { getPublicFees } from "@/lib/actions/fees";
+import { hasPassword } from "@/lib/actions/patient-auth";
 import { attachReferralFromCookie, maybeConvertReferral } from "@/lib/referrals";
+import { createClient } from "@/lib/supabase/server";
 import type {
   CategoryDto,
   EligibilityResultDto,
@@ -110,65 +114,74 @@ async function categoryHasActiveQuestionnaire(categoryId: string): Promise<boole
   return (active ?? []).length > 0;
 }
 
+type EmbeddedQuestionOption = {
+  id: string;
+  question_id: string;
+  label: string;
+  sort_order: number;
+};
+type EmbeddedQuestion = {
+  id: string;
+  prompt: string;
+  description: string | null;
+  question_type: string;
+  is_required: boolean;
+  sort_order: number;
+  questionnaire_question_options: EmbeddedQuestionOption[] | null;
+};
+
+function mapQuestionnaireDto(questionnaire: {
+  id: string;
+  name: string;
+  questionnaire_questions: EmbeddedQuestion[] | null;
+}): QuestionnaireDto {
+  const questions = [...(questionnaire.questionnaire_questions ?? [])].sort(
+    (a, b) => a.sort_order - b.sort_order,
+  );
+
+  return {
+    id: questionnaire.id,
+    title: questionnaire.name,
+    questions: questions.map((q) => ({
+      id: q.id,
+      text: q.prompt,
+      description: q.description,
+      questionType: normalizeQuestionType(q.question_type),
+      isRequired: q.is_required,
+      options: [...(q.questionnaire_question_options ?? [])]
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map((o) => ({ id: o.id, label: o.label })),
+    })),
+  };
+}
+
+// Single round trip: questionnaire + its questions + each question's options, via nested
+// PostgREST embeds (was 3 separate sequential queries).
 async function loadQuestionnaireDto(
-  questionnaireId: string,
-): Promise<IntakeActionResult<QuestionnaireDto>> {
-  const { data: questionnaire, error: questionnaireError } = await supabaseAdmin
+  questionnaireIds: string[],
+): Promise<IntakeActionResult<QuestionnaireDto | null>> {
+  const { data: questionnaire, error } = await supabaseAdmin
     .from("questionnaires")
-    .select("id, name, description, is_active")
-    .eq("id", questionnaireId)
+    .select(
+      "id, name, questionnaire_questions(id, prompt, description, question_type, is_required, sort_order, questionnaire_question_options(id, question_id, label, sort_order))",
+    )
+    .in("id", questionnaireIds)
     .eq("is_active", true)
+    .limit(1)
     .maybeSingle();
 
-  if (questionnaireError) {
-    return { ok: false, code: "fetch_error", message: questionnaireError.message };
+  if (error) {
+    return { ok: false, code: "fetch_error", message: error.message };
   }
   if (!questionnaire) {
-    return { ok: false, code: "not_found", message: "Questionnaire not found" };
-  }
-
-  const { data: questions, error: questionsError } = await supabaseAdmin
-    .from("questionnaire_questions")
-    .select("id, prompt, description, question_type, is_required, sort_order, disqualify_rules")
-    .eq("questionnaire_id", questionnaire.id)
-    .order("sort_order", { ascending: true });
-
-  if (questionsError) {
-    return { ok: false, code: "fetch_error", message: questionsError.message };
-  }
-
-  const questionIds = (questions ?? []).map((q) => q.id);
-  const { data: options, error: optionsError } = await supabaseAdmin
-    .from("questionnaire_question_options")
-    .select("id, question_id, label, sort_order")
-    .in("question_id", questionIds.length ? questionIds : ["00000000-0000-0000-0000-000000000000"])
-    .order("sort_order", { ascending: true });
-
-  if (optionsError) {
-    return { ok: false, code: "fetch_error", message: optionsError.message };
-  }
-
-  const optionsByQuestion = new Map<string, { id: string; label: string }[]>();
-  for (const option of options ?? []) {
-    const list = optionsByQuestion.get(option.question_id) ?? [];
-    list.push({ id: option.id, label: option.label });
-    optionsByQuestion.set(option.question_id, list);
+    return { ok: true, data: null };
   }
 
   return {
     ok: true,
-    data: {
-      id: questionnaire.id,
-      title: questionnaire.name,
-      questions: (questions ?? []).map((q) => ({
-        id: q.id,
-        text: q.prompt,
-        description: q.description,
-        questionType: normalizeQuestionType(q.question_type),
-        isRequired: q.is_required,
-        options: optionsByQuestion.get(q.id) ?? [],
-      })),
-    },
+    data: mapQuestionnaireDto(
+      questionnaire as unknown as Parameters<typeof mapQuestionnaireDto>[0],
+    ),
   };
 }
 
@@ -889,25 +902,7 @@ export async function getQuestionnaireForCategory(
     return { ok: true, data: null };
   }
 
-  const { data: activeQuestionnaires, error: questionnaireError } = await supabaseAdmin
-    .from("questionnaires")
-    .select("id")
-    .in("id", questionnaireIds)
-    .eq("is_active", true)
-    .limit(1);
-
-  if (questionnaireError) {
-    return { ok: false, code: "fetch_error", message: questionnaireError.message };
-  }
-
-  const questionnaireId = activeQuestionnaires?.[0]?.id;
-  if (!questionnaireId) {
-    return { ok: true, data: null };
-  }
-
-  const loaded = await loadQuestionnaireDto(questionnaireId);
-  if (!loaded.ok) return loaded;
-  return { ok: true, data: loaded.data };
+  return loadQuestionnaireDto(questionnaireIds);
 }
 
 export async function getCategoryRequiresQuestionnaire(
@@ -1263,6 +1258,29 @@ export async function completeIntakeSession(): Promise<IntakeActionResult<{ sess
   return { ok: true, data: { sessionId: sessionResult.session.id } };
 }
 
+/** Backstop for onboarding confirmation — same self-heal as authenticated /order-confirmation. */
+export async function reconcileOnboardingSubscription(): Promise<IntakeActionResult<null>> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, code: "auth_error", message: "Authentication required." };
+  }
+
+  try {
+    await reconcileLatestSubscriptionForUser(user.id);
+    return { ok: true, data: null };
+  } catch (error) {
+    console.error("[stripe] reconcile onboarding confirmation failed:", error);
+    return {
+      ok: false,
+      code: "reconcile_error",
+      message: error instanceof Error ? error.message : "Unable to reconcile subscription.",
+    };
+  }
+}
+
 function formatOrderDate(iso: string): string {
   return new Intl.DateTimeFormat("en-US", {
     month: "long",
@@ -1397,6 +1415,108 @@ export async function getOnboardingOrderSummary(): Promise<
   };
 }
 
+/**
+ * Single entry point for the onboarding confirmation page.
+ *
+ * Next.js serializes server actions from the same client, so the page previously paid for
+ * seven queued round trips (complete + reconcile + meta + summary x2 + fees + hasPassword),
+ * each re-resolving the intake session. This does the same work in one round trip with a
+ * single session resolve and one parallel wave.
+ */
+export async function getOnboardingConfirmationData(): Promise<
+  IntakeActionResult<{
+    orderNumber: string;
+    orderDate: string;
+    medicineName: string | null;
+    variantName: string | null;
+    packageName: string | null;
+    packagePrice: number | null;
+    totalPaid: number | null;
+    email: string | null;
+    renewalShippingCents: number;
+    passwordSet: boolean;
+  }>
+> {
+  const token = await getSessionTokenFromCookie();
+  if (!token) {
+    return { ok: false, code: "session_error", message: "No intake session" };
+  }
+
+  const { session, error } = await resolveIntakeSession(token, { allowCompleted: true });
+  if (!session || error) {
+    return { ok: false, code: "session_error", message: error ?? "Invalid session" };
+  }
+
+  // Reconcile before reading payments so Total Paid reflects the real charge. Cheap after the
+  // first pass — alreadyReconciled() short-circuits without touching Stripe.
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) await reconcileLatestSubscriptionForUser(user.id);
+  } catch (reconcileError) {
+    console.error("[stripe] reconcile on onboarding confirmation failed:", reconcileError);
+  }
+
+  const [summary, paymentResult, requestResult, fees, passwordSet] = await Promise.all([
+    buildIntakeSummary(session.id, session),
+    supabaseAdmin
+      .from("payments")
+      .select("id, amount_cents, created_at")
+      .eq("session_id", session.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("medication_requests")
+      .select("id, created_at")
+      .eq("session_id", session.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    getPublicFees(),
+    hasPassword(),
+    session.status === "completed"
+      ? Promise.resolve(null)
+      : supabaseAdmin.from("intake_sessions").update({ status: "completed" }).eq("id", session.id),
+  ]);
+
+  if (!summary) {
+    return { ok: false, code: "not_found", message: "Order summary unavailable" };
+  }
+
+  const payment = paymentResult.data;
+  const request = requestResult.data;
+  const paidCents = payment?.amount_cents;
+  const totalPaid =
+    paidCents != null
+      ? Number(paidCents) / 100
+      : summary.packagePrice != null
+        ? Number(summary.packagePrice)
+        : null;
+
+  const orderSource = payment ?? request;
+
+  return {
+    ok: true,
+    data: {
+      orderNumber: formatOrderId(orderSource?.id ?? session.id),
+      orderDate: formatOrderDate(
+        orderSource?.created_at ?? session.updated_at ?? session.created_at,
+      ),
+      medicineName: summary.medicineName,
+      variantName: summary.variantName,
+      packageName: summary.packageName,
+      packagePrice: summary.packagePrice,
+      totalPaid,
+      email: summary.email?.trim() || null,
+      renewalShippingCents: fees.shippingFeeCents,
+      passwordSet,
+    },
+  };
+}
+
 export async function claimIntakeSession(userId: string): Promise<void> {
   // Referral attach must never break signup, and runs before the intake-token check
   // so direct signups (no onboarding session) still get linked to their referrer.
@@ -1443,12 +1563,28 @@ export async function claimIntakeSession(userId: string): Promise<void> {
     .eq("session_id", session.id)
     .is("user_id", null);
 
+  // Always attribute session-scoped Stripe rows to this account.
+  await supabaseAdmin
+    .from("subscriptions")
+    .update({ user_id: userId })
+    .eq("session_id", session.id)
+    .is("user_id", null);
+  await supabaseAdmin
+    .from("payments")
+    .update({ user_id: userId })
+    .eq("session_id", session.id)
+    .is("user_id", null);
+
   if (session.stripe_customer_id) {
-    await linkOnboardingStripeToUser({
-      sessionId: session.id,
-      stripeCustomerId: session.stripe_customer_id,
-      userId,
-    });
+    try {
+      await linkOnboardingStripeToUser({
+        sessionId: session.id,
+        stripeCustomerId: session.stripe_customer_id,
+        userId,
+      });
+    } catch (error) {
+      console.error("[stripe] linkOnboardingStripeToUser failed:", error);
+    }
     // The onboarding payment happened as a guest, so it only becomes attributable to
     // this user after the linking above — re-check the referral conversion now.
     try {
@@ -1456,5 +1592,12 @@ export async function claimIntakeSession(userId: string): Promise<void> {
     } catch (error) {
       console.error("[referrals] convert after claim failed:", error);
     }
+  }
+
+  // Self-heal without waiting on webhooks: promote incomplete → active and record payment.
+  try {
+    await reconcileLatestSubscriptionForUser(userId);
+  } catch (error) {
+    console.error("[stripe] reconcile after claim failed:", error);
   }
 }

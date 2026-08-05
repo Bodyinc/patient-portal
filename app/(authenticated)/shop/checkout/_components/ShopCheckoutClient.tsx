@@ -12,6 +12,7 @@ import ReferralCard from "./ReferralCard";
 import SelectedProductCard from "./SelectedProductCard";
 import { getCheckoutDiscount } from "@/lib/actions/stripe-checkout";
 import { getShopOrderFees } from "@/lib/actions/fees";
+import { getStripeJs } from "@/lib/stripe/client";
 import type { CheckoutBootstrap, CheckoutPlanId } from "./types";
 
 type ShopCheckoutClientProps = {
@@ -59,10 +60,21 @@ export default function ShopCheckoutClient({
   const [promoSavings, setPromoSavings] = useState(0);
   const [appliedPromoLabel, setAppliedPromoLabel] = useState<string | null>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
-  const [payment, setPayment] = useState<{ clientSecret: string; returnUrl: string } | null>(null);
+  const [payment, setPayment] = useState<{
+    clientSecret: string;
+    returnUrl: string;
+    key: string;
+  } | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [shipping, setShipping] = useState(0);
   const [consultation, setConsultation] = useState(0);
+
+  // Warm the Stripe.js script as soon as the page mounts so its ~300ms network load overlaps
+  // with the user choosing a plan, rather than blocking the modal the moment they click Pay.
+  useEffect(() => {
+    void getStripeJs();
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -96,10 +108,21 @@ export default function ShopCheckoutClient({
       ? selectedPlanMeta.id
       : null;
 
+  // Identifies the Stripe subscription/order for the current plan + promo. When unchanged, we
+  // reopen the existing PaymentModal instead of creating a fresh subscription on every click.
+  const paymentKey = `${selectedPackageId ?? ""}|${promoCode.trim().toUpperCase()}`;
+
   function handleContinue() {
     if (!selectedPlanMeta) return;
     if (!selectedPackageId) {
       setError("This plan is not available for purchase yet. Please contact support.");
+      return;
+    }
+
+    // Reuse the already-created subscription for this exact plan + promo.
+    if (payment && payment.key === paymentKey) {
+      setError(null);
+      setModalOpen(true);
       return;
     }
 
@@ -140,7 +163,9 @@ export default function ShopCheckoutClient({
           returnUrl: `${window.location.origin}/shop/checkout/confirmation?orderId=${encodeURIComponent(
             data.orderId,
           )}`,
+          key: paymentKey,
         });
+        setModalOpen(true);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unable to start checkout.");
       }
@@ -183,6 +208,7 @@ export default function ShopCheckoutClient({
             onChange={(planId) => {
               setSelectedPlan(planId);
               setPayment(null);
+              setModalOpen(false);
               if (appliedPromoLabel) {
                 setAppliedPromoLabel(null);
                 setPromoSavings(0);
@@ -259,11 +285,12 @@ export default function ShopCheckoutClient({
 
       {payment ? (
         <PaymentModal
-          open
+          open={modalOpen}
           clientSecret={payment.clientSecret}
           returnUrl={payment.returnUrl}
           onOpenChange={(open) => {
-            if (!open) setPayment(null);
+            // Keep the created subscription cached on close so reopening skips a Stripe round trip.
+            setModalOpen(open);
           }}
         />
       ) : null}

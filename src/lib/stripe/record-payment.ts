@@ -1,6 +1,7 @@
 import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { ensureMedicationOrderForPayment } from "@/lib/orders/ensure-medication-order";
 import type { Database } from "@/lib/supabase/types";
 
 type PaymentInsert = Database["public"]["Tables"]["payments"]["Insert"];
@@ -8,7 +9,7 @@ type PaymentInsert = Database["public"]["Tables"]["payments"]["Insert"];
 // Idempotent payment write keyed on the Stripe invoice, without depending on a DB unique
 // index (an ON CONFLICT upsert throws if that index is missing). Safe to call from the
 // webhook and the reconcile path for the same invoice.
-export async function recordPayment(payment: PaymentInsert): Promise<void> {
+export async function recordPayment(payment: PaymentInsert): Promise<string | null> {
   if (payment.stripe_invoice_id) {
     const { data: existing } = await supabaseAdmin
       .from("payments")
@@ -17,8 +18,27 @@ export async function recordPayment(payment: PaymentInsert): Promise<void> {
       .maybeSingle();
     if (existing) {
       await supabaseAdmin.from("payments").update(payment).eq("id", existing.id);
-      return;
+      if (payment.status === "succeeded") {
+        await ensureMedicationOrderForPayment({ paymentId: existing.id });
+      }
+      return existing.id;
     }
   }
-  await supabaseAdmin.from("payments").insert(payment);
+
+  const { data: inserted, error } = await supabaseAdmin
+    .from("payments")
+    .insert(payment)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    console.error("[payments] recordPayment insert failed:", error.message);
+    return null;
+  }
+
+  const paymentId = inserted?.id ?? null;
+  if (paymentId && payment.status === "succeeded") {
+    await ensureMedicationOrderForPayment({ paymentId });
+  }
+  return paymentId;
 }

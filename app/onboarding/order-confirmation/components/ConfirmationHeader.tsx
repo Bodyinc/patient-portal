@@ -1,25 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+type ConfirmationHeaderProps = {
+  orderNumber: string | null;
+  orderDate: string | null;
+};
 
-import { getOnboardingOrderMeta } from "@/lib/actions/intake";
-
-export default function ConfirmationHeader() {
-  const [orderNumber, setOrderNumber] = useState<string | null>(null);
-  const [orderDate, setOrderDate] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    void getOnboardingOrderMeta().then((result) => {
-      if (!active || !result.ok) return;
-      setOrderNumber(result.data.orderNumber);
-      setOrderDate(result.data.orderDate);
-    });
-    return () => {
-      active = false;
-    };
-  }, []);
-
+export default function ConfirmationHeader({ orderNumber, orderDate }: ConfirmationHeaderProps) {
   return (
     <div className="flex w-full max-w-xl flex-col items-center gap-4">
       <h1 className="text-[28px] font-semibold tracking-[-0.5px] text-[#152A51] sm:text-[32px]">

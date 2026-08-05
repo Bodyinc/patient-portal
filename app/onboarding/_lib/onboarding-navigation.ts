@@ -2,8 +2,6 @@ import type { OnboardingState } from "./onboarding-store";
 import type { QuestionDto } from "@/lib/intake/types";
 import { isQuestionAnswered } from "@/lib/intake/questionnaire";
 
-import { debugLog } from "./debug-log";
-
 export const ONBOARDING_STEPS = [
   { id: "goal", path: "/onboarding/goal" },
   { id: "demographics", path: "/onboarding/demographics" },
@@ -182,30 +180,15 @@ export function isOnboardingNavigationPending() {
   return Date.now() < navigationGraceUntil;
 }
 
-function logNavRejection(method: "push" | "replace", href: string, reason: unknown) {
-  debugLog({
-    runId: "post-fix-4",
-    hypothesisId: "F",
-    location: "onboarding-navigation.ts:nav-reject",
-    message: `router.${method} rejected`,
-    data: {
-      href,
-      reasonType: reason === null ? "null" : typeof reason,
-      reasonString: String(reason),
-      isEvent: typeof Event !== "undefined" && reason instanceof Event,
-      eventType: typeof Event !== "undefined" && reason instanceof Event ? reason.type : undefined,
-    },
-  });
-}
-
-async function runNavAction(method: "push" | "replace", action: () => unknown, href: string) {
+async function runNavAction(_method: "push" | "replace", action: () => unknown, _href: string) {
   try {
     const result = action();
     if (result && typeof (result as Promise<unknown>).then === "function") {
-      await (result as Promise<unknown>).catch((reason) => logNavRejection(method, href, reason));
+      // Swallow router rejections so they don't surface as the Next.js [object Event] overlay.
+      await (result as Promise<unknown>).catch(() => {});
     }
-  } catch (reason) {
-    logNavRejection(method, href, reason);
+  } catch {
+    // Ignored for the same reason.
   }
 }
 
