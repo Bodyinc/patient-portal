@@ -7,14 +7,21 @@ const BREVO_SMTP_HOST = "smtp-relay.brevo.com";
 const BREVO_SMTP_PORT = 587;
 
 let transporter: Transporter | null = null;
+// Cache key, so editing the SMTP credentials in .env rebuilds the transport instead of
+// reusing a connection pool still bound to the old (rejected) login.
+let transporterAuth: string | null = null;
 
 function getTransporter(login: string, key: string): Transporter {
-  transporter ??= nodemailer.createTransport({
-    host: BREVO_SMTP_HOST,
-    port: BREVO_SMTP_PORT,
-    secure: false,
-    auth: { user: login, pass: key },
-  });
+  const auth = `${login}:${key}`;
+  if (!transporter || transporterAuth !== auth) {
+    transporter = nodemailer.createTransport({
+      host: BREVO_SMTP_HOST,
+      port: BREVO_SMTP_PORT,
+      secure: false,
+      auth: { user: login, pass: key },
+    });
+    transporterAuth = auth;
+  }
   return transporter;
 }
 

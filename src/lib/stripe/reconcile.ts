@@ -14,22 +14,24 @@ const ACTIVE_SUBSCRIPTION_STATUSES = ["active", "trialing", "past_due"];
 // on every hot-path load.
 const RECONCILABLE_STATUSES = ["incomplete"];
 
-// Fast, Stripe-free check: an active subscription plus a recorded succeeded payment means the
-// webhook (or a prior reconcile) already did the work, so there is nothing left to self-heal.
-async function alreadyReconciled(userId: string): Promise<boolean> {
-  const { data: sub } = await supabaseAdmin
-    .from("subscriptions")
-    .select("id")
-    .eq("user_id", userId)
-    .in("status", [...ACTIVE_SUBSCRIPTION_STATUSES])
-    .limit(1)
-    .maybeSingle();
-  if (!sub) return false;
+/**
+ * Fast, Stripe-free check for ONE subscription: active locally and its payment already
+ * recorded means the webhook (or a prior reconcile) did the work.
+ *
+ * This must stay scoped to a single subscription. A returning patient reordering a refill
+ * still has their original active subscription and payment, so a user-wide check would skip
+ * reconciling the brand-new one and leave it stuck on "incomplete".
+ */
+async function subscriptionAlreadyReconciled(
+  stripeSubscriptionId: string,
+  status: string | null,
+): Promise<boolean> {
+  if (!status || !ACTIVE_SUBSCRIPTION_STATUSES.includes(status)) return false;
 
   const { data: payment } = await supabaseAdmin
     .from("payments")
     .select("id")
-    .eq("user_id", userId)
+    .eq("stripe_subscription_id", stripeSubscriptionId)
     .eq("status", "succeeded")
     .limit(1)
     .maybeSingle();
@@ -73,10 +75,11 @@ async function backfillOrphanStripeRows(userId: string, sessionId: string | null
 async function resolveStripeSubscriptionForUser(userId: string): Promise<{
   stripeSubscriptionId: string | null;
   sessionId: string | null;
+  status: string | null;
 }> {
   const { data: sub } = await supabaseAdmin
     .from("subscriptions")
-    .select("stripe_subscription_id, session_id")
+    .select("stripe_subscription_id, session_id, status")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -86,6 +89,7 @@ async function resolveStripeSubscriptionForUser(userId: string): Promise<{
     return {
       stripeSubscriptionId: sub.stripe_subscription_id,
       sessionId: sub.session_id,
+      status: sub.status,
     };
   }
 
@@ -102,13 +106,14 @@ async function resolveStripeSubscriptionForUser(userId: string): Promise<{
     return {
       stripeSubscriptionId: intake.stripe_subscription_id,
       sessionId: intake.id,
+      status: null,
     };
   }
 
   if (intake?.id) {
     const { data: orphanSub } = await supabaseAdmin
       .from("subscriptions")
-      .select("stripe_subscription_id, session_id")
+      .select("stripe_subscription_id, session_id, status")
       .eq("session_id", intake.id)
       .not("stripe_subscription_id", "is", null)
       .order("created_at", { ascending: false })
@@ -118,11 +123,12 @@ async function resolveStripeSubscriptionForUser(userId: string): Promise<{
       return {
         stripeSubscriptionId: orphanSub.stripe_subscription_id,
         sessionId: orphanSub.session_id ?? intake.id,
+        status: orphanSub.status,
       };
     }
   }
 
-  return { stripeSubscriptionId: null, sessionId: null };
+  return { stripeSubscriptionId: null, sessionId: null, status: null };
 }
 
 // Pull the current truth from Stripe and write it to our DB — the same effect the webhook
@@ -221,12 +227,13 @@ export async function reconcileSubscription(stripeSubscriptionId: string): Promi
 
 // Convenience wrapper used by the confirmation pages and post-claim self-heal.
 export async function reconcileLatestSubscriptionForUser(userId: string): Promise<void> {
-  // Once the webhook has activated the sub and recorded the payment, there is nothing to pull
-  // from Stripe — skip the live round-trip so confirmation/dashboard render straight from DB.
-  if (await alreadyReconciled(userId)) return;
-
-  const { stripeSubscriptionId, sessionId } = await resolveStripeSubscriptionForUser(userId);
+  const { stripeSubscriptionId, sessionId, status } =
+    await resolveStripeSubscriptionForUser(userId);
   if (!stripeSubscriptionId) return;
+
+  // Once THIS subscription is active and its payment is recorded there is nothing to pull from
+  // Stripe — skip the live round-trip so confirmation renders straight from the DB.
+  if (await subscriptionAlreadyReconciled(stripeSubscriptionId, status)) return;
 
   await backfillOrphanStripeRows(userId, sessionId);
 
@@ -238,33 +245,19 @@ export async function reconcileLatestSubscriptionForUser(userId: string): Promis
 }
 
 /**
- * If the user has no active subscription but still has an `incomplete` one (common when
- * onboarding paid before webhooks ran), pull Stripe truth once so dashboard/My Meds heal.
+ * If the user's most recent subscription is still `incomplete` (common when checkout paid
+ * before webhooks ran), pull Stripe truth once so dashboard/My Meds/billing heal.
  * Returns whether a reconcile was attempted.
  */
 export async function maybeReconcileIncompleteSubscription(userId: string): Promise<boolean> {
-  const { data: active } = await supabaseAdmin
-    .from("subscriptions")
-    .select("id")
-    .eq("user_id", userId)
-    .in("status", [...ACTIVE_SUBSCRIPTION_STATUSES])
-    .limit(1)
-    .maybeSingle();
-  if (active) return false;
-
-  const { stripeSubscriptionId, sessionId } = await resolveStripeSubscriptionForUser(userId);
+  const { stripeSubscriptionId, sessionId, status } =
+    await resolveStripeSubscriptionForUser(userId);
   if (!stripeSubscriptionId) return false;
 
-  const { data: subRow } = await supabaseAdmin
-    .from("subscriptions")
-    .select("status")
-    .eq("stripe_subscription_id", stripeSubscriptionId)
-    .maybeSingle();
-
-  // Reconcile only when the local row can still transition to active (or doesn't exist yet).
-  // Terminal states (canceled/unpaid/incomplete_expired) would otherwise hit Stripe on every
-  // dashboard/billing/my-meds load forever.
-  if (subRow && !RECONCILABLE_STATUSES.includes(subRow.status)) return false;
+  // Reconcile only when the latest subscription can still transition to active (or we could not
+  // read its status). Active rows are already healthy, and terminal states
+  // (canceled/unpaid/incomplete_expired) would otherwise hit Stripe on every page load forever.
+  if (status && !RECONCILABLE_STATUSES.includes(status)) return false;
 
   await backfillOrphanStripeRows(userId, sessionId);
 
