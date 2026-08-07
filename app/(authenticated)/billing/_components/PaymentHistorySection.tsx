@@ -25,6 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { BillingPaymentDto, BillingPaymentsListDto } from "./types";
+import { formatPortalDate } from "@/lib/date-format";
 
 type PaymentHistorySectionProps = {
   payments: BillingPaymentsListDto;
@@ -39,11 +40,7 @@ const REFUND_STATUS_LABELS: Record<string, string> = {
 };
 
 function formatDate(value: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(value));
+  return formatPortalDate(value);
 }
 
 function formatCurrency(amount: number): string {

@@ -4,9 +4,28 @@ export const MIN_SIGNUP_AGE = 18;
 export const MAX_SIGNUP_AGE = 120;
 
 const DOB_FORMAT = /^\d{4}-\d{2}-\d{2}$/;
-// Digits, spaces, parens, plus, hyphens; 7–20 chars. Mirrors the access-hub provider form so
-// phone validation is consistent across both apps.
-const PHONE_FORMAT = /^[\d\s()+-]{7,20}$/;
+
+/** Default dial code shown on onboarding (US/CA). */
+export const DEFAULT_PHONE_COUNTRY_CODE = "+1";
+
+/** Supported dial codes and expected national number length (digits only). */
+export const PHONE_COUNTRY_CODES = [{ code: "+1", label: "US +1", nationalLength: 10 }] as const;
+
+export type PhoneCountryCode = (typeof PHONE_COUNTRY_CODES)[number]["code"];
+
+export function phoneNationalLength(countryCode: string): number {
+  return PHONE_COUNTRY_CODES.find((entry) => entry.code === countryCode)?.nationalLength ?? 15;
+}
+
+/** Strip non-digits and cap to the expected national length for the dial code. */
+export function digitsOnlyPhone(value: string, countryCode: string): string {
+  return value.replace(/\D/g, "").slice(0, phoneNationalLength(countryCode));
+}
+
+export function isValidNationalPhone(phone: string, countryCode: string): boolean {
+  const length = phoneNationalLength(countryCode);
+  return new RegExp(`^\\d{${length}}$`).test(phone);
+}
 
 export function ageFromDob(dob: string): number | null {
   if (!DOB_FORMAT.test(dob)) return null;
@@ -63,12 +82,34 @@ export const OPTIONAL_DOB_SCHEMA = z
     refineDob(v, ctx);
   });
 
-export const PHONE_SCHEMA = z.string().trim().regex(PHONE_FORMAT, "Enter a valid phone number");
+export const PHONE_COUNTRY_CODE_SCHEMA = z
+  .string()
+  .trim()
+  .refine(
+    (value) => PHONE_COUNTRY_CODES.some((entry) => entry.code === value),
+    "Select a country code",
+  );
 
-// Empty allowed; when present it must match the phone format.
+/** National number only (no dial code). Defaults to US/CA 10-digit length. */
+export const PHONE_SCHEMA = z
+  .string()
+  .trim()
+  .regex(/^\d{10}$/, "Enter a valid 10-digit phone number");
+
+// Empty allowed; when present it must be digits at a plausible national length.
 export const OPTIONAL_PHONE_SCHEMA = z
   .string()
   .trim()
   .optional()
   .or(z.literal(""))
-  .refine((v) => !v || PHONE_FORMAT.test(v), "Enter a valid phone number");
+  .refine((v) => !v || /^\d{7,15}$/.test(v), "Enter a valid phone number");
+
+export const OPTIONAL_PHONE_COUNTRY_CODE_SCHEMA = z
+  .string()
+  .trim()
+  .optional()
+  .or(z.literal(""))
+  .refine(
+    (value) => !value || PHONE_COUNTRY_CODES.some((entry) => entry.code === value),
+    "Select a country code",
+  );

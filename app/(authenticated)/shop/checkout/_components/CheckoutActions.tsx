@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-
+import Link from "next/link";
 type CheckoutActionsProps = {
   termsAccepted: boolean;
   onTermsChange: (checked: boolean) => void;
@@ -41,9 +41,22 @@ export default function CheckoutActions({
           className="mt-0.5 border-[#6A9B9C]/60 data-[state=checked]:border-[#6A9B9C] data-[state=checked]:bg-[#6A9B9C]"
         />
         <span>
-          I agree to the Terms of Service and Privacy Policy. I understand my subscription will
-          automatically renew until canceled, and I authorize recurring payments with my selected
-          payment method.
+          I agree to the{" "}
+          <Link
+            href="/terms"
+            className="font-medium text-[#152A51] underline underline-offset-2 hover:opacity-80"
+          >
+            Terms of Service
+          </Link>{" "}
+          and{" "}
+          <Link
+            href="/privacy"
+            className="font-medium text-[#152A51] underline underline-offset-2 hover:opacity-80"
+          >
+            Privacy Policy
+          </Link>
+          . I understand my subscription will automatically renew until canceled, and I authorize
+          recurring payments with my selected payment method.
         </span>
       </label>
 

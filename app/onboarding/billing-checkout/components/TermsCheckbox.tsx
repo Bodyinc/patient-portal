@@ -31,7 +31,7 @@ export default function TermsCheckbox({ checked, onChange }: TermsCheckboxProps)
         </a>{" "}
         and{" "}
         <a
-          href="/privacy"
+          href="https://bodyinc.com/privacy-policy"
           target="_blank"
           rel="noopener noreferrer"
           className="font-medium text-[#152A51] underline underline-offset-2"

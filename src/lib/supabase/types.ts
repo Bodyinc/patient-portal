@@ -400,6 +400,7 @@ export type Database = {
           full_name: string | null;
           email: string | null;
           phone: string | null;
+          phone_country_code: string | null;
           street_address: string | null;
           apartment: string | null;
           city: string | null;
@@ -432,6 +433,7 @@ export type Database = {
           full_name?: string | null;
           email?: string | null;
           phone?: string | null;
+          phone_country_code?: string | null;
           street_address?: string | null;
           apartment?: string | null;
           city?: string | null;
@@ -464,6 +466,7 @@ export type Database = {
           full_name?: string | null;
           email?: string | null;
           phone?: string | null;
+          phone_country_code?: string | null;
           street_address?: string | null;
           apartment?: string | null;
           city?: string | null;
@@ -1208,6 +1211,7 @@ export type Database = {
           id: string;
           full_name: string;
           phone: string | null;
+          phone_country_code: string | null;
           dob: string | null;
           email: string;
           avatar_url: string | null;
@@ -1229,6 +1233,7 @@ export type Database = {
           id: string;
           full_name: string;
           phone?: string | null;
+          phone_country_code?: string | null;
           dob?: string | null;
           email: string;
           avatar_url?: string | null;
@@ -1250,6 +1255,7 @@ export type Database = {
           id?: string;
           full_name?: string;
           phone?: string | null;
+          phone_country_code?: string | null;
           dob?: string | null;
           email?: string;
           avatar_url?: string | null;

@@ -38,6 +38,14 @@ export const metadata: Metadata = {
     template: "%s · BodyInc Patient Portal",
   },
   description: "Access your BodyInc patient account, appointments, and care plan.",
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/fevicone.svg", type: "image/svg+xml" },
+    ],
+    shortcut: "/fevicone.svg",
+    apple: "/fevicone.svg",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

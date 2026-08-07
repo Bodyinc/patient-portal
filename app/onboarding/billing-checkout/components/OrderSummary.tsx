@@ -6,10 +6,12 @@ type OrderSummaryProps = {
   medicationName: string;
   planLabel: string;
   medicationTotal: number;
+  medicationOriginalTotal: number;
   subtotal: number;
   discount: number;
   discountLabel: string | null;
   total: number;
+  totalSavings: number;
   promoCode: string;
   promoMessage: string | null;
   promoError: string | null;
@@ -24,14 +26,39 @@ function formatMoney(amount: number) {
   return `$${amount.toFixed(2)}`;
 }
 
+function PricePair({
+  original,
+  final,
+  finalClassName,
+}: {
+  original: number;
+  final: number;
+  finalClassName?: string;
+}) {
+  if (original <= final) {
+    return <span className={finalClassName}>{formatMoney(final)}</span>;
+  }
+
+  return (
+    <span className="flex items-baseline gap-2">
+      <span className="text-[13px] font-normal text-[#152A51]/50 line-through">
+        {formatMoney(original)}
+      </span>
+      <span className={finalClassName}>{formatMoney(final)}</span>
+    </span>
+  );
+}
+
 export default function OrderSummary({
   medicationName,
   planLabel,
   medicationTotal,
+  medicationOriginalTotal,
   subtotal,
   discount,
   discountLabel,
   total,
+  totalSavings,
   promoCode,
   promoMessage,
   promoError,
@@ -41,10 +68,21 @@ export default function OrderSummary({
   onPromoCodeChange,
   onApplyPromo,
 }: OrderSummaryProps) {
+  const checkoutOriginal = discount > 0 ? subtotal : medicationOriginalTotal;
+
   return (
     <div className="h-fit w-full rounded-[14px] border border-[#E8E8E8] bg-white p-4 onboarding-font sm:p-5">
-      <div className="shrink-0 border-b border-[#E8E8E8] pb-3">
+      <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[#E8E8E8] pb-3">
         <h2 className="text-[16px] font-medium text-[#152A51] sm:text-[18px]">Order Summary</h2>
+        {!loading ? (
+          <PricePair
+            original={checkoutOriginal}
+            final={total}
+            finalClassName="text-[18px] font-medium tracking-[-0.5px] text-[#152A51] sm:text-[20px]"
+          />
+        ) : (
+          <span className="text-[18px] font-medium text-[#152A51]">—</span>
+        )}
       </div>
 
       <div className="py-3">
@@ -53,9 +91,15 @@ export default function OrderSummary({
             <p className="truncate text-[14px] font-medium text-[#152A51]">{medicationName}</p>
             <p className="truncate text-[12px] text-[#152A51]/70">{planLabel}</p>
           </div>
-          <p className="shrink-0 text-[14px] font-medium text-[#152A51]">
-            {loading ? "—" : formatMoney(medicationTotal)}
-          </p>
+          <div className="shrink-0 text-right">
+            {loading ? (
+              <p className="text-[14px] font-medium text-[#152A51]">—</p>
+            ) : (
+              <p className="text-[14px] font-medium text-[#152A51]">
+                {formatMoney(medicationTotal)}
+              </p>
+            )}
+          </div>
         </div>
 
         <div className="mt-4 space-y-2 border-t border-[#E8E8E8] pt-4 text-[14px] text-[#152A51]">
@@ -91,11 +135,28 @@ export default function OrderSummary({
           </p>
         )}
 
-        <div className="mt-5 flex items-center justify-between border-t border-[#E8E8E8] pt-4">
-          <p className="text-[15px] font-medium text-[#152A51]">Total Due Today</p>
-          <p className="text-[22px] font-medium tracking-[-0.5px] text-[#152A51] sm:text-[24px]">
-            {loading ? "—" : formatMoney(total)}
-          </p>
+        <div className="mt-5 flex items-end justify-between border-t border-[#E8E8E8] pt-4">
+          <div>
+            <p className="text-[15px] font-medium text-[#152A51]">Total Due Today</p>
+            {!loading && totalSavings > 0 ? (
+              <p className="mt-1 text-[12px] font-medium text-[#34845F]">
+                Total savings {formatMoney(totalSavings)}
+              </p>
+            ) : null}
+          </div>
+          <div className="text-right">
+            {loading ? (
+              <p className="text-[22px] font-medium tracking-[-0.5px] text-[#152A51] sm:text-[24px]">
+                —
+              </p>
+            ) : (
+              <PricePair
+                original={checkoutOriginal}
+                final={total}
+                finalClassName="text-[22px] font-medium tracking-[-0.5px] text-[#152A51] sm:text-[24px]"
+              />
+            )}
+          </div>
         </div>
 
         <div className="mt-5">

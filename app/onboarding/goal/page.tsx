@@ -107,7 +107,7 @@ export default function GoalPage() {
       showBack={false}
       variant="bare"
       align="center"
-      maxWidth="4xl"
+      maxWidth="7xl"
       layout="fill"
     >
       {isError ? (
@@ -124,7 +124,7 @@ export default function GoalPage() {
           </button>
         </div>
       ) : (
-        <div className="mx-auto grid w-full grid-cols-2 justify-items-center gap-x-4 gap-y-6 sm:grid-cols-3 sm:gap-x-5 sm:gap-y-8">
+        <div className="mx-auto grid w-full grid-cols-2 gap-x-2 gap-y-5 sm:grid-cols-4 sm:gap-x-3 sm:gap-y-6">
           {categories.map((goal) => (
             <GoalOptionCard
               key={goal.slug}

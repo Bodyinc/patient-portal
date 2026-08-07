@@ -139,24 +139,27 @@ export default function DemographicsPage() {
         </div>
 
         <div className="space-y-4">
-          <Label className={fieldLabelClass}>Sex</Label>
-          <div className="grid gap-2 sm:grid-cols-3">
-            {SEX_OPTIONS.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => setForm((f) => ({ ...f, sex: option.id }))}
-                className={cn(
-                  "h-[45px] rounded-[14px] px-4 text-left text-[14px] font-normal leading-none transition",
-                  form.sex === option.id
-                    ? "bg-[#E8EEED] text-[#152A51] ring-1 ring-[#152A51]"
-                    : "bg-[#E8EEED] text-[#152A51]/80",
-                )}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+          <Label htmlFor="sex" className={fieldLabelClass}>
+            Sex
+          </Label>
+          <Select
+            value={form.sex || undefined}
+            onValueChange={(value) => {
+              if (!value) return;
+              setForm((f) => ({ ...f, sex: value }));
+            }}
+          >
+            <SelectTrigger id="sex" className={cn(fieldControlClass, "w-full")}>
+              <SelectValue placeholder="Select your sex" />
+            </SelectTrigger>
+            <SelectContent>
+              {SEX_OPTIONS.map((option) => (
+                <SelectItem key={option.id} value={option.id}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="space-y-4">

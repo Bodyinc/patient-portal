@@ -89,6 +89,7 @@ export type IntakeSummaryDto = {
   fullName: string | null;
   email: string | null;
   phone: string | null;
+  phoneCountryCode: string | null;
   streetAddress: string | null;
   apartment: string | null;
   city: string | null;
@@ -109,6 +110,7 @@ export type IntakeSummaryDto = {
   variantName: string | null;
   packageDurationMonths: number | null;
   packagePrice: number | null;
+  packageOriginalPrice: number | null;
   eligibilityResult: string | null;
   status: string;
 };

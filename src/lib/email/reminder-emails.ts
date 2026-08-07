@@ -1,6 +1,7 @@
 import "server-only";
 
 import { emailButton, emailLayout, formatAmount } from "./layout";
+import { formatPortalDate } from "@/lib/date-format";
 
 function firstName(fullName: string | null): string {
   const first = (fullName ?? "").trim().split(/\s+/)[0];
@@ -34,11 +35,7 @@ export function refillReminderEmail(params: {
   amountCents: number | null;
   billingUrl: string;
 }): { subject: string; html: string } {
-  const date = new Date(params.renewalDate).toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
+  const date = formatPortalDate(params.renewalDate);
   const charge =
     params.amountCents != null
       ? ` and ${formatAmount(params.amountCents, "usd")} will be charged to your card on file`
