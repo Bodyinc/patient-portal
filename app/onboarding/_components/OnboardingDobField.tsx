@@ -1,6 +1,5 @@
 "use client";
 
-import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -9,6 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { MAX_SIGNUP_AGE, MIN_SIGNUP_AGE } from "@/lib/validation";
 
+import { isoDobToDisplay } from "../_lib/dob-format";
 import {
   dateToIsoDob,
   displayDobToIso,
@@ -93,10 +93,7 @@ export default function OnboardingDobField({
     if (iso) emit(iso);
   }
 
-  function handleGroupBlur(event: React.FocusEvent<HTMLDivElement>) {
-    const next = event.relatedTarget;
-    if (next instanceof Node && event.currentTarget.contains(next)) return;
-
+  function padAndEmitParts() {
     const current = partsRef.current;
     let month = padPart(current.month, 2);
     let day = padPart(current.day, 2);
@@ -110,6 +107,24 @@ export default function OnboardingDobField({
     partsRef.current = padded;
     setParts(padded);
     emit(partsToIsoDob(padded) ?? "");
+  }
+
+  function handleGroupBlur(event: React.FocusEvent<HTMLDivElement>) {
+    // Calendar content is portaled outside this wrapper. While open, the first
+    // click into day/month/year blurs the trigger and would re-render mid-click
+    // if we pad/emit here — eating the selection until a second click.
+    if (open) return;
+
+    const next = event.relatedTarget;
+    if (next instanceof Node && event.currentTarget.contains(next)) return;
+
+    padAndEmitParts();
+  }
+
+  function handleOpenChange(nextOpen: boolean) {
+    setOpen(nextOpen);
+    // Blur padding is skipped while open; normalize MM/DD when the calendar closes.
+    if (!nextOpen) padAndEmitParts();
   }
 
   function handleKeyDown(
@@ -158,7 +173,7 @@ export default function OnboardingDobField({
   return (
     <div className="flex w-full flex-nowrap items-center gap-2" onBlur={handleGroupBlur}>
       <div className="relative min-w-0 flex-[1.1]">
-        <Popover open={open} onOpenChange={setOpen}>
+        <Popover open={open} onOpenChange={handleOpenChange}>
           <PopoverTrigger asChild>
             <button
               type="button"
@@ -197,7 +212,7 @@ export default function OnboardingDobField({
             />
             {selectedDate ? (
               <div className="border-t border-[#E8EEED] px-3 py-2 text-center text-xs text-[#152A51]/70">
-                {format(selectedDate, "MM/dd/yyyy")}
+                {isoDobToDisplay(dateToIsoDob(selectedDate))}
               </div>
             ) : null}
           </PopoverContent>

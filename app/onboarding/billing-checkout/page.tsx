@@ -29,6 +29,7 @@ import { calculateCheckoutPricing } from "../_lib/intake-pricing";
 import { getStateName } from "../_lib/onboarding-config";
 import { getPrevStepPath } from "../_lib/onboarding-navigation";
 import { useOnboarding } from "../_lib/onboarding-store";
+import { formatIsoDate } from "@/lib/date-format";
 
 const ORDER_CONFIRMATION_REDIRECT = "/onboarding/order-confirmation";
 
@@ -94,8 +95,14 @@ export default function BillingCheckoutPage() {
     (summary?.variantName ? ` — ${summary.variantName}` : "");
   const planLabel = summary?.packageName ?? "Treatment Plan";
   const pricing = useMemo(
-    () => calculateCheckoutPricing(summary?.packagePrice, discountAmount, discountLabel),
-    [summary?.packagePrice, discountAmount, discountLabel],
+    () =>
+      calculateCheckoutPricing(
+        summary?.packagePrice,
+        discountAmount,
+        discountLabel,
+        summary?.packageOriginalPrice,
+      ),
+    [summary?.packagePrice, summary?.packageOriginalPrice, discountAmount, discountLabel],
   );
 
   useEffect(() => {
@@ -226,7 +233,13 @@ export default function BillingCheckoutPage() {
                 items={[
                   { label: "Name", value: summary?.fullName || state.fullName || "—" },
                   { label: "Email Address", value: summary?.email || state.email || "—" },
-                  { label: "Phone Number", value: summary?.phone || state.phone || "—" },
+                  {
+                    label: "Phone Number",
+                    value:
+                      summary?.phone || state.phone
+                        ? `${summary?.phoneCountryCode || state.phoneCountryCode || "+1"} ${summary?.phone || state.phone}`
+                        : "—",
+                  },
                 ]}
               />
 
@@ -237,7 +250,10 @@ export default function BillingCheckoutPage() {
                     label: "State",
                     value: getStateName(summary?.stateCode ?? state.state) || "—",
                   },
-                  { label: "Date of Birth", value: summary?.dob || state.dob || "—" },
+                  {
+                    label: "Date of Birth",
+                    value: formatIsoDate(summary?.dob || state.dob || null),
+                  },
                   {
                     label: "BMI",
                     value:
@@ -311,10 +327,12 @@ export default function BillingCheckoutPage() {
               medicationName={medicationName}
               planLabel={planLabel}
               medicationTotal={pricing.medicationTotal}
+              medicationOriginalTotal={pricing.medicationOriginalTotal}
               subtotal={pricing.subtotal}
               discount={pricing.discount}
               discountLabel={pricing.discountLabel}
               total={pricing.total}
+              totalSavings={pricing.totalSavings}
               promoCode={promoCode}
               promoMessage={promoMessage}
               promoError={promoError}

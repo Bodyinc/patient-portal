@@ -41,7 +41,12 @@ import { resolveMedicineImageSrc } from "@/lib/intake/medicine-image";
 import { formatOrderId } from "@/lib/orders/order-id";
 import { classifyPatientEmail } from "@/lib/auth/patient-email";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { DOB_SCHEMA, OPTIONAL_PHONE_SCHEMA, PHONE_SCHEMA } from "@/lib/validation";
+import {
+  DOB_SCHEMA,
+  OPTIONAL_PHONE_SCHEMA,
+  PHONE_COUNTRY_CODE_SCHEMA,
+  isValidNationalPhone,
+} from "@/lib/validation";
 import type { Json } from "@/lib/supabase/types";
 
 function parseImportantInfo(value: Json): string[] {
@@ -217,7 +222,7 @@ async function buildIntakeSummary(
     session.selected_plan_id
       ? supabaseAdmin
           .from("packages")
-          .select("id, name, duration_months, price, medicine_variants(name)")
+          .select("id, name, duration_months, price, original_price, medicine_variants(name)")
           .eq("id", session.selected_plan_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -268,6 +273,7 @@ async function buildIntakeSummary(
     fullName: session.full_name,
     email: session.email,
     phone: session.phone,
+    phoneCountryCode: session.phone_country_code,
     streetAddress: session.street_address,
     apartment: session.apartment,
     city: session.city,
@@ -290,6 +296,8 @@ async function buildIntakeSummary(
         ?.name ?? null,
     packageDurationMonths: packageData?.duration_months ?? null,
     packagePrice: packageData?.price !== undefined ? Number(packageData.price) : null,
+    packageOriginalPrice:
+      packageData?.original_price !== undefined ? Number(packageData.original_price) : null,
     eligibilityResult: eligibility?.result ?? null,
     status: session.status,
   };
@@ -794,7 +802,8 @@ const addressSchema = z
     apartment: z.string().trim().min(1, "Enter your apartment number").max(60),
     city: z.string().trim().min(1, "Enter your city").max(120),
     postalCode: z.string().trim().min(3, "Enter your ZIP code").max(20),
-    phone: PHONE_SCHEMA,
+    phone: z.string().trim(),
+    phoneCountryCode: PHONE_COUNTRY_CODE_SCHEMA,
     billingSameAsShipping: z.boolean(),
     billingStreetAddress: z.string().trim().max(255).optional().or(z.literal("")),
     billingApartment: z.string().trim().max(60).optional().or(z.literal("")),
@@ -805,6 +814,13 @@ const addressSchema = z
     marketingConsent: z.boolean(),
   })
   .superRefine((data, ctx) => {
+    if (!isValidNationalPhone(data.phone, data.phoneCountryCode)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["phone"],
+        message: "Enter a valid phone number",
+      });
+    }
     if (!data.smsConsent) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

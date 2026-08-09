@@ -1,17 +1,14 @@
 "use client";
 
 import type { RefundRequestDto } from "@/lib/billing/types";
+import { formatPortalDate } from "@/lib/date-format";
 
 type RefundRequestsSectionProps = {
   requests: RefundRequestDto[];
 };
 
 function formatDate(value: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(value));
+  return formatPortalDate(value);
 }
 
 function formatCurrency(amount: number): string {

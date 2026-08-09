@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { Search } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -12,19 +13,19 @@ import {
 } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { MyMedsMedicationRequestDto, MyMedsMedicationRequestsListDto } from "./types";
+import { formatPortalDate } from "@/lib/date-format";
 
 type MedicationRequestsSectionProps = {
   requests: MyMedsMedicationRequestsListDto;
   isPending?: boolean;
+  searchQuery: string;
+  onSearchChange: (value: string) => void;
+  onSearchSubmit: () => void;
   onChangePage: (page: number) => void;
 };
 
 function formatDate(value: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(value));
+  return formatPortalDate(value);
 }
 
 function money(cents: number) {
@@ -50,6 +51,9 @@ function statusBadgeClass(status: string): string {
 export default function MedicationRequestsSection({
   requests,
   isPending = false,
+  searchQuery,
+  onSearchChange,
+  onSearchSubmit,
   onChangePage,
 }: MedicationRequestsSectionProps) {
   const { items, page, totalPages, total, pageSize } = requests;
@@ -59,11 +63,34 @@ export default function MedicationRequestsSection({
   const [active, setActive] = useState<MyMedsMedicationRequestDto | null>(null);
 
   return (
-    <section className="rounded-[24px] border border-[#E8EEED] bg-white p-4 sm:p-6">
-      <div className="mb-4 flex items-center justify-between gap-3">
+    <section className="rounded-[16px] border border-[#E8EEED] bg-white p-4 sm:p-5">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-lg font-medium tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
           Medication Requests
         </h2>
+        <form
+          className="flex w-full max-w-sm items-center gap-2 rounded-full border border-[#E8EEED] bg-[#F3F6F6] px-3 py-1.5"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onSearchSubmit();
+          }}
+        >
+          <Search className="h-4 w-4 shrink-0 text-[#152A51]/50" />
+          <input
+            value={searchQuery}
+            onChange={(event) => onSearchChange(event.target.value)}
+            placeholder="Search requests..."
+            className="min-w-0 flex-1 bg-transparent text-sm text-[#152A51] outline-none placeholder:text-[#152A51]/40"
+            aria-label="Search medication requests"
+          />
+          <button
+            type="submit"
+            disabled={isPending}
+            className="shrink-0 rounded-full bg-[#152A51] px-3 py-1 text-xs font-medium text-white disabled:opacity-60"
+          >
+            Search
+          </button>
+        </form>
       </div>
 
       {items.length === 0 ? (
@@ -150,7 +177,7 @@ export default function MedicationRequestsSection({
                 type="button"
                 disabled={isPending}
                 onClick={() => onChangePage(page + 1)}
-                className="rounded-full bg-[#152A51] px-4 py-1.5 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-full border border-[#E8EEED] px-4 py-1.5 text-sm text-[#152A51] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Next
               </button>

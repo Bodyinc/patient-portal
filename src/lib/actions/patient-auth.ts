@@ -319,6 +319,7 @@ export async function preparePostCheckoutAccount(): Promise<PostCheckoutAccountR
     user_metadata: {
       full_name: fullName,
       phone: session.phone ?? null,
+      phone_country_code: session.phone_country_code ?? null,
       dob,
     },
   });

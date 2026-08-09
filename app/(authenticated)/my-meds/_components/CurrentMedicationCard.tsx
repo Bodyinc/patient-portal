@@ -11,13 +11,11 @@ import {
   resolveMedicineImageSrc,
 } from "@/lib/intake/medicine-image";
 import { buildShopCheckoutHref } from "@/lib/shop/checkout-href";
+import { formatPortalDate } from "@/lib/date-format";
 import { cn } from "@/lib/utils";
 
 import type { MyMedsCurrentMedicationDto } from "./types";
-import {
-  medicineImageFrameClass,
-  medicineImageFitClass,
-} from "../../../onboarding/_lib/onboarding-theme";
+import { medicineImageFitClass } from "../../../onboarding/_lib/onboarding-theme";
 
 type CurrentMedicationCardProps = {
   medication: MyMedsCurrentMedicationDto;
@@ -25,16 +23,9 @@ type CurrentMedicationCardProps = {
   hideTitle?: boolean;
 };
 
-/** Figma treatment image: 339 × 354.6 — used as aspect; scales down responsively */
-const IMAGE_ASPECT = "339 / 354.6";
-
 function formatDate(value: string | null): string {
   if (!value) return "—";
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(value));
+  return formatPortalDate(value);
 }
 
 function toDbImageSrc(imageSrc: string | null | undefined): string | null {
@@ -45,7 +36,7 @@ function toDbImageSrc(imageSrc: string | null | undefined): string | null {
 
 export function ActiveMedicationsEmptyState() {
   return (
-    <section className="rounded-[24px] border border-[#E8EEED] bg-white p-4 sm:p-6">
+    <section className="rounded-[16px] border border-[#E8EEED] bg-white p-4 sm:p-5">
       <h2 className="mb-4 text-lg font-medium tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
         Active Treatments
       </h2>
@@ -84,73 +75,62 @@ export default function CurrentMedicationCard({
   const external = imageSrc ? isExternalMedicineImage(imageSrc) : false;
   const canRefill = Boolean(medication.medicineId);
 
+  const fields = [
+    { label: "Medication Name", value: medication.medicationName },
+    { label: "Dose", value: medication.variantName || medication.dosage || "—" },
+    { label: "Current Plan", value: medication.currentPlan },
+    { label: "Next Refill Date", value: formatDate(medication.nextRefillDate) },
+  ];
+
   return (
-    <article className="rounded-[24px] border border-[#E8EEED] bg-white">
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-stretch lg:gap-6">
-        <div
-          className={cn(
-            "mx-auto w-full max-w-[280px] shrink-0 sm:mx-0 sm:max-w-[300px] lg:w-[38%] lg:max-w-[339px]",
-            medicineImageFrameClass,
-          )}
-          style={{ aspectRatio: IMAGE_ASPECT }}
-        >
+    <article className="rounded-[16px] border border-[#E8EEED] bg-white p-4 sm:p-5">
+      {!hideTitle ? (
+        <h2 className="mb-4 text-lg font-medium tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
+          Active Treatment
+        </h2>
+      ) : null}
+
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-5">
+        <div className="relative mx-auto h-[168px] w-[168px] shrink-0 overflow-hidden rounded-[18px] bg-[#5A778D] sm:mx-0">
           {imageSrc ? (
             <Image
               src={imageSrc}
               alt={medication.medicationName}
               fill
-              sizes="(max-width: 1024px) 260px, 339px"
+              sizes="168px"
               unoptimized={external}
               className={medicineImageFitClass}
             />
           ) : null}
         </div>
 
-        <div className="flex min-w-0 flex-1 flex-col justify-between gap-5 px-4 pb-4 sm:px-5 sm:pb-5">
-          {!hideTitle ? (
-            <h2 className="pt-4 text-lg font-medium tracking-[-0.3px] text-[#152A51] sm:text-[28px]">
-              Active Treatment
-            </h2>
-          ) : (
-            <div className="pt-4" />
-          )}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <p className="text-xs text-[#152A51]/60 sm:text-sm">Medication Name</p>
-              <p className="mt-1 text-sm font-medium text-[#152A51] sm:text-[15px]">
-                {medication.medicationName}
+        <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-0">
+          {fields.map((field, index) => (
+            <div
+              key={field.label}
+              className={cn(
+                "min-w-0 lg:px-4",
+                index > 0 && "lg:border-l lg:border-[#E8EEED]",
+                index === 0 && "lg:pl-0",
+              )}
+            >
+              <p className="text-xs text-[#152A51]/60 sm:text-[13px]">{field.label}</p>
+              <p className="mt-1 truncate text-sm font-medium text-[#152A51] sm:text-[15px]">
+                {field.value}
               </p>
             </div>
-            <div>
-              <p className="text-xs text-[#152A51]/60 sm:text-sm">Current Plan</p>
-              <p className="mt-1 text-sm font-medium text-[#152A51] sm:text-[15px]">
-                {medication.currentPlan}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-[#152A51]/60 sm:text-sm">Dose</p>
-              <p className="mt-1 text-sm font-medium text-[#152A51] sm:text-[15px]">
-                {medication.variantName || medication.dosage || "—"}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-[#152A51]/60 sm:text-sm">Next Refill Date</p>
-              <p className="mt-1 text-sm font-medium text-[#152A51] sm:text-[15px]">
-                {formatDate(medication.nextRefillDate)}
-              </p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleRefillRequest}
-            disabled={!canRefill}
-            className="mb-4 inline-flex h-[46px] w-full items-center justify-center gap-2 rounded-full border border-[#152A51] px-5 text-sm font-medium text-[#152A51] hover:bg-[#F3F6F6] disabled:cursor-not-allowed disabled:opacity-50 sm:w-fit"
-          >
-            New Refill Request
-            <ArrowRight className="h-4 w-4" />
-          </button>
+          ))}
         </div>
+
+        <button
+          type="button"
+          onClick={handleRefillRequest}
+          disabled={!canRefill}
+          className="inline-flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-full border border-[#152A51] px-5 text-sm font-medium text-[#152A51] hover:bg-[#F3F6F6] disabled:cursor-not-allowed disabled:opacity-50 sm:w-fit lg:ml-2"
+        >
+          New Refill Request
+          <ArrowRight className="h-4 w-4" />
+        </button>
       </div>
     </article>
   );

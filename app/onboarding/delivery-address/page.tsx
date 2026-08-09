@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import { PhoneField } from "@/components/phone-field";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,7 +18,11 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { saveIntakeAddress } from "@/lib/actions/intake";
-import { PHONE_SCHEMA } from "@/lib/validation";
+import {
+  DEFAULT_PHONE_COUNTRY_CODE,
+  PHONE_COUNTRY_CODE_SCHEMA,
+  isValidNationalPhone,
+} from "@/lib/validation";
 
 import OnboardingStepLayout from "../_components/OnboardingStepLayout";
 import { US_STATES } from "../_lib/onboarding-config";
@@ -35,7 +40,8 @@ const addressSchema = z
     apartment: z.string().trim().min(1, "Enter your apartment number"),
     postalCode: z.string().trim().min(3, "Enter your ZIP code"),
     city: z.string().trim().min(1, "Enter your city"),
-    phone: PHONE_SCHEMA,
+    phone: z.string().trim(),
+    phoneCountryCode: PHONE_COUNTRY_CODE_SCHEMA,
     billingSameAsShipping: z.boolean(),
     billingStreetAddress: z.string().trim(),
     billingApartment: z.string().trim(),
@@ -46,6 +52,13 @@ const addressSchema = z
     marketingConsent: z.boolean(),
   })
   .superRefine((data, ctx) => {
+    if (!isValidNationalPhone(data.phone, data.phoneCountryCode)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["phone"],
+        message: "Enter a valid phone number",
+      });
+    }
     if (!data.smsConsent) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -77,6 +90,7 @@ export default function DeliveryAddressPage() {
     postalCode: state.postalCode,
     city: state.city,
     phone: state.phone,
+    phoneCountryCode: state.phoneCountryCode || DEFAULT_PHONE_COUNTRY_CODE,
     billingSameAsShipping: state.billingSameAsShipping,
     billingStreetAddress: state.billingStreetAddress,
     billingApartment: state.billingApartment,
@@ -95,6 +109,7 @@ export default function DeliveryAddressPage() {
       postalCode: state.postalCode,
       city: state.city,
       phone: state.phone,
+      phoneCountryCode: state.phoneCountryCode || DEFAULT_PHONE_COUNTRY_CODE,
       billingSameAsShipping: state.billingSameAsShipping,
       billingStreetAddress: state.billingStreetAddress,
       billingApartment: state.billingApartment,
@@ -111,6 +126,7 @@ export default function DeliveryAddressPage() {
     state.postalCode,
     state.city,
     state.phone,
+    state.phoneCountryCode,
     state.billingSameAsShipping,
     state.billingStreetAddress,
     state.billingApartment,
@@ -178,7 +194,7 @@ export default function DeliveryAddressPage() {
               autoFocus
               value={form.streetAddress}
               onChange={(e) => setField("streetAddress", e.target.value)}
-              placeholder="123, Main Street"
+              placeholder="456 Oak Avenue"
               className={fieldControlClass}
             />
           </div>
@@ -191,7 +207,7 @@ export default function DeliveryAddressPage() {
               autoComplete="address-line2"
               value={form.apartment}
               onChange={(e) => setField("apartment", e.target.value)}
-              placeholder="1A"
+              placeholder="Unit 12B"
               className={fieldControlClass}
             />
           </div>
@@ -207,7 +223,7 @@ export default function DeliveryAddressPage() {
               autoComplete="postal-code"
               value={form.postalCode}
               onChange={(e) => setField("postalCode", e.target.value)}
-              placeholder="12345"
+              placeholder="90210"
               className={fieldControlClass}
             />
           </div>
@@ -220,7 +236,7 @@ export default function DeliveryAddressPage() {
               autoComplete="address-level2"
               value={form.city}
               onChange={(e) => setField("city", e.target.value)}
-              placeholder="Phoenix"
+              placeholder="Los Angeles"
               className={fieldControlClass}
             />
           </div>
@@ -320,20 +336,12 @@ export default function DeliveryAddressPage() {
           <Label htmlFor="phone" className={fieldLabelClass}>
             Phone number <span className="text-[#152A51]/50">*</span>
           </Label>
-          <div className="flex h-[45px] items-stretch overflow-hidden rounded-[14px] bg-[#E8EEED]">
-            <span className="flex items-center px-3 text-[14px] font-medium text-[#152A51]/70">
-              +1
-            </span>
-            <input
-              id="phone"
-              type="tel"
-              autoComplete="tel"
-              value={form.phone}
-              onChange={(e) => setField("phone", e.target.value)}
-              placeholder="1234567890"
-              className="min-w-0 flex-1 bg-transparent px-3 text-[14px] text-[#152A51] outline-none placeholder:text-[#152A51]/40"
-            />
-          </div>
+          <PhoneField
+            id="phone"
+            phone={form.phone}
+            phoneCountryCode={form.phoneCountryCode}
+            onPhoneChange={(phone) => setField("phone", phone)}
+          />
           <p className="text-[12px] leading-snug text-[#152A51]/70">
             We&apos;ll only use your number to text order updates and important information about
             your treatments.

@@ -4,6 +4,7 @@ import { Wallet } from "lucide-react";
 import { useState } from "react";
 
 import type { WalletSummary } from "@/lib/wallet";
+import { formatPortalDate } from "@/lib/date-format";
 
 type WalletCardProps = {
   wallet: WalletSummary;
@@ -14,11 +15,7 @@ function formatUsd(cents: number) {
 }
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  return formatPortalDate(iso);
 }
 
 export default function WalletCard({ wallet }: WalletCardProps) {

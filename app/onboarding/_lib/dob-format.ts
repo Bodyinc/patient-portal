@@ -3,14 +3,18 @@ const ISO_DOB = /^\d{4}-\d{2}-\d{2}$/;
 export function isoDobToDisplay(iso: string): string {
   if (!ISO_DOB.test(iso)) return "";
   const [year, month, day] = iso.split("-");
-  return `${month}/${day}/${year}`;
+  return `${month}-${day}-${year.slice(-2)}`;
 }
 
 export function displayDobToIso(display: string): string | null {
-  const match = display.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  const trimmed = display.trim();
+  const slashMatch = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  const hyphenMatch = trimmed.match(/^(\d{2})-(\d{2})-(\d{2,4})$/);
+  const match = slashMatch ?? hyphenMatch;
   if (!match) return null;
 
-  const [, month, day, year] = match;
+  const [, month, day, yearPart] = match;
+  const year = yearPart.length === 2 ? `20${yearPart}` : yearPart;
   const monthNum = Number(month);
   const dayNum = Number(day);
   const yearNum = Number(year);

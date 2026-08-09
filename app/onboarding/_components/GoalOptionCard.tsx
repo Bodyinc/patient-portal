@@ -33,7 +33,7 @@ export default function GoalOptionCard({ goal, selected, dimmed, onClick }: Goal
       type="button"
       onClick={onClick}
       aria-pressed={selected}
-      className="group relative mx-auto w-full max-w-[203px] text-left transition-all"
+      className="group relative w-full text-left transition-all"
     >
       <div className="relative w-full">
         <div

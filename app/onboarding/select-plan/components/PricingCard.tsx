@@ -53,13 +53,13 @@ export default function PricingCard({ pkg }: PricingCardProps) {
         </CollapsibleTrigger>
 
         <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-none">
-          <div className="mt-4 overflow-hidden rounded-[14px] border border-[#E8EEED] bg-white px-4 py-2 sm:px-5">
+          <div className="mt-4 overflow-hidden rounded-[14px] border border-[#E8EEED] bg-white">
             {features.map((feature) => (
-              <div key={feature}>
-                <hr className="border-[#E8EEED] first:hidden" />
-                <p className="py-2.5 text-center text-[14px] font-normal text-[#152A51]">
-                  {feature}
-                </p>
+              <div
+                key={feature}
+                className="border-b border-[#E8EEED] px-5 py-4 last:border-b-0 sm:px-6"
+              >
+                <p className="text-center text-[15px] leading-relaxed text-[#152A51]">{feature}</p>
               </div>
             ))}
           </div>

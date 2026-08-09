@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { buildShopCheckoutHref } from "@/lib/shop/checkout-href";
 
 import type { BillingSubscriptionDto } from "./types";
+import { formatPortalDate } from "@/lib/date-format";
 
 type SubscriptionRowProps = {
   subscription: BillingSubscriptionDto;
@@ -13,11 +14,7 @@ type SubscriptionRowProps = {
 
 function formatDate(value: string | null): string {
   if (!value) return "—";
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(value));
+  return formatPortalDate(value);
 }
 
 function formatCurrency(amount: number): string {

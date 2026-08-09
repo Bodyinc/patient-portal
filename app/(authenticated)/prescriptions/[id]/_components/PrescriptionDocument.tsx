@@ -3,6 +3,8 @@
 import { useEffect } from "react";
 import Link from "next/link";
 
+import { formatPortalDate } from "@/lib/date-format";
+
 export type PrescriptionView = {
   id: string;
   medicineName: string;
@@ -26,11 +28,7 @@ export default function PrescriptionDocument({
     }
   }, [autoPrint]);
 
-  const date = new Intl.DateTimeFormat("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(prescription.createdAt));
+  const date = formatPortalDate(prescription.createdAt);
 
   return (
     <div className="mx-auto max-w-2xl">

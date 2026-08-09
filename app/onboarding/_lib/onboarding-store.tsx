@@ -17,6 +17,7 @@ import { fromHeightCm, fromWeightKg } from "@/lib/intake/conversions";
 import { intakeQueryKeys } from "@/lib/intake/query-keys";
 import type { IntakeSummaryDto, QuestionnaireAnswerValue } from "@/lib/intake/types";
 import { legacyAnswersToValues } from "@/lib/intake/questionnaire";
+import { DEFAULT_PHONE_COUNTRY_CODE } from "@/lib/validation";
 
 import {
   canAccessStep,
@@ -44,6 +45,7 @@ export type OnboardingState = {
   fullName: string;
   email: string;
   phone: string;
+  phoneCountryCode: string;
   streetAddress: string;
   apartment: string;
   city: string;
@@ -80,6 +82,7 @@ export const initialOnboardingState: OnboardingState = {
   fullName: "",
   email: "",
   phone: "",
+  phoneCountryCode: DEFAULT_PHONE_COUNTRY_CODE,
   streetAddress: "",
   apartment: "",
   city: "",
@@ -162,6 +165,7 @@ function summaryToState(summary: IntakeSummaryDto, prev: OnboardingState): Onboa
     fullName: summary.fullName ?? base.fullName,
     email: summary.email ?? base.email,
     phone: summary.phone ?? base.phone,
+    phoneCountryCode: summary.phoneCountryCode ?? base.phoneCountryCode,
     streetAddress: summary.streetAddress ?? base.streetAddress,
     apartment: summary.apartment ?? base.apartment,
     city: summary.city ?? base.city,

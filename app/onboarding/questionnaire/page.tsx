@@ -211,9 +211,9 @@ export default function QuestionnairePage() {
       maxWidth="2xl"
       variant="bare"
       align="center"
-      layout="fill"
+      layout="centered"
     >
-      <div className="space-y-6 pb-2 text-left sm:space-y-7">
+      <div className="space-y-6 pb-10 text-left sm:space-y-7">
         {questionnaire.questions.map((question, index) => (
           <div key={question.id} className="space-y-4">
             <p className="text-[15px] font-medium leading-snug text-[#152A51] sm:text-[16px]">

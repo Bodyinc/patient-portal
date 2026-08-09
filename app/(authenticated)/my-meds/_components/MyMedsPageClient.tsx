@@ -61,16 +61,7 @@ export default function MyMedsPageClient({
 
   return (
     <div className="space-y-4 px-4">
-      <MyMedsHeader
-        fullName={fullName}
-        patientId={patientId}
-        avatarUrl={avatarUrl}
-        searchQuery={searchQuery}
-        searchPending={isPending}
-        onSearchChange={setSearchQuery}
-        onSearchSubmit={() => updateParams({ q: searchQuery })}
-        offer={offer}
-      />
+      <MyMedsHeader fullName={fullName} patientId={patientId} avatarUrl={avatarUrl} offer={offer} />
 
       <MyMedsReferralCard
         referralCode={referralCode}
@@ -105,6 +96,9 @@ export default function MyMedsPageClient({
       <MedicationRequestsSection
         requests={data.requests}
         isPending={isPending}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        onSearchSubmit={() => updateParams({ q: searchQuery })}
         onChangePage={(page) => updateParams({ page })}
       />
     </div>

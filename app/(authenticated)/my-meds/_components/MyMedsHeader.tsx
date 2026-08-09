@@ -12,10 +12,6 @@ type MyMedsHeaderProps = {
   fullName: string;
   patientId: string;
   avatarUrl: string | null;
-  searchQuery: string;
-  searchPending?: boolean;
-  onSearchChange?: (value: string) => void;
-  onSearchSubmit?: () => void;
   offer?: PortalOfferDto | null;
 };
 
@@ -43,13 +39,13 @@ export default function MyMedsHeader({
 
   return (
     <>
-      <section className="mb-4 rounded-[20px] bg-[#F3F6F6] px-4 py-4 sm:px-6 sm:py-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-          <div>
+      <section className="mb-4 rounded-[20px] bg-[#F3F6F6] px-6 py-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+          <div className="min-w-0 space-y-1">
             <h1 className="text-xl font-medium tracking-[-0.5px] text-[#152A51] sm:text-2xl lg:text-[28px]">
               My Meds
             </h1>
-            <p className="text-sm text-[#152A51]/80 sm:text-[15px]">
+            <p className="max-w-xl text-sm text-[#152A51]/80 sm:text-[15px]">
               Manage your medications, refill requests, and track your treatment progress.
             </p>
           </div>
