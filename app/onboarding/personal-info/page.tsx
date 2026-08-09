@@ -97,10 +97,11 @@ export default function PersonalInfoPage() {
       return;
     }
 
+    // Phone is collected on delivery-address — do not forward leftover state.phone here or
+    // saveIntakeContact will reject it with "Enter a valid phone number".
     const contact = {
       fullName: parsed.data.fullName,
       email: parsed.data.email,
-      phone: state.phone || "",
     };
     const result = await saveIntakeContact(contact);
     setSaving(false);

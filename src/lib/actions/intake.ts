@@ -736,8 +736,8 @@ export async function saveIntakeMedicine(
 const contactSchema = z.object({
   fullName: z.string().trim().min(1).max(120),
   email: z.string().trim().email().max(255),
-  // Phone is collected on delivery-address; optional here for confirm-email contact step.
-  phone: OPTIONAL_PHONE_SCHEMA,
+  // Phone is collected on delivery-address; omit it from this step entirely.
+  phone: OPTIONAL_PHONE_SCHEMA.optional(),
 });
 
 export async function saveIntakeContact(
@@ -785,7 +785,8 @@ export async function saveIntakeContact(
     .update({
       full_name: data.fullName,
       email,
-      phone: data.phone || "",
+      // Only write phone when the caller actually provided one (delivery-address owns this field).
+      ...(data.phone !== undefined ? { phone: data.phone || "" } : {}),
     })
     .eq("id", sessionResult.session.id);
 
