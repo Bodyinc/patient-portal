@@ -7,6 +7,7 @@ import {
   priceLabelFromDuration,
 } from "@/lib/pricing";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import type { Json } from "@/lib/supabase/types";
 import type {
   ShopCategoryDto,
   ShopMedicineVariantOption,
@@ -18,6 +19,11 @@ import type {
   ShopCheckoutOrderCreateInput,
   ShopCheckoutOrderDto,
 } from "./service-types";
+
+function parseImportantInfo(value: Json | null | undefined): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+}
 
 export async function fetchShopCategoriesData(): Promise<ShopCategoryDto[]> {
   const { data, error } = await supabaseAdmin
@@ -92,9 +98,12 @@ export async function fetchShopCatalogData(options: {
 
   let query = supabaseAdmin
     .from("medicines")
-    .select("id, name, short_description, image_url, from_price_cents, sort_order", {
-      count: "exact",
-    })
+    .select(
+      "id, name, short_description, image_url, from_price_cents, sort_order, important_info, notice_text",
+      {
+        count: "exact",
+      },
+    )
     .eq("is_active", true)
     .eq("status", "active");
 
@@ -173,6 +182,8 @@ export async function fetchShopCatalogData(options: {
       imageSrc: resolveMedicineImageSrc(medicine.image_url),
       fromPriceCents: medicine.from_price_cents == null ? null : Number(medicine.from_price_cents),
       variants: variantsByMedicineId.get(medicine.id) ?? [],
+      importantInfo: parseImportantInfo(medicine.important_info as Json | null),
+      notice: (medicine.notice_text ?? "").trim(),
     })),
     total,
     page,

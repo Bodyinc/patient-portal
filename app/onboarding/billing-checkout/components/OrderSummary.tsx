@@ -68,16 +68,14 @@ export default function OrderSummary({
   onPromoCodeChange,
   onApplyPromo,
 }: OrderSummaryProps) {
-  const checkoutOriginal = discount > 0 ? subtotal : medicationOriginalTotal;
-
   return (
     <div className="h-fit w-full rounded-[14px] border border-[#E8E8E8] bg-white p-4 onboarding-font sm:p-5">
       <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[#E8E8E8] pb-3">
         <h2 className="text-[16px] font-medium text-[#152A51] sm:text-[18px]">Order Summary</h2>
         {!loading ? (
           <PricePair
-            original={checkoutOriginal}
-            final={total}
+            original={medicationOriginalTotal}
+            final={medicationTotal}
             finalClassName="text-[18px] font-medium tracking-[-0.5px] text-[#152A51] sm:text-[20px]"
           />
         ) : (
@@ -150,11 +148,9 @@ export default function OrderSummary({
                 —
               </p>
             ) : (
-              <PricePair
-                original={checkoutOriginal}
-                final={total}
-                finalClassName="text-[22px] font-medium tracking-[-0.5px] text-[#152A51] sm:text-[24px]"
-              />
+              <p className="text-[22px] font-medium tracking-[-0.5px] text-[#152A51] sm:text-[24px]">
+                {formatMoney(total)}
+              </p>
             )}
           </div>
         </div>

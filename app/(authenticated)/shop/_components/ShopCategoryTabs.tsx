@@ -17,7 +17,10 @@ export default function ShopCategoryTabs({
   onSelectCategory,
 }: ShopCategoryTabsProps) {
   const baseClass =
-    "rounded-full border px-3 py-2 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm";
+    "rounded-full border px-4 py-2 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm";
+
+  const activeClass = "border-[#E3E084] bg-[#E3E084] text-[#152A51]";
+  const inactiveClass = "border-[#E8EEED] bg-white text-[#152A51] hover:bg-[#F3F6F6]";
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -25,12 +28,7 @@ export default function ShopCategoryTabs({
         type="button"
         disabled={isPending}
         onClick={() => onSelectCategory(null)}
-        className={cn(
-          baseClass,
-          !currentCategorySlug
-            ? "border-[#152A51] bg-[#152A51] text-white"
-            : "border-[#E8EEED] bg-white text-[#152A51] hover:bg-[#F3F6F6]",
-        )}
+        className={cn(baseClass, !currentCategorySlug ? activeClass : inactiveClass)}
       >
         All Medicines
       </button>
@@ -43,9 +41,7 @@ export default function ShopCategoryTabs({
           key={category.id}
           className={cn(
             baseClass,
-            currentCategorySlug === category.slug
-              ? "border-[#152A51] bg-[#152A51] text-white"
-              : "border-[#E8EEED] bg-white text-[#152A51] hover:bg-[#F3F6F6]",
+            currentCategorySlug === category.slug ? activeClass : inactiveClass,
           )}
         >
           {category.name}

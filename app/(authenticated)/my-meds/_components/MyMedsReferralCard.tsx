@@ -51,7 +51,7 @@ export default function MyMedsReferralCard({
         <button
           type="button"
           onClick={() => handleCopy(referralLink || referralCode, "link")}
-          className="h-10 w-full shrink-0 rounded-full bg-[#152A51] px-5 text-center text-sm font-medium text-white hover:bg-[#152A51]/90 sm:w-auto"
+          className="h-[40px] w-full shrink-0 rounded-full bg-[#E3E084] px-5 text-center text-sm font-medium text-[#152A51] hover:bg-[#D9D674] sm:w-auto"
         >
           {copied === "link"
             ? "Link Copied ✓"
