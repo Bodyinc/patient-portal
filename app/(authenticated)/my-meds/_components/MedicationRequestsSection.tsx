@@ -138,7 +138,7 @@ export default function MedicationRequestsSection({
                     <button
                       type="button"
                       onClick={() => setActive(request)}
-                      className="rounded-full border border-[#152A51] px-3 py-1.5 text-sm font-medium text-[#152A51] hover:bg-[#F3F6F6]"
+                      className="text-sm font-medium text-[#152A51] underline underline-offset-2 hover:text-[#152A51]/80"
                     >
                       Track request
                     </button>

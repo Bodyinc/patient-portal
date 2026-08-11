@@ -5,9 +5,9 @@ import { useEffect, useMemo, useState } from "react";
 
 import MedicineImage from "./MedicineImage";
 import type { MedicineDto } from "@/lib/intake/types";
-import { formatMonthly } from "@/lib/pricing";
+import { formatFromPrice } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
-import { fieldControlClass, MEDICATION_BADGE_ACCENTS, ONBOARDING } from "../_lib/onboarding-theme";
+import { fieldControlClass } from "../_lib/onboarding-theme";
 
 type MedicationCardProps = {
   medication: MedicineDto;
@@ -19,57 +19,16 @@ type MedicationCardProps = {
   onViewDetails?: (id: string) => void;
 };
 
-const HIGHLIGHT_BADGE_RE = /popular|highest|best|fastest|maximum|most/i;
-const DOSAGE_BADGE_RE = /\b(\d+(\.\d+)?\s*mg|size\s*\d|\d+(\.\d+)?\s*ml)\b/i;
-const MAX_SECONDARY_BADGES = 3;
+const IMAGE_ASPECT = "386 / 359";
 
-/** Fixed dimensions for image panel on desktop to prevent variable card width/height */
-const IMAGE_PANEL_CLASS =
-  "relative isolate aspect-[339/354.6] w-full shrink-0 overflow-hidden rounded-[35px] bg-[#5A778D] sm:aspect-none sm:h-[355px] sm:w-[320px]";
-
-/** Figma: Price Oval */
-function PlansFromBadge({ fromPriceCents }: { fromPriceCents: number | null }) {
-  if (fromPriceCents == null) {
-    return (
-      <span className="flex h-[58px] w-[min(259px,calc(100%-1.5rem))] items-center justify-center rounded-full bg-white text-center text-[13px] font-medium leading-none text-[#152A51] shadow-[0_4px_14px_rgba(0,0,0,0.16)] sm:h-[74px]">
-        Pricing coming soon
-      </span>
-    );
-  }
-
-  return (
-    <span className="flex h-[58px] w-[min(259px,calc(100%-1.5rem))] items-center justify-center gap-1 rounded-full bg-white text-center text-[13px] font-medium leading-none text-[#152A51] shadow-[0_4px_14px_rgba(0,0,0,0.16)] sm:h-[60px] sm:text-[14px]">
-      <span className="flex items-end text-[15px] font-medium sm:text-[15px]">Plans from</span>
-      <span className="text-[18px] font-bold tracking-[-0.3px] sm:text-[28px]">
-        {formatMonthly(fromPriceCents)}
-        <span className="text-[13px] font-medium sm:text-[20px]">/mo</span>
-      </span>
-    </span>
-  );
-}
-
-function pickHighlightIndex(badges: string[]): number {
-  if (badges.length === 0) return -1;
-  const match = badges.findIndex((b) => HIGHLIGHT_BADGE_RE.test(b));
-  return match >= 0 ? match : 0;
-}
-
-function featureBadges(medication: MedicineDto): string[] {
-  const variantNames = new Set(
-    medication.variants.map((v) => v.name.trim().toLowerCase()).filter(Boolean),
-  );
-  return medication.importantInfo
-    .map((b) => b.trim())
-    .filter(Boolean)
-    .filter((b) => !variantNames.has(b.toLowerCase()))
-    .filter((b) => !DOSAGE_BADGE_RE.test(b));
-}
+/** Figma medication card image well — light surface, vial fills frame with small edge padding. */
+const medicationCardImageFrameClass =
+  "relative w-full shrink-0 overflow-hidden rounded-[20px] bg-[#E8EEED]";
 
 export default function MedicationCard({
   medication,
   selected = false,
   activeVariantId = null,
-  accentIndex = 0,
   onSelect,
   onViewDetails,
 }: MedicationCardProps) {
@@ -99,19 +58,11 @@ export default function MedicationCard({
   const displayFromPriceCents =
     (hasVariants ? selectedVariant?.fromPriceCents : null) ?? medication.fromPriceCents;
 
-  const badges = featureBadges(medication);
-  const highlightIndex = pickHighlightIndex(badges);
-  const highlightBadge = highlightIndex >= 0 ? badges[highlightIndex] : null;
-  const secondaryBadges = badges
-    .filter((_, i) => i !== highlightIndex)
-    .slice(0, MAX_SECONDARY_BADGES);
-  const solidAccent =
-    MEDICATION_BADGE_ACCENTS[accentIndex % MEDICATION_BADGE_ACCENTS.length] ??
-    ONBOARDING.badgeOrchid;
-
   function chooseMedication(variantId: string | null = selectedVariantId) {
     onSelect?.(medication.id, hasVariants ? variantId : null);
   }
+
+  const tagLabel = medication.tag?.trim();
 
   return (
     <div
@@ -125,66 +76,49 @@ export default function MedicationCard({
         }
       }}
       className={cn(
-        // Strict box model: full width (856px max), fixed height on sm, flex row stretch
-        "relative mx-auto flex h-auto w-full max-w-[856px] shrink-0 cursor-pointer flex-col overflow-visible rounded-[37px] border-2 border-[#E8EEED] bg-white shadow-[0_15px_40px_rgba(59,71,89,0.10)] transition-all onboarding-font sm:h-[355px] sm:flex-row sm:items-stretch",
-        selected && "ring-2 ring-[#6A9B9C]/25",
+        "relative flex h-full w-full min-w-0 max-w-[386px] cursor-pointer flex-col rounded-[20px] border border-[#E8EEED] bg-white p-3 transition-all onboarding-font sm:p-4",
+        selected && "ring-2 ring-inset ring-[#6A9B9C]/40",
       )}
     >
-      {/* Left: product shot */}
-      <div className={IMAGE_PANEL_CLASS}>
-        <MedicineImage
-          src={medication.imageSrc}
-          alt={medication.name}
-          width={180}
-          height={180}
-          fill
-          fit="cover"
-          position="center 50%"
-        />
-
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center px-3">
-          <PlansFromBadge fromPriceCents={displayFromPriceCents} />
+      <div className={medicationCardImageFrameClass} style={{ aspectRatio: IMAGE_ASPECT }}>
+        <div className="absolute inset-x-[10%] top-[4%] bottom-[1%]">
+          <MedicineImage
+            src={medication.imageSrc}
+            alt={medication.name}
+            width={177}
+            height={316}
+            fill
+            fit="contain"
+            position="center bottom"
+            className="object-contain object-bottom mix-blend-normal"
+          />
         </div>
       </div>
 
-      {/* Right: title, badges, description, controls */}
-      <div className="relative flex min-w-0 flex-1 flex-col justify-center gap-2.5 px-5 py-5 pr-14 sm:gap-3 sm:px-6 sm:py-6 sm:pr-16">
-        {secondaryBadges.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5">
-            {secondaryBadges.map((badge) => (
-              <span
-                key={badge}
-                className="rounded-full border border-[#D5D9E0] bg-white px-2.5 py-1 text-[11px] font-medium leading-none text-[#152A51] sm:text-[12px]"
-              >
-                {badge}
-              </span>
-            ))}
-          </div>
-        ) : null}
-
-        <div className="min-w-0 space-y-2 pr-1">
-          <h2 className="text-[17px] font-medium leading-snug tracking-[-0.3px] text-[#152A51] sm:text-[30px]">
+      <div className="flex flex-1 flex-col gap-2 pt-3 sm:gap-2.5 sm:pt-4">
+        <div className="flex min-w-0 items-start justify-between gap-2">
+          <h2 className="min-w-0 break-words text-[16px] font-medium leading-snug tracking-[-0.25px] text-[#152A51] sm:text-[18px]">
             {medication.name}
           </h2>
-
-          {highlightBadge ? (
-            <span
-              className="inline-flex rounded-full px-3 py-1 text-[11px] font-medium leading-none text-white sm:text-[12px]"
-              style={{ backgroundColor: solidAccent }}
-            >
-              {highlightBadge}
+          {tagLabel ? (
+            <span className="shrink-0 rounded-full bg-[#F3F6F6] px-2.5 py-1 text-[11px] font-medium leading-none text-[#152A51]">
+              {tagLabel}
             </span>
-          ) : null}
-
-          {medication.description ? (
-            <p className="line-clamp-3 text-[13px] font-normal leading-snug text-[#152A51]/70 sm:text-[14px]">
-              {medication.description}
-            </p>
           ) : null}
         </div>
 
+        {medication.description ? (
+          <p className="line-clamp-3 text-[13px] font-normal leading-snug text-[#152A51]/70 sm:text-[14px]">
+            {medication.description}
+          </p>
+        ) : null}
+
+        <p className="text-[18px] font-medium leading-none tracking-[-0.3px] text-[#152A51] sm:text-[20px]">
+          {formatFromPrice(displayFromPriceCents)}
+        </p>
+
         {hasVariants ? (
-          <div className="max-w-[240px] pt-0.5" onClick={(e) => e.stopPropagation()}>
+          <div className="min-w-0 w-full pt-0.5" onClick={(e) => e.stopPropagation()}>
             <label className="mb-1.5 block text-[12px] font-normal text-[#152A51]/70">
               Select option
             </label>
@@ -195,7 +129,10 @@ export default function MedicationCard({
                 setSelectedVariantId(nextVariantId);
                 chooseMedication(nextVariantId);
               }}
-              className={cn("w-full text-[13px] sm:text-[14px]", fieldControlClass)}
+              className={cn(
+                "min-w-0 w-full max-w-full text-[13px] sm:text-[14px]",
+                fieldControlClass,
+              )}
             >
               {medication.variants.map((v) => (
                 <option key={v.id} value={v.id}>
@@ -223,23 +160,31 @@ export default function MedicationCard({
         ) : null}
 
         {medication.notice.trim() ? (
-          <p className="mt-1 text-[11px] font-normal leading-snug text-[#152A51]/55 sm:text-[12px]">
+          <p className="text-[11px] font-normal leading-snug text-[#152A51]/55 sm:text-[12px]">
             {medication.notice.startsWith("Note:")
               ? medication.notice
               : `Note: ${medication.notice}`}
           </p>
         ) : null}
-      </div>
 
-      {/* Figma Selection Ellipse (114px x 114px) overlapping right edge */}
-      <div
-        className={cn(
-          "absolute -right-7 top-1/2 z-20 flex h-[80px] w-[80px] -translate-y-1/2 items-center justify-center rounded-full border-2 transition sm:-right-10 sm:h-[114px] sm:w-[114px]",
-          selected ? "border-white bg-[#6A9B9C]" : "border-[#E8EEED] bg-white",
-        )}
-        aria-hidden
-      >
-        {selected ? <Check className="h-10 w-10 text-white stroke-[3] sm:h-12 sm:w-12" /> : null}
+        <div className="mt-auto pt-2">
+          <span
+            className={cn(
+              "inline-flex h-[46px] w-[121px] items-center justify-center gap-2 rounded-full text-[14px] font-medium leading-none text-[#152A51] transition",
+              selected ? "bg-[#E3E084]" : "border border-[#152A51]/15 bg-white",
+            )}
+            aria-hidden
+          >
+            {selected ? (
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#152A51]/10">
+                <Check className="h-3.5 w-3.5 stroke-[2.5]" />
+              </span>
+            ) : (
+              <span className="h-6 w-6 rounded-full border-2 border-[#152A51]/15" />
+            )}
+            Select
+          </span>
+        </div>
       </div>
     </div>
   );

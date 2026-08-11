@@ -1,21 +1,17 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 
-import {
-  DEFAULT_MEDICINE_IMAGE,
-  isExternalMedicineImage,
-  resolveMedicineImageSrc,
-} from "@/lib/intake/medicine-image";
+import { DEFAULT_MEDICINE_IMAGE, resolveMedicineImageSrc } from "@/lib/intake/medicine-image";
 import { buildShopCheckoutHref } from "@/lib/shop/checkout-href";
 import { formatPortalDate } from "@/lib/date-format";
 import { cn } from "@/lib/utils";
 
+import MedicineProductImage from "../../../onboarding/_components/MedicineProductImage";
+
 import type { MyMedsCurrentMedicationDto } from "./types";
-import { medicineImageFitClass } from "../../../onboarding/_lib/onboarding-theme";
 
 type CurrentMedicationCardProps = {
   medication: MyMedsCurrentMedicationDto;
@@ -72,7 +68,6 @@ export default function CurrentMedicationCard({
   }
 
   const imageSrc = toDbImageSrc(medication.imageSrc);
-  const external = imageSrc ? isExternalMedicineImage(imageSrc) : false;
   const canRefill = Boolean(medication.medicineId);
 
   const fields = [
@@ -91,18 +86,12 @@ export default function CurrentMedicationCard({
       ) : null}
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-5">
-        <div className="relative mx-auto h-[168px] w-[168px] shrink-0 overflow-hidden rounded-[18px] bg-[#5A778D] sm:mx-0">
-          {imageSrc ? (
-            <Image
-              src={imageSrc}
-              alt={medication.medicationName}
-              fill
-              sizes="168px"
-              unoptimized={external}
-              className={medicineImageFitClass}
-            />
-          ) : null}
-        </div>
+        <MedicineProductImage
+          src={imageSrc}
+          alt={medication.medicationName}
+          squareSize={100}
+          frameClassName="mx-auto rounded-[10px] bg-[#E8EEED] sm:mx-0"
+        />
 
         <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-0">
           {fields.map((field, index) => (
@@ -122,15 +111,17 @@ export default function CurrentMedicationCard({
           ))}
         </div>
 
-        <button
-          type="button"
-          onClick={handleRefillRequest}
-          disabled={!canRefill}
-          className="inline-flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-full border border-[#152A51] px-5 text-sm font-medium text-[#152A51] hover:bg-[#F3F6F6] disabled:cursor-not-allowed disabled:opacity-50 sm:w-fit lg:ml-2"
-        >
-          New Refill Request
-          <ArrowRight className="h-4 w-4" />
-        </button>
+        <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center lg:flex-col lg:items-end xl:flex-row xl:items-center">
+          <button
+            type="button"
+            onClick={handleRefillRequest}
+            disabled={!canRefill}
+            className="inline-flex h-[46px] w-full items-center justify-center gap-2 rounded-full bg-[#152A51] px-5 text-sm font-medium text-white hover:bg-[#152A51]/90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-fit lg:w-full xl:w-fit"
+          >
+            New Refill Request
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </article>
   );

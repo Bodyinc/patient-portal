@@ -21,6 +21,10 @@ export type ShopMedicineCardDto = {
   fromPriceCents: number | null;
   // Empty when the medicine has no variants (buy the medicine directly).
   variants: ShopMedicineVariantOption[];
+  /** Admin-provided important info bullets from medicine.important_info */
+  importantInfo: string[];
+  /** Admin-provided notice from medicine.notice_text */
+  notice: string;
 };
 
 export type ShopMedicinesListDto = {

@@ -1,25 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { getDbMedicineImageSrc } from "@/lib/intake/medicine-image";
 import type { ShopMedicineCardDto } from "@/lib/shop/types";
 import { formatFromPrice } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
 
-import {
-  medicineImageFrameClass,
-  medicineImageFitClass,
-} from "../../../onboarding/_lib/onboarding-theme";
-import MedicineImage from "../../../onboarding/_components/MedicineImage";
-
-const IMAGE_ASPECT = "339 / 354.6";
+import MedicineProductImage from "../../../onboarding/_components/MedicineProductImage";
+import MedicationDetailsLayout from "../../../onboarding/_components/MedicationDetailsLayout";
 
 export default function ShopProductCard({ item }: { item: ShopMedicineCardDto }) {
   const [open, setOpen] = useState(false);
+  const [importantOpen, setImportantOpen] = useState(false);
   const router = useRouter();
 
   const hasVariants = item.variants.length > 0;
@@ -40,6 +35,10 @@ export default function ShopProductCard({ item }: { item: ShopMedicineCardDto })
   const available = displayFromPriceCents != null;
 
   const imageSrc = getDbMedicineImageSrc(item.imageSrc);
+
+  useEffect(() => {
+    if (!open) setImportantOpen(false);
+  }, [open]);
 
   function handleContinue() {
     if (!available) return;
@@ -73,24 +72,7 @@ export default function ShopProductCard({ item }: { item: ShopMedicineCardDto })
     </div>
   ) : null;
 
-  // Fixed aspect ratio block used specifically for the primary grid card
-  const cardImageBlock = (
-    <div className={cn("w-full", medicineImageFrameClass)} style={{ aspectRatio: IMAGE_ASPECT }}>
-      {imageSrc ? (
-        <MedicineImage
-          src={imageSrc}
-          alt={item.name}
-          width={339}
-          height={355}
-          fill
-          dbOnly
-          fit="cover"
-          position="top"
-          className={medicineImageFitClass}
-        />
-      ) : null}
-    </div>
-  );
+  const cardImageBlock = <MedicineProductImage src={imageSrc} alt={item.name} />;
 
   return (
     <>
@@ -116,7 +98,7 @@ export default function ShopProductCard({ item }: { item: ShopMedicineCardDto })
             <button
               type="button"
               onClick={() => setOpen(true)}
-              className="h-[42px] w-full rounded-full bg-[#152A51] text-[13px] font-medium text-white transition hover:bg-[#152A51]/90 sm:h-[46px] sm:text-[14px]"
+              className="h-[42px] w-full rounded-full bg-[#E3E084] text-[13px] font-medium text-[#152A51] transition hover:bg-[#D9D674] sm:h-[46px] sm:text-[14px]"
             >
               View Details
             </button>
@@ -125,102 +107,27 @@ export default function ShopProductCard({ item }: { item: ShopMedicineCardDto })
       </article>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[95vh] max-w-4xl gap-0 overflow-y-auto scrollbar-hide rounded-[24px] border-[#E8EEED] p-4 sm:rounded-[24px] sm:p-6">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,339px)_1fr]">
-            <div className="flex h-full min-h-[350px] flex-col justify-between rounded-[24px] border border-[#E8EEED] bg-white p-3">
-              {/* Dynamic full-height container that stops right before the price tag */}
-              <div className={cn("relative min-h-[220px] w-full flex-1", medicineImageFrameClass)}>
-                {imageSrc ? (
-                  <MedicineImage
-                    src={imageSrc}
-                    alt={item.name}
-                    width={339}
-                    height={355}
-                    fill
-                    dbOnly
-                    fit="cover"
-                    position="top"
-                    className={medicineImageFitClass}
-                  />
-                ) : null}
-              </div>
-
-              <p className="mt-4 shrink-0 px-1 text-[22px] font-medium tracking-[-0.3px] text-[#152A51]">
-                {formatFromPrice(displayFromPriceCents)}
-              </p>
-            </div>
-
-            <div className="flex min-w-0 flex-col justify-between py-1">
-              <div>
-                <DialogTitle className="text-[28px] font-medium leading-tight tracking-[-0.5px] text-[#152A51] sm:text-[32px]">
-                  {item.name}
-                </DialogTitle>
-                <DialogDescription className="sr-only">
-                  Detailed information about {item.name}
-                </DialogDescription>
-
-                <p className="mt-4 text-[15px] leading-relaxed text-[#152A51]">
-                  {item.description}
-                </p>
-                <p className="mt-3 text-[14px] leading-relaxed text-[#152A51]/80">
-                  This treatment plan is personalized based on your health assessment and clinician
-                  recommendations for safe and sustainable progress.
-                </p>
-
-                {hasVariants ? <div className="mt-5 max-w-xs">{variantSelect}</div> : null}
-
-                <div className="mt-6">
-                  <h3 className="text-[15px] font-medium text-[#152A51]">Important Information</h3>
-                  <ul className="mt-3 space-y-2.5">
-                    <li className="border-l-[3px] border-[#6A9B9C] pl-3 text-[14px] text-[#152A51]">
-                      Prescription required following clinical approval.
-                    </li>
-                    <li className="border-l-[3px] border-[#6A9B9C] pl-3 text-[14px] text-[#152A51]">
-                      Contact your provider if you experience unexpected side effects.
-                    </li>
-                    <li className="border-l-[3px] border-[#6A9B9C] pl-3 text-[14px] text-[#152A51]">
-                      Individual results may vary based on medical history and lifestyle.
-                    </li>
-                    <li className="border-l-[3px] border-[#6A9B9C] pl-3 text-[14px] text-[#152A51]">
-                      Use only as directed by your care team.
-                    </li>
-                  </ul>
-                </div>
-
-                <div className="mt-6 rounded-[16px] border border-[#E8EEED] bg-[#F3F6F6] p-4">
-                  <h4 className="text-[13px] font-medium text-[#152A51]">Notice</h4>
-                  <p className="mt-1 text-[12px] leading-normal text-[#152A51]/80">
-                    * Prescription required. Professional medical consultation necessary before
-                    fulfillment.
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setOpen(false)}
-                  className="h-[46px] w-full rounded-full border-[#152A51]/30 bg-transparent px-6 text-[14px] font-medium text-[#152A51] shadow-none hover:bg-[#152A51]/5 sm:w-auto"
-                >
-                  Explore More
-                </Button>
-                <Button
-                  type="button"
-                  onClick={handleContinue}
-                  disabled={!available}
-                  className={cn(
-                    "h-[46px] w-full rounded-full px-6 text-[14px] font-medium shadow-none sm:w-auto",
-                    available
-                      ? "bg-[#E3E084] text-[#152A51] hover:bg-[#D9D674]"
-                      : "bg-[#E8EEED] text-[#152A51]/50",
-                  )}
-                >
-                  {available ? "Continue" : "Pricing coming soon"}
-                </Button>
-              </div>
-            </div>
-          </div>
+        <DialogContent
+          className={cn(
+            "max-h-[95vh] gap-0 overflow-y-auto scrollbar-hide border-0 bg-transparent p-2 shadow-none sm:p-3 [&>button]:right-6 [&>button]:top-6 [&>button]:z-10",
+            importantOpen ? "max-w-[min(96vw,1480px)]" : "max-w-[min(96vw,820px)]",
+          )}
+        >
+          <MedicationDetailsLayout
+            name={item.name}
+            description={item.description}
+            imageSrc={imageSrc}
+            fromPriceCents={displayFromPriceCents}
+            variantSelect={variantSelect}
+            importantInfo={item.importantInfo}
+            notice={item.notice}
+            importantOpen={importantOpen}
+            onImportantOpenChange={setImportantOpen}
+            continueLabel={available ? "Continue" : "Pricing coming soon"}
+            continueDisabled={!available}
+            onExploreMore={() => setOpen(false)}
+            onContinue={handleContinue}
+          />
         </DialogContent>
       </Dialog>
     </>

@@ -97,62 +97,66 @@ export default function MedicationsPage() {
           />
         }
       >
-        <div className="mx-auto mb-4 w-full max-w-[980px] shrink-0 text-center onboarding-font sm:mb-6">
-          <h1 className="text-[28px] font-medium leading-none tracking-[-0.5px] text-[#152A51] sm:text-[32px]">
-            Choose your medication
-          </h1>
-          <p className="mx-auto mt-3.5 max-w-2xl text-[14px] font-normal leading-snug text-[#152A51]/80">
-            {state.goalName
-              ? `Recommended options for ${state.goalName}.`
-              : "Select the treatment that fits your goals."}
-          </p>
-        </div>
-
-        {/* Updated max-w-[980px] and px-12 sm:px-16 to accommodate 856px card + 114px checkmark offset without clipping */}
-        <div className="mx-auto flex min-h-0 w-full max-w-[980px] flex-1 flex-col gap-4 overflow-y-auto px-10 pb-4 pt-2 scrollbar-hide sm:gap-5 sm:px-16">
-          {isLoading ? (
-            <p className="text-center text-sm text-[#152A51]/70">Loading medications…</p>
-          ) : isError ? (
-            <div className="text-center">
-              <p className="text-sm text-red-600">
-                {error instanceof Error ? error.message : "Could not load medications."}
-              </p>
-              <button
-                type="button"
-                onClick={() => void refetch()}
-                className="mt-2 text-sm font-medium text-[#152A51] underline"
-              >
-                Try again
-              </button>
-            </div>
-          ) : !categoryEligible ? (
-            <div className="rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-4 text-center">
-              <p className="text-sm font-medium text-amber-900">
-                {ineligibleReason ??
-                  "Based on your profile, no medications are available for this goal."}
-              </p>
-              <p className="mt-1 text-sm text-amber-800">
-                Go back to update your demographics or choose a different goal.
-              </p>
-            </div>
-          ) : medications.length === 0 ? (
-            <p className="text-center text-sm text-[#152A51]/70">
-              No medications are available for this goal right now. Try going back and selecting a
-              different goal.
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden scrollbar-hide">
+          <div className="mx-auto mb-4 w-full min-w-0 max-w-[1220px] shrink-0 px-4 text-center onboarding-font sm:mb-6 sm:px-6">
+            <h1 className="text-[28px] font-medium leading-none tracking-[-0.5px] text-[#152A51] sm:text-[32px]">
+              Choose your medication
+            </h1>
+            <p className="mx-auto mt-3.5 max-w-2xl text-[14px] font-normal leading-snug text-[#152A51]/80">
+              {state.goalName
+                ? `Recommended options for ${state.goalName}.`
+                : "Select the treatment that fits your goals."}
             </p>
-          ) : (
-            medications.map((medication, index) => (
-              <MedicationCard
-                key={medication.id}
-                medication={medication}
-                selected={selected === medication.id}
-                activeVariantId={selected === medication.id ? selectedVariantId : null}
-                accentIndex={index}
-                onSelect={selectMedication}
-                onViewDetails={setDetailsMedicationId}
-              />
-            ))
-          )}
+          </div>
+
+          <div className="mx-auto grid w-full min-w-0 max-w-[1220px] grid-cols-1 items-stretch gap-5 px-4 pb-4 pt-2 sm:grid-cols-2 sm:gap-6 sm:px-6 xl:grid-cols-3">
+            {isLoading ? (
+              <p className="col-span-full text-center text-sm text-[#152A51]/70">
+                Loading medications…
+              </p>
+            ) : isError ? (
+              <div className="col-span-full text-center">
+                <p className="text-sm text-red-600">
+                  {error instanceof Error ? error.message : "Could not load medications."}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void refetch()}
+                  className="mt-2 text-sm font-medium text-[#152A51] underline"
+                >
+                  Try again
+                </button>
+              </div>
+            ) : !categoryEligible ? (
+              <div className="col-span-full rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-4 text-center">
+                <p className="text-sm font-medium text-amber-900">
+                  {ineligibleReason ??
+                    "Based on your profile, no medications are available for this goal."}
+                </p>
+                <p className="mt-1 text-sm text-amber-800">
+                  Go back to update your demographics or choose a different goal.
+                </p>
+              </div>
+            ) : medications.length === 0 ? (
+              <p className="col-span-full text-center text-sm text-[#152A51]/70">
+                No medications are available for this goal right now. Try going back and selecting a
+                different goal.
+              </p>
+            ) : (
+              medications.map((medication, index) => (
+                <div key={medication.id} className="flex h-full min-w-0 justify-center">
+                  <MedicationCard
+                    medication={medication}
+                    selected={selected === medication.id}
+                    activeVariantId={selected === medication.id ? selectedVariantId : null}
+                    accentIndex={index}
+                    onSelect={selectMedication}
+                    onViewDetails={setDetailsMedicationId}
+                  />
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </OnboardingFrame>
 
