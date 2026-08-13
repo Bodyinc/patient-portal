@@ -3,7 +3,7 @@ const ISO_DOB = /^\d{4}-\d{2}-\d{2}$/;
 export function isoDobToDisplay(iso: string): string {
   if (!ISO_DOB.test(iso)) return "";
   const [year, month, day] = iso.split("-");
-  return `${month}-${day}-${year.slice(-2)}`;
+  return `${month}/${day}/${year}`;
 }
 
 export function displayDobToIso(display: string): string | null {

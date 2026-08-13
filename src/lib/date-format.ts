@@ -1,12 +1,12 @@
-/** Portal-wide display format: MM-DD-YY */
+/** Portal-wide display format: MM/DD/YYYY */
 
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})/;
 
 function partsToPortalDate(month: string, day: string, year: string): string {
-  return `${month}-${day}-${year.slice(-2)}`;
+  return `${month}/${day}/${year}`;
 }
 
-/** Format an ISO date string (YYYY-MM-DD) as MM-DD-YY. */
+/** Format an ISO date string (YYYY-MM-DD) as MM/DD/YYYY. */
 export function formatIsoDate(iso: string | null | undefined): string {
   if (!iso) return "—";
   const match = iso.match(ISO_DATE);
@@ -15,7 +15,7 @@ export function formatIsoDate(iso: string | null | undefined): string {
   return partsToPortalDate(month, day, year);
 }
 
-/** Format a Date or ISO timestamp for display as MM-DD-YY. */
+/** Format a Date or ISO timestamp for display as MM/DD/YYYY. */
 export function formatPortalDate(value: string | Date | null | undefined): string {
   if (!value) return "—";
 

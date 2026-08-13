@@ -79,12 +79,7 @@ export default function MedicationDetailsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className={cn(
-          "max-h-[95vh] gap-0 overflow-y-auto scrollbar-hide border-0 bg-transparent p-2 shadow-none sm:p-3 [&>button]:right-6 [&>button]:top-6 [&>button]:z-10",
-          importantOpen ? "max-w-[min(96vw,1480px)]" : "max-w-[min(96vw,820px)]",
-        )}
-      >
+      <DialogContent className="max-h-[95vh] max-w-[min(96vw,820px)] gap-0 overflow-y-auto scrollbar-hide border-0 bg-transparent p-2 shadow-none sm:p-3 [&>button]:right-6 [&>button]:top-6 [&>button]:z-10">
         <MedicationDetailsLayout
           className="onboarding-font"
           name={medication.name}

@@ -31,6 +31,8 @@ type MedicationDetailsLayoutProps = {
   className?: string;
 };
 
+const DETAILS_GRID = "grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,300px)_1fr] lg:items-start";
+
 function formatNotice(notice: string) {
   const trimmed = notice.trim();
   if (!trimmed) return "";
@@ -38,24 +40,9 @@ function formatNotice(notice: string) {
   return `* ${trimmed}`;
 }
 
-function ImportantInfoCard({
-  items,
-  notice,
-  className,
-}: {
-  items: string[];
-  notice: string;
-  className?: string;
-}) {
+function ImportantInfoPanel({ items, notice }: { items: string[]; notice: string }) {
   return (
-    <aside
-      className={cn(
-        // Figma Frame 1618875058: 595 × 248
-        "flex w-full shrink-0 flex-col justify-between rounded-[16px] border border-[#E8EEED] bg-white p-5 shadow-[0_8px_24px_rgba(21,42,81,0.08)] sm:p-6",
-        "min-h-[248px] lg:w-[595px] lg:max-w-[595px]",
-        className,
-      )}
-    >
+    <div className="border-t border-[#152A51]/10 px-4 pb-4 pt-3">
       {items.length > 0 ? (
         <ul className="space-y-3">
           {items.map((item) => (
@@ -73,7 +60,7 @@ function ImportantInfoCard({
       {notice ? (
         <div
           className={cn(
-            "rounded-[16px] border border-[#E8EEED] bg-[#F3F6F6] p-4",
+            "rounded-[14px] border border-[#E8EEED] bg-[#F3F6F6] p-4",
             items.length > 0 && "mt-4",
           )}
         >
@@ -81,7 +68,7 @@ function ImportantInfoCard({
           <p className="mt-1 text-[12px] leading-normal text-[#152A51]/80">{notice}</p>
         </div>
       ) : null}
-    </aside>
+    </div>
   );
 }
 
@@ -108,10 +95,9 @@ export default function MedicationDetailsLayout({
   const hasImportantPanel = infoItems.length > 0 || Boolean(noticeText);
 
   return (
-    <div className={cn("flex flex-col gap-4 lg:flex-row lg:items-end", className)}>
-      {/* Main popup card */}
-      <div className="min-w-0 flex-1 rounded-[24px] border border-[#E8EEED] bg-white p-4 sm:p-5">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,300px)_1fr] lg:items-start">
+    <div className={cn("min-w-0", className)}>
+      <div className="overflow-visible rounded-[24px] border border-[#E8EEED] bg-white p-4 sm:p-5">
+        <div className={DETAILS_GRID}>
           <MedicineProductImage
             src={imageSrc}
             alt={name}
@@ -119,7 +105,6 @@ export default function MedicationDetailsLayout({
             className="mx-auto w-full max-w-[300px] lg:mx-0"
           />
 
-          {/* Right: title → description → select → price → buttons → important trigger */}
           <div className="flex min-w-0 flex-col">
             <DialogTitle className="text-[28px] font-medium leading-tight tracking-[-0.5px] text-[#152A51] sm:text-[32px]">
               {name}
@@ -168,30 +153,43 @@ export default function MedicationDetailsLayout({
             </div>
 
             {hasImportantPanel ? (
-              <button
-                type="button"
-                onClick={() => onImportantOpenChange(!importantOpen)}
-                aria-expanded={importantOpen}
-                className="mt-6 flex w-full items-center justify-between gap-3 rounded-[14px] bg-[#E8EEED] px-4 py-3 text-left"
-              >
-                <span className="text-[15px] font-medium text-[#152A51]">
-                  Important Information
-                </span>
-                <ChevronDown
+              <div className="relative mt-6">
+                <button
+                  type="button"
+                  onClick={() => onImportantOpenChange(!importantOpen)}
+                  aria-expanded={importantOpen}
                   className={cn(
-                    "h-4 w-4 shrink-0 text-[#152A51] transition-transform duration-200",
-                    importantOpen && "rotate-180",
+                    "flex w-full items-center justify-between gap-3 bg-[#E8EEED] px-4 py-3 text-left",
+                    importantOpen ? "rounded-t-[14px]" : "rounded-[14px]",
                   )}
-                />
-              </button>
+                >
+                  <span className="text-[15px] font-medium text-[#152A51]">
+                    Important Information
+                  </span>
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 shrink-0 text-[#152A51] transition-transform duration-200",
+                      importantOpen && "rotate-180",
+                    )}
+                  />
+                </button>
+
+                {importantOpen ? (
+                  <div className="absolute left-0 right-0 top-full z-20 overflow-hidden rounded-b-[14px] bg-[#E8EEED]">
+                    <ImportantInfoPanel items={infoItems} notice={noticeText} />
+                  </div>
+                ) : null}
+              </div>
             ) : null}
           </div>
         </div>
       </div>
 
-      {/* Separate small card — only when Important Information is open; admin content only */}
       {importantOpen && hasImportantPanel ? (
-        <ImportantInfoCard items={infoItems} notice={noticeText} />
+        <div className={cn(DETAILS_GRID, "pointer-events-none invisible")} aria-hidden>
+          <div className="hidden lg:block" />
+          <ImportantInfoPanel items={infoItems} notice={noticeText} />
+        </div>
       ) : null}
     </div>
   );

@@ -11,7 +11,7 @@ export const ONBOARDING = {
   gauge: "#6A9B9C",
   check: "#6A9B9C",
   /** Figma product shot surface behind medicine images */
-  medicineImageBg: "#5A778D",
+  medicineImageBg: "#E8EEED",
   /** Medication card solid badge accents (Figma) */
   badgeTerracotta: "#C47A5A",
   badgeOrchid: "#C47A9B",
@@ -25,11 +25,26 @@ export const MEDICATION_BADGE_ACCENTS = [
   ONBOARDING.badgeOrchid,
 ] as const;
 
-/** Unified rounded frame with Figma blue-slate background surface. */
-export const medicineImageFrameClass = "relative overflow-hidden rounded-[20px] bg-[#5A778D]";
+/** Unified rounded frame with Figma catalog surface. */
+export const medicineImageFrameClass = "relative overflow-hidden rounded-[20px] bg-[#E8EEED]";
 
-/** Standardized crop: Top-aligned and zoomed to cut lower body at Figma specification. */
-export const medicineImageFitClass = "object-cover object-top scale-110";
+/** Figma choose-medication / shop catalog image well. */
+export const MEDICATION_CARD_IMAGE_ASPECT = "386 / 359";
+
+/** @deprecated Use MEDICATION_CARD_IMAGE_ASPECT */
+export const MEDICATION_IMAGE_ASPECT = MEDICATION_CARD_IMAGE_ASPECT;
+
+/** @deprecated Use MEDICATION_CARD_IMAGE_ASPECT */
+export const SHOP_CATALOG_IMAGE_ASPECT = MEDICATION_CARD_IMAGE_ASPECT;
+
+/** @deprecated Slot is now a fixed 133×200 height-fill frame in MedicineProductImage */
+export const medicationImageInsetClass = "absolute inset-x-[10%] top-[4%] bottom-[1%]";
+
+/** @deprecated Slot is now a fixed 133×200 height-fill frame in MedicineProductImage */
+export const shopCatalogImageInsetClass = "absolute inset-x-[14%] top-[6%] bottom-0";
+
+/** Full vial visible inside the fixed 133×200 slot. */
+export const medicineImageFitClass = "object-contain object-bottom mix-blend-normal";
 
 /** Shared label / control classes for Figma-styled form fields. */
 export const fieldLabelClass = "text-[14px] font-normal leading-none text-[#152A51]";

@@ -3,10 +3,9 @@
 import Link from "next/link";
 import { Check, RefreshCw } from "lucide-react";
 
-import MedicineImage from "../../_components/MedicineImage";
+import MedicineProductImage from "../../_components/MedicineProductImage";
 import type { MedicineDto } from "@/lib/intake/types";
 import { DEFAULT_MEDICINE_IMAGE } from "@/lib/intake/medicine-image";
-import { cn } from "@/lib/utils";
 
 type TreatmentSummaryProps = {
   medicine: MedicineDto | null;
@@ -53,24 +52,17 @@ export default function TreatmentSummary({
               h-[154px] w-full
               shrink-0
               overflow-hidden
-              bg-[#5A778D]
               rounded-[17px]
               sm:w-[147px]
               sm:rounded-[17px]
             "
           >
-            {imageFromDb ? (
-              <MedicineImage
-                src={imageFromDb}
-                alt={medicine.name}
-                width={339}
-                height={355}
-                fill
-                dbOnly
-                fit="contain"
-                position="top"
-              />
-            ) : null}
+            <MedicineProductImage
+              src={imageFromDb}
+              alt={medicine.name}
+              fillParent
+              frameClassName="rounded-[17px] bg-[#E8EEED]"
+            />
           </div>
 
           <div className="flex min-w-0 flex-1 flex-col justify-center px-4 py-4 sm:px-6 sm:py-5">

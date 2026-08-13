@@ -1,5 +1,6 @@
 import "server-only";
 
+import { formatPortalDate } from "@/lib/date-format";
 import { emailButton, emailLayout, formatAmount } from "./layout";
 
 function firstName(fullName: string | null | undefined): string {
@@ -9,11 +10,7 @@ function firstName(fullName: string | null | undefined): string {
 
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return "the end of your billing period";
-  return new Date(iso).toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
+  return formatPortalDate(iso);
 }
 
 export function paymentFailedEmail(params: {

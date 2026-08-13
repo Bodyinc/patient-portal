@@ -38,6 +38,7 @@ import type {
 } from "@/lib/intake/types";
 import { normalizeQuestionType } from "@/lib/intake/questionnaire";
 import { resolveMedicineImageSrc } from "@/lib/intake/medicine-image";
+import { formatPortalDate } from "@/lib/date-format";
 import { formatOrderId } from "@/lib/orders/order-id";
 import { classifyPatientEmail } from "@/lib/auth/patient-email";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -1299,11 +1300,7 @@ export async function reconcileOnboardingSubscription(): Promise<IntakeActionRes
 }
 
 function formatOrderDate(iso: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(iso));
+  return formatPortalDate(iso);
 }
 
 /**
