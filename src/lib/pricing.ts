@@ -31,7 +31,8 @@ export function priceLabelFromDuration(
   amount: number,
   durationMonths: number | null | undefined,
 ): string {
-  if (!durationMonths || durationMonths === 1) return `$${amount}/month`;
-  if (durationMonths === 3) return `$${amount}/quarter`;
-  return `$${amount}/${durationMonths} months`;
+  const months = !durationMonths || durationMonths < 1 ? 1 : durationMonths;
+  const monthly = amount / months;
+  const formatted = Number.isInteger(monthly) ? `$${monthly}` : `$${monthly.toFixed(2)}`;
+  return `${formatted}/month`;
 }

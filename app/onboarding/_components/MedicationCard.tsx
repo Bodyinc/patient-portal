@@ -3,7 +3,7 @@
 import { Check } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import MedicineImage from "./MedicineImage";
+import MedicineProductImage from "./MedicineProductImage";
 import type { MedicineDto } from "@/lib/intake/types";
 import { formatFromPrice } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
@@ -18,12 +18,6 @@ type MedicationCardProps = {
   onSelect?: (id: string, variantId: string | null) => void;
   onViewDetails?: (id: string) => void;
 };
-
-const IMAGE_ASPECT = "386 / 359";
-
-/** Figma medication card image well — light surface, vial fills frame with small edge padding. */
-const medicationCardImageFrameClass =
-  "relative w-full shrink-0 overflow-hidden rounded-[20px] bg-[#E8EEED]";
 
 export default function MedicationCard({
   medication,
@@ -80,20 +74,12 @@ export default function MedicationCard({
         selected && "ring-2 ring-inset ring-[#6A9B9C]/40",
       )}
     >
-      <div className={medicationCardImageFrameClass} style={{ aspectRatio: IMAGE_ASPECT }}>
-        <div className="absolute inset-x-[10%] top-[4%] bottom-[1%]">
-          <MedicineImage
-            src={medication.imageSrc}
-            alt={medication.name}
-            width={177}
-            height={316}
-            fill
-            fit="contain"
-            position="center bottom"
-            className="object-contain object-bottom mix-blend-normal"
-          />
-        </div>
-      </div>
+      <MedicineProductImage
+        src={medication.imageSrc}
+        alt={medication.name}
+        dbOnly={false}
+        frameClassName="rounded-[20px] bg-[#E8EEED]"
+      />
 
       <div className="flex flex-1 flex-col gap-2 pt-3 sm:gap-2.5 sm:pt-4">
         <div className="flex min-w-0 items-start justify-between gap-2">

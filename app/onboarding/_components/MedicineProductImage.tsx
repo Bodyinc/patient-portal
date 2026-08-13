@@ -2,43 +2,76 @@
 
 import { cn } from "@/lib/utils";
 
-import { medicineImageFitClass, medicineImageFrameClass } from "../_lib/onboarding-theme";
+import {
+  MEDICATION_CARD_IMAGE_ASPECT,
+  medicineImageFitClass,
+  medicineImageFrameClass,
+} from "../_lib/onboarding-theme";
 import MedicineImage from "./MedicineImage";
 
-export const MEDICINE_PRODUCT_IMAGE_ASPECT = "339 / 354.6";
+/** @deprecated Prefer MEDICATION_CARD_IMAGE_ASPECT */
+export const MEDICINE_PRODUCT_IMAGE_ASPECT = MEDICATION_CARD_IMAGE_ASPECT;
+
+/** Figma vial export frame */
+const VIAL_ASPECT = "133 / 200";
 
 type MedicineProductImageProps = {
   src: string | null | undefined;
   alt: string;
   className?: string;
   frameClassName?: string;
-  /** Fixed square thumbnail (e.g. dashboard 100×100). */
+  /** Fixed square thumbnail (e.g. checkout 80×80). */
   squareSize?: number;
+  /** Fill a parent that already defines width/height (treatment row bottle well). */
+  fillParent?: boolean;
+  /** Only show DB images (shop). Onboarding may pass false to allow default vial. */
+  dbOnly?: boolean;
 };
 
-/** Shop-catalog medicine image framing — top-aligned crop with slight zoom. */
+/**
+ * Shared medicine image framing.
+ * Every admin 133×200 upload is placed in the same height-filled portrait slot
+ * so bottles render at one consistent size (shop catalog, details, checkout, etc.).
+ */
 export default function MedicineProductImage({
   src,
   alt,
   className,
   frameClassName,
   squareSize,
+  fillParent = false,
+  dbOnly = true,
 }: MedicineProductImageProps) {
   const frameClass = frameClassName ?? medicineImageFrameClass;
 
-  const image = src ? (
-    <MedicineImage
-      src={src}
-      alt={alt}
-      width={339}
-      height={355}
-      fill
-      dbOnly
-      fit="cover"
-      position="top"
-      className={medicineImageFitClass}
-    />
+  const framedImage = src ? (
+    <div className="absolute inset-0 flex items-end justify-center px-[6%] pt-[2%]">
+      <div
+        className="relative h-full max-h-full w-auto max-w-full"
+        style={{ aspectRatio: VIAL_ASPECT }}
+      >
+        <MedicineImage
+          src={src}
+          alt={alt}
+          width={133}
+          height={200}
+          fill
+          dbOnly={dbOnly}
+          fit="contain"
+          position="center bottom"
+          className={medicineImageFitClass}
+        />
+      </div>
+    </div>
   ) : null;
+
+  if (fillParent) {
+    return (
+      <div className={cn("relative h-full w-full overflow-hidden", frameClass, className)}>
+        {framedImage}
+      </div>
+    );
+  }
 
   if (squareSize) {
     return (
@@ -46,7 +79,7 @@ export default function MedicineProductImage({
         className={cn("relative shrink-0 overflow-hidden", frameClass, className)}
         style={{ width: squareSize, height: squareSize }}
       >
-        {image}
+        {framedImage}
       </div>
     );
   }
@@ -54,9 +87,9 @@ export default function MedicineProductImage({
   return (
     <div
       className={cn("relative w-full", frameClass, className)}
-      style={{ aspectRatio: MEDICINE_PRODUCT_IMAGE_ASPECT }}
+      style={{ aspectRatio: MEDICATION_CARD_IMAGE_ASPECT }}
     >
-      {image}
+      {framedImage}
     </div>
   );
 }

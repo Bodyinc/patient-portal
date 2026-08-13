@@ -6,6 +6,7 @@ import { Bell } from "lucide-react";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { getMyNotifications } from "@/lib/actions/notifications";
+import { formatPortalDate } from "@/lib/date-format";
 import type { PatientNotificationDto } from "@/lib/notifications/service-data";
 import { cn } from "@/lib/utils";
 
@@ -22,10 +23,7 @@ function formatRelativeTime(iso: string): string {
   if (diffHr < 24) return `${diffHr}h ago`;
   const diffDay = Math.round(diffHr / 24);
   if (diffDay < 7) return `${diffDay}d ago`;
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-  }).format(new Date(iso));
+  return formatPortalDate(iso);
 }
 
 function readSeenAt(): number {
