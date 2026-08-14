@@ -45,7 +45,12 @@ export default function MedicineProductImage({
   const frameClass = frameClassName ?? medicineImageFrameClass;
 
   const framedImage = src ? (
-    <div className="absolute inset-0 flex items-end justify-center px-[6%] pt-[2%]">
+    <div
+      className={cn(
+        "absolute inset-0 flex items-end justify-center",
+        squareSize || fillParent ? "px-[4%] pt-[1%]" : "px-[6%] pt-[2%]",
+      )}
+    >
       <div
         className="relative h-full max-h-full w-auto max-w-full"
         style={{ aspectRatio: VIAL_ASPECT }}
