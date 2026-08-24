@@ -6,11 +6,13 @@ import { sendTransactionalEmail } from "./send";
 import { incompleteOrderEmail, refillReminderEmail } from "./reminder-emails";
 import { orderStatusEmail } from "./order-status-emails";
 import { alreadySentKeys, markEmailSent } from "./idempotency";
-import { appUrl, patientEmailByUserId } from "./recipients";
+import { appUrl, patientEmailByIntakeSession, patientEmailByUserId } from "./recipients";
 
 const INCOMPLETE_ORDER_DELAY_HOURS = 24;
 const REFILL_WINDOW_DAYS = 5;
-const ORDER_EVENT_LOOKBACK_HOURS = 24;
+// Daily Hobby cron. Keep a 3-day window so a failed immediate send is retried
+// (already-sent rows in email_reminders are skipped).
+const ORDER_EVENT_LOOKBACK_HOURS = 72;
 const ACTIVE_INTAKE_STATUSES = ["in_progress", "payment_pending"] as const;
 
 const ORDER_STATUS_EMAIL_STATUSES = new Set([
@@ -145,14 +147,33 @@ export async function sendRefillReminders(now = new Date()): Promise<ReminderRun
   return { candidates: candidates.length, sent };
 }
 
-export async function sendOrderStatusEmails(now = new Date()): Promise<ReminderRunResult> {
-  const since = new Date(now.getTime() - ORDER_EVENT_LOOKBACK_HOURS * 60 * 60 * 1000);
+async function resolveOrderStatusRecipient(request: {
+  user_id: string | null;
+  session_id: string | null;
+}): Promise<{ email: string; fullName: string | null } | null> {
+  return (
+    (await patientEmailByUserId(request.user_id)) ??
+    (await patientEmailByIntakeSession(request.session_id))
+  );
+}
 
-  const { data: events, error } = await supabaseAdmin
+export async function sendUnsentOrderStatusEmails(opts?: {
+  requestId?: string;
+  since?: Date;
+}): Promise<ReminderRunResult> {
+  let query = supabaseAdmin
     .from("medication_request_events")
     .select("id, request_id, status, created_at")
-    .gte("created_at", since.toISOString())
     .order("created_at", { ascending: true });
+
+  if (opts?.requestId) {
+    query = query.eq("request_id", opts.requestId);
+  } else {
+    const since = opts?.since ?? new Date(Date.now() - ORDER_EVENT_LOOKBACK_HOURS * 60 * 60 * 1000);
+    query = query.gte("created_at", since.toISOString());
+  }
+
+  const { data: events, error } = await query;
   if (error) throw new Error(error.message);
 
   const candidates = (events ?? []).filter((ev) => ORDER_STATUS_EMAIL_STATUSES.has(ev.status));
@@ -165,7 +186,7 @@ export async function sendOrderStatusEmails(now = new Date()): Promise<ReminderR
   const { data: requests } = requestIds.length
     ? await supabaseAdmin
         .from("medication_requests")
-        .select("id, user_id, medicine_id, provider_id, tracking_number")
+        .select("id, user_id, session_id, medicine_id, tracking_number")
         .in("id", requestIds)
     : { data: [] };
 
@@ -180,54 +201,91 @@ export async function sendOrderStatusEmails(now = new Date()): Promise<ReminderR
 
   let sent = 0;
   for (const event of candidates) {
+    if (sentKeys.has(`${event.id}|`)) continue;
+
     const request = requestById.get(event.request_id);
     const medicineName =
       (request?.medicine_id ? medicineById.get(request.medicine_id) : null) ?? "your treatment";
     const orderNumber = request ? formatOrderId(request.id) : formatOrderId(event.request_id);
 
-    if (!sentKeys.has(`${event.id}|`)) {
-      if (!request?.user_id) {
-        await markEmailSent("order_status", event.id, "");
-        sentKeys.add(`${event.id}|`);
-      } else {
-        const patient = await patientEmailByUserId(request.user_id);
-        if (!patient) {
-          await markEmailSent("order_status", event.id, "");
-          sentKeys.add(`${event.id}|`);
-        } else {
-          const ctaUrl =
-            event.status === "awaiting_additional_payment"
-              ? `${appUrl()}/orders/${request.id}/pay`
-              : `${appUrl()}/my-meds`;
+    const patient = request ? await resolveOrderStatusRecipient(request) : null;
+    if (!patient) {
+      console.warn("[email] order status skipped: no recipient yet", event.id);
+      continue;
+    }
 
-          const mail = orderStatusEmail({
-            fullName: patient.fullName,
-            medicineName,
-            status: event.status,
-            orderNumber,
-            ctaUrl,
-            trackingNumber: request.tracking_number,
-          });
+    const ctaUrl =
+      event.status === "awaiting_additional_payment" && request
+        ? `${appUrl()}/orders/${request.id}/pay`
+        : `${appUrl()}/my-meds`;
 
-          if (
-            mail &&
-            (await sendTransactionalEmail({
-              to: patient.email,
-              subject: mail.subject,
-              html: mail.html,
-            }))
-          ) {
-            await markEmailSent("order_status", event.id, "");
-            sentKeys.add(`${event.id}|`);
-            sent += 1;
-          } else if (!mail) {
-            await markEmailSent("order_status", event.id, "");
-            sentKeys.add(`${event.id}|`);
-          }
-        }
-      }
+    const mail = orderStatusEmail({
+      fullName: patient.fullName,
+      medicineName,
+      status: event.status,
+      orderNumber,
+      ctaUrl,
+      trackingNumber: request?.tracking_number,
+    });
+
+    if (!mail) {
+      await markEmailSent("order_status", event.id, "");
+      sentKeys.add(`${event.id}|`);
+      continue;
+    }
+
+    if (
+      await sendTransactionalEmail({
+        to: patient.email,
+        subject: mail.subject,
+        html: mail.html,
+      })
+    ) {
+      await markEmailSent("order_status", event.id, "");
+      sentKeys.add(`${event.id}|`);
+      sent += 1;
     }
   }
 
   return { candidates: candidates.length, sent };
+}
+
+export async function sendUnsentOrderStatusEmailsForPayment(
+  paymentId: string,
+): Promise<ReminderRunResult> {
+  const { data: payment } = await supabaseAdmin
+    .from("payments")
+    .select("id, stripe_invoice_id")
+    .eq("id", paymentId)
+    .maybeSingle();
+  if (!payment) return { candidates: 0, sent: 0 };
+
+  const { data: byPayment } = await supabaseAdmin
+    .from("medication_requests")
+    .select("id")
+    .eq("payment_id", payment.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let requestId = byPayment?.id ?? null;
+  if (!requestId && payment.stripe_invoice_id) {
+    const { data: byInvoice } = await supabaseAdmin
+      .from("medication_requests")
+      .select("id")
+      .eq("stripe_invoice_id", payment.stripe_invoice_id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    requestId = byInvoice?.id ?? null;
+  }
+  if (!requestId) return { candidates: 0, sent: 0 };
+
+  return sendUnsentOrderStatusEmails({ requestId });
+}
+
+export async function sendOrderStatusEmails(now = new Date()): Promise<ReminderRunResult> {
+  return sendUnsentOrderStatusEmails({
+    since: new Date(now.getTime() - ORDER_EVENT_LOOKBACK_HOURS * 60 * 60 * 1000),
+  });
 }

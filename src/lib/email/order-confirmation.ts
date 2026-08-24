@@ -107,16 +107,25 @@ export async function sendOrderConfirmationEmail(paymentId: string): Promise<boo
     .select("id, status, amount_cents, currency, stripe_invoice_id")
     .eq("id", paymentId)
     .maybeSingle();
-  if (!payment || payment.status !== "succeeded") return false;
+  if (!payment || payment.status !== "succeeded") {
+    console.warn("[email] order confirmation skipped: payment not succeeded", paymentId);
+    return false;
+  }
 
   const order = await findOrderForPayment(payment);
-  if (!order) return false;
+  if (!order) {
+    console.warn("[email] order confirmation skipped: no order row yet for payment", paymentId);
+    return false;
+  }
 
   // Keyed on the order, so a replayed webhook or a repeat reconcile never re-sends.
   if (await wasEmailSent(REMINDER_TYPE, order.id)) return false;
 
   const recipient = await resolveRecipient(order);
-  if (!recipient) return false;
+  if (!recipient) {
+    console.warn("[email] order confirmation skipped: no patient email for order", order.id);
+    return false;
+  }
 
   const labels = await loadOrderLabels(order);
   const { subject, html } = orderConfirmedEmail({
@@ -136,12 +145,13 @@ export async function sendOrderConfirmationEmail(paymentId: string): Promise<boo
     await markEmailSent(REMINDER_TYPE, order.id);
     return true;
   }
+  console.error("[email] order confirmation send failed for order", order.id);
   return false;
 }
 
 /** Retry confirmations that were skipped because the order row was not ready yet. */
 export async function sendMissedOrderConfirmationEmails(): Promise<number> {
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const since = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
   const { data: payments, error } = await supabaseAdmin
     .from("payments")
     .select("id")
