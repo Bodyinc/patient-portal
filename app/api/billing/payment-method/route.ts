@@ -68,18 +68,19 @@ export async function PUT(request: Request) {
       userId: result.user.id,
     });
 
-    void (async () => {
+    try {
       const patient = await patientEmailByUserId(result.user.id);
-      if (!patient) return;
-      const { subject, html } = cardUpdatedEmail({
-        fullName: patient.fullName,
-        cardLabel: formatSavedCardLabel(card),
-        billingUrl: `${appUrl()}/billing`,
-      });
-      await sendTransactionalEmail({ to: patient.email, subject, html });
-    })().catch((err) => {
+      if (patient) {
+        const { subject, html } = cardUpdatedEmail({
+          fullName: patient.fullName,
+          cardLabel: formatSavedCardLabel(card),
+          billingUrl: `${appUrl()}/billing`,
+        });
+        await sendTransactionalEmail({ to: patient.email, subject, html });
+      }
+    } catch (err) {
       console.error("[email] card updated notify failed:", err);
-    });
+    }
 
     return NextResponse.json({ ok: true });
   } catch (error) {

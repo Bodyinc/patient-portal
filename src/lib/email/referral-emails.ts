@@ -1,6 +1,6 @@
 import "server-only";
 
-import { emailButton, emailLayout, formatAmount } from "./layout";
+import { EMAIL_THEME, emailButton, emailLayout, formatAmount } from "./layout";
 
 export function referralRewardEmail(params: { fullName: string | null; amountCents: number }): {
   subject: string;
@@ -11,7 +11,7 @@ export function referralRewardEmail(params: { fullName: string | null; amountCen
   const body = [
     `<p>Hi ${first},</p>`,
     `<p>Someone you referred just started their Body Inc treatment — thank you for spreading the word!</p>`,
-    `<p style="font-size:24px;font-weight:bold;color:#1a1a1a;margin:16px 0;">${amount} credit added</p>`,
+    `<p style="font-size:24px;font-weight:600;color:${EMAIL_THEME.navy};margin:16px 0;">${amount} credit added</p>`,
     `<p>The credit is on your account and applies automatically to your next bill. Keep sharing your link to earn more.</p>`,
     emailButton(
       "View my billing",

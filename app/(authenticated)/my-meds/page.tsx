@@ -1,4 +1,5 @@
 import { requirePatientSession } from "@/lib/auth/require-patient";
+import { fulfillAdditionalPaymentByIntentId } from "@/lib/orders/additional-payment";
 import { fetchMyMedsPageData } from "@/lib/my-meds/service-data";
 import { fetchActivePortalOffer } from "@/lib/offers/service-data";
 import { buildReferralLink, getReferralSummary } from "@/lib/referrals";
@@ -17,12 +18,22 @@ export default async function MyMedsPage({
   searchParams?: Promise<{
     page?: string;
     q?: string;
+    paid?: string;
+    payment_intent?: string;
+    redirect_status?: string;
   }>;
 }) {
   const { user } = await requirePatientSession();
   const resolvedSearchParams = (await searchParams) ?? {};
   const page = Math.max(1, Number(resolvedSearchParams.page ?? "1") || 1);
   const query = (resolvedSearchParams.q ?? "").trim();
+  const redirectStatus = resolvedSearchParams.redirect_status;
+  const paymentJustCompleted =
+    redirectStatus === "succeeded" || (resolvedSearchParams.paid === "1" && !redirectStatus);
+
+  if (resolvedSearchParams.payment_intent) {
+    await fulfillAdditionalPaymentByIntentId(resolvedSearchParams.payment_intent);
+  }
 
   try {
     const [data, referral, offer] = await Promise.all([
@@ -49,6 +60,7 @@ export default async function MyMedsPage({
           referralLink={referral?.link ?? buildReferralLink("BODYINC")}
           rewardCents={referral?.rewardCents ?? 0}
           offer={offer}
+          paymentJustCompleted={paymentJustCompleted}
         />
       </main>
     );

@@ -13,8 +13,7 @@ import AuthPageShell, {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { changeCheckoutEmail } from "@/lib/actions/patient-auth";
-import { createClient } from "@/lib/supabase/client";
+import { changeCheckoutEmail, sendPatientLoginOtp } from "@/lib/actions/patient-auth";
 
 const emailSchema = z.object({ email: z.string().trim().email("Enter a valid email") });
 
@@ -22,7 +21,6 @@ function ChangeEmailContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirect");
-  const supabase = createClient();
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -42,9 +40,9 @@ function ChangeEmailContent() {
         return;
       }
 
-      const { error } = await supabase.auth.signInWithOtp({ email: result.email });
-      if (error) {
-        toast.error(error.message);
+      const sent = await sendPatientLoginOtp(result.email);
+      if (!sent.ok) {
+        toast.error(sent.message);
         return;
       }
 

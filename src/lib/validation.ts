@@ -113,3 +113,20 @@ export const OPTIONAL_PHONE_COUNTRY_CODE_SCHEMA = z
     (value) => !value || PHONE_COUNTRY_CODES.some((entry) => entry.code === value),
     "Select a country code",
   );
+
+export const ZIP_CODE_MAX_DIGITS = 6;
+
+/** Digits only, capped at 6. */
+export function digitsOnlyZip(value: string): string {
+  return value.replace(/\D/g, "").slice(0, ZIP_CODE_MAX_DIGITS);
+}
+
+export const ZIP_CODE_SCHEMA = z
+  .string()
+  .trim()
+  .transform(digitsOnlyZip)
+  .refine((v) => v.length >= 1, {
+    message: "Enter a ZIP code of up to 6 digits",
+  });
+
+export const OPTIONAL_ZIP_CODE_SCHEMA = z.string().trim().transform(digitsOnlyZip);

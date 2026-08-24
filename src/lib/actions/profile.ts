@@ -5,7 +5,12 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { PROFILE_AVATAR_MAX_BYTES, PROFILE_AVATAR_MAX_LABEL } from "@/lib/profile/avatar";
-import { OPTIONAL_DOB_SCHEMA, OPTIONAL_PHONE_SCHEMA } from "@/lib/validation";
+import {
+  OPTIONAL_DOB_SCHEMA,
+  OPTIONAL_PHONE_SCHEMA,
+  OPTIONAL_ZIP_CODE_SCHEMA,
+  digitsOnlyZip,
+} from "@/lib/validation";
 import type { Tables } from "@/lib/supabase/types";
 
 // NOTE: email is intentionally NOT accepted here. The login (auth) email and profiles.email
@@ -20,7 +25,7 @@ const profileUpdateSchema = z.object({
   streetAddress: z.string().trim().max(255).optional().or(z.literal("")),
   apartment: z.string().trim().max(60).optional().or(z.literal("")),
   city: z.string().trim().max(120).optional().or(z.literal("")),
-  postalCode: z.string().trim().max(20).optional().or(z.literal("")),
+  postalCode: OPTIONAL_ZIP_CODE_SCHEMA,
   country: z.string().trim().max(120).optional().or(z.literal("")),
   avatarUrl: z.string().trim().url().optional().or(z.literal("")),
 });
@@ -56,7 +61,7 @@ function mapProfile(profile: Tables<"profiles">): EditableProfileDto {
     streetAddress: profile.street_address ?? "",
     apartment: profile.apartment ?? "",
     city: profile.city ?? "",
-    postalCode: profile.postal_code ?? "",
+    postalCode: digitsOnlyZip(profile.postal_code ?? ""),
     country: profile.country ?? "",
     avatarUrl: profile.avatar_url ?? "",
   };

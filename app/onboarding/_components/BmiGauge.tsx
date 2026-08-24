@@ -10,6 +10,9 @@ export default function BmiGauge({ bmi, category }: BmiGaugeProps) {
 
   const size = 220;
   const stroke = 14;
+  const knobR = 9;
+  // Knob sticks past the track at either end; pad the viewBox so it is not clipped.
+  const pad = knobR + 4;
   const radius = (size - stroke) / 2;
   const cx = size / 2;
   const cy = size / 2;
@@ -23,10 +26,11 @@ export default function BmiGauge({ bmi, category }: BmiGaugeProps) {
 
   return (
     <div className="mx-auto flex w-full max-w-[260px] flex-col items-center">
-      <div className="relative w-full" style={{ aspectRatio: "2 / 1" }}>
+      <div className="relative w-full overflow-visible">
         <svg
-          viewBox={`0 0 ${size} ${size / 2 + stroke}`}
-          className="h-auto w-full"
+          viewBox={`${-pad} ${-pad} ${size + pad * 2} ${size / 2 + stroke + pad}`}
+          className="h-auto w-full overflow-visible"
+          overflow="visible"
           role="img"
           aria-label={`BMI ${bmi}, ${category}`}
         >
@@ -46,7 +50,7 @@ export default function BmiGauge({ bmi, category }: BmiGaugeProps) {
             strokeDasharray={circumference}
             strokeDashoffset={dashOffset}
           />
-          <circle cx={knobX} cy={knobY} r={9} fill="#6A9B9C" />
+          <circle cx={knobX} cy={knobY} r={knobR} fill="#6A9B9C" />
           <circle cx={knobX} cy={knobY} r={4} fill="white" />
         </svg>
 

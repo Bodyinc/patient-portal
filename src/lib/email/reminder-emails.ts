@@ -1,6 +1,6 @@
 import "server-only";
 
-import { emailButton, emailLayout, formatAmount } from "./layout";
+import { EMAIL_THEME, emailButton, emailLayout, formatAmount } from "./layout";
 import { formatPortalDate } from "@/lib/date-format";
 
 function firstName(fullName: string | null): string {
@@ -20,7 +20,7 @@ export function incompleteOrderEmail(params: {
     `<p>Hi ${firstName(params.fullName)},</p>`,
     `<p>You're almost there — ${plan} is saved and waiting. Pick up right where you left off and finish your checkout in under a minute.</p>`,
     emailButton("Finish my order", params.resumeUrl),
-    `<p style="color:#777777;font-size:13px;">Your progress is saved for 7 days. If you didn't start an order with Body Inc, you can ignore this email.</p>`,
+    `<p style="color:${EMAIL_THEME.navyFaint};font-size:13px;">Your progress is saved for 7 days. If you didn't start an order with Body Inc, you can ignore this email.</p>`,
   ].join("");
   return {
     subject: "Your Body Inc order is almost complete",

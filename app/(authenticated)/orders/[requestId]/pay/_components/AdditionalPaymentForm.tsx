@@ -22,15 +22,24 @@ function Fields({ amountCents }: { amountCents: number }) {
     setSubmitting(true);
     setError(null);
 
-    const { error: confirmError } = await stripe.confirmPayment({
+    const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
       elements,
-      confirmParams: { return_url: `${window.location.origin}/my-meds?paid=1` },
+      confirmParams: {
+        return_url: `${window.location.origin}/my-meds?paid=1`,
+      },
+      redirect: "if_required",
     });
 
     if (confirmError) {
       setError(confirmError.message ?? "Payment could not be completed.");
       setSubmitting(false);
+      return;
     }
+
+    const paidUrl = new URL("/my-meds", window.location.origin);
+    paidUrl.searchParams.set("paid", "1");
+    if (paymentIntent?.id) paidUrl.searchParams.set("payment_intent", paymentIntent.id);
+    window.location.assign(paidUrl.toString());
   }
 
   return (

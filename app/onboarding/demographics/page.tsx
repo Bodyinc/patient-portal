@@ -104,7 +104,7 @@ export default function DemographicsPage() {
   return (
     <OnboardingStepLayout
       title="We need to make sure we can support you"
-      description="*Required fields are marked with ."
+      description="*Required fields are marked with *."
       onBack={handleBack}
       onContinue={handleContinue}
       continueDisabled={saving}
@@ -116,7 +116,7 @@ export default function DemographicsPage() {
       <div className="space-y-6">
         <div className="space-y-4">
           <Label htmlFor="state" className={fieldLabelClass}>
-            State
+            State <span className="text-red-500">*</span>
           </Label>
           <Select
             value={form.state || undefined}
@@ -140,7 +140,7 @@ export default function DemographicsPage() {
 
         <div className="space-y-4">
           <Label htmlFor="sex" className={fieldLabelClass}>
-            Sex
+            Sex <span className="text-red-500">*</span>
           </Label>
           <Select
             value={form.sex || undefined}
@@ -164,7 +164,7 @@ export default function DemographicsPage() {
 
         <div className="space-y-4">
           <Label htmlFor="dob" className={fieldLabelClass}>
-            Date of birth
+            Date of birth <span className="text-red-500">*</span>
           </Label>
           <OnboardingDobField
             id="dob"

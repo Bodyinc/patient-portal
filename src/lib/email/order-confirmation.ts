@@ -101,22 +101,22 @@ async function loadOrderLabels(order: OrderRow): Promise<{
  * fires for both the Stripe webhook and the on-demand reconcile (which is what completes the
  * order when webhooks are delayed or not reachable). Stripe sends the invoice separately.
  */
-export async function sendOrderConfirmationEmail(paymentId: string): Promise<void> {
+export async function sendOrderConfirmationEmail(paymentId: string): Promise<boolean> {
   const { data: payment } = await supabaseAdmin
     .from("payments")
     .select("id, status, amount_cents, currency, stripe_invoice_id")
     .eq("id", paymentId)
     .maybeSingle();
-  if (!payment || payment.status !== "succeeded") return;
+  if (!payment || payment.status !== "succeeded") return false;
 
   const order = await findOrderForPayment(payment);
-  if (!order) return;
+  if (!order) return false;
 
   // Keyed on the order, so a replayed webhook or a repeat reconcile never re-sends.
-  if (await wasEmailSent(REMINDER_TYPE, order.id)) return;
+  if (await wasEmailSent(REMINDER_TYPE, order.id)) return false;
 
   const recipient = await resolveRecipient(order);
-  if (!recipient) return;
+  if (!recipient) return false;
 
   const labels = await loadOrderLabels(order);
   const { subject, html } = orderConfirmedEmail({
@@ -134,5 +134,29 @@ export async function sendOrderConfirmationEmail(paymentId: string): Promise<voi
 
   if (await sendTransactionalEmail({ to: recipient.email, subject, html })) {
     await markEmailSent(REMINDER_TYPE, order.id);
+    return true;
   }
+  return false;
+}
+
+/** Retry confirmations that were skipped because the order row was not ready yet. */
+export async function sendMissedOrderConfirmationEmails(): Promise<number> {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { data: payments, error } = await supabaseAdmin
+    .from("payments")
+    .select("id")
+    .eq("status", "succeeded")
+    .gte("created_at", since)
+    .order("created_at", { ascending: false })
+    .limit(40);
+  if (error) {
+    console.error("[email] missed order confirmation lookup failed:", error.message);
+    return 0;
+  }
+
+  let sent = 0;
+  for (const payment of payments ?? []) {
+    if (await sendOrderConfirmationEmail(payment.id)) sent += 1;
+  }
+  return sent;
 }

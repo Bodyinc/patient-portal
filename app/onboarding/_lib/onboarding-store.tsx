@@ -17,7 +17,7 @@ import { fromHeightCm, fromWeightKg } from "@/lib/intake/conversions";
 import { intakeQueryKeys } from "@/lib/intake/query-keys";
 import type { IntakeSummaryDto, QuestionnaireAnswerValue } from "@/lib/intake/types";
 import { legacyAnswersToValues } from "@/lib/intake/questionnaire";
-import { DEFAULT_PHONE_COUNTRY_CODE } from "@/lib/validation";
+import { DEFAULT_PHONE_COUNTRY_CODE, digitsOnlyZip } from "@/lib/validation";
 
 import {
   canAccessStep,
@@ -169,13 +169,13 @@ function summaryToState(summary: IntakeSummaryDto, prev: OnboardingState): Onboa
     streetAddress: summary.streetAddress ?? base.streetAddress,
     apartment: summary.apartment ?? base.apartment,
     city: summary.city ?? base.city,
-    postalCode: summary.postalCode ?? base.postalCode,
+    postalCode: digitsOnlyZip(summary.postalCode ?? base.postalCode),
     billingSameAsShipping: summary.billingSameAsShipping ?? base.billingSameAsShipping,
     billingStreetAddress: summary.billingStreetAddress ?? base.billingStreetAddress,
     billingApartment: summary.billingApartment ?? base.billingApartment,
     billingCity: summary.billingCity ?? base.billingCity,
     billingStateCode: summary.billingStateCode ?? base.billingStateCode,
-    billingPostalCode: summary.billingPostalCode ?? base.billingPostalCode,
+    billingPostalCode: digitsOnlyZip(summary.billingPostalCode ?? base.billingPostalCode),
     smsConsent: summary.smsConsent ?? base.smsConsent,
     marketingConsent: summary.marketingConsent ?? base.marketingConsent,
     selectedPackageId: summary.selectedPackageId ?? base.selectedPackageId,

@@ -3,6 +3,10 @@ import "server-only";
 import { resolveMedicineImageSrc } from "@/lib/intake/medicine-image";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { fetchPatientOrders } from "@/lib/orders/service-data";
+import {
+  fetchPendingAdditionalPayments,
+  maybeReconcileAdditionalPayments,
+} from "@/lib/orders/additional-payment";
 import { maybeReconcileIncompleteSubscription } from "@/lib/stripe/reconcile";
 import type { Json } from "@/lib/supabase/types";
 import type {
@@ -253,14 +257,19 @@ export async function fetchMyMedsPageData(
   options: { page?: number; pageSize?: number; query?: string } = {},
 ): Promise<MyMedsPageDataDto> {
   await maybeReconcileIncompleteSubscription(userId);
+  await maybeReconcileAdditionalPayments(userId);
 
-  const [subscriptionsResult, requests] = await Promise.all([
+  const [subscriptionsResult, requests, pendingPayments] = await Promise.all([
     supabaseAdmin
       .from("subscriptions")
       .select(SUBSCRIPTION_SELECT)
       .eq("user_id", userId)
       .order("created_at", { ascending: false }),
     fetchMedicationRequests(userId, options),
+    fetchPendingAdditionalPayments(userId).catch((err) => {
+      console.error("[additional_payments] My Meds load failed:", err);
+      return [];
+    }),
   ]);
 
   if (subscriptionsResult.error) throw new Error(subscriptionsResult.error.message);
@@ -290,5 +299,5 @@ export async function fetchMyMedsPageData(
     pastMedications.push(mapPastMedication(row));
   }
 
-  return { activeMedications, pastMedications, requests };
+  return { activeMedications, pastMedications, requests, pendingPayments };
 }

@@ -2,10 +2,16 @@
 
 import { useRouter } from "next/navigation";
 
+import { getDbMedicineImageSrc } from "@/lib/intake/medicine-image";
 import { buildShopCheckoutHref } from "@/lib/shop/checkout-href";
+import { formatPortalDate } from "@/lib/date-format";
+
+import MedicineProductImage from "../../../onboarding/_components/MedicineProductImage";
 
 import type { BillingSubscriptionDto } from "./types";
-import { formatPortalDate } from "@/lib/date-format";
+
+/** Match Active Treatments — bottle well stretches to card height. */
+const SUBSCRIPTION_ROW_HEIGHT = 102;
 
 type SubscriptionRowProps = {
   subscription: BillingSubscriptionDto;
@@ -26,6 +32,7 @@ function formatCurrency(amount: number): string {
 
 export default function SubscriptionRow({ subscription, onCancel }: SubscriptionRowProps) {
   const router = useRouter();
+  const imageSrc = getDbMedicineImageSrc(subscription.imageSrc);
 
   function handleUpgrade() {
     if (!subscription.medicineId) return;
@@ -40,15 +47,22 @@ export default function SubscriptionRow({ subscription, onCancel }: Subscription
   }
 
   return (
-    <article className="rounded-md border border-[#E8EEED] bg-[#F3F6F6] p-4">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex min-w-0 flex-1 items-start gap-3">
-          <img
-            src={subscription.imageSrc}
+    <article className="overflow-hidden rounded-md border border-[#E8EEED] bg-[#F3F6F6]">
+      <div
+        className="flex flex-col lg:flex-row lg:items-stretch"
+        style={{ minHeight: SUBSCRIPTION_ROW_HEIGHT }}
+      >
+        <div className="relative mx-auto h-[102px] w-[102px] shrink-0 overflow-hidden rounded-[10px] bg-[#E8EEED] lg:mx-0 lg:h-auto lg:w-[102px] lg:self-stretch">
+          <MedicineProductImage
+            src={imageSrc}
             alt={subscription.medicineName}
-            className="h-20 w-20 shrink-0 rounded-md border border-[#E8EEED] object-cover"
+            fillParent
+            frameClassName="rounded-[10px] bg-[#E8EEED]"
           />
-          <div className="min-w-0">
+        </div>
+
+        <div className="flex min-w-0 flex-1 flex-col gap-4 p-4 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
+          <div className="min-w-0 flex-1">
             <h3 className="text-base font-semibold text-[#152A51]">{subscription.medicineName}</h3>
             {subscription.variantName || subscription.planLabel ? (
               <div className="mt-1 flex flex-wrap items-center gap-1.5">
@@ -71,40 +85,40 @@ export default function SubscriptionRow({ subscription, onCancel }: Subscription
               </p>
             ) : null}
           </div>
-        </div>
 
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:min-w-[280px]">
-          <div>
-            <p className="text-xs text-[#152A51]/60">Next Billing Date</p>
-            <p className="mt-1 text-sm font-medium text-[#152A51]">
-              {formatDate(subscription.nextBillingDate)}
-            </p>
+          <div className="grid grid-cols-2 gap-4 lg:min-w-[280px]">
+            <div>
+              <p className="text-xs text-[#152A51]/60">Next Billing Date</p>
+              <p className="mt-1 text-sm font-medium text-[#152A51]">
+                {formatDate(subscription.nextBillingDate)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-[#152A51]/60">Upcoming Charge</p>
+              <p className="mt-1 text-sm font-semibold text-[#152A51]">
+                {formatCurrency(subscription.upcomingCharge)}
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-xs text-[#152A51]/60">Upcoming Charge</p>
-            <p className="mt-1 text-sm font-semibold text-[#152A51]">
-              {formatCurrency(subscription.upcomingCharge)}
-            </p>
-          </div>
-        </div>
 
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-          <button
-            type="button"
-            onClick={handleUpgrade}
-            disabled={!subscription.medicineId}
-            className="w-full rounded-md border border-[#152A51] px-4 py-2 text-sm font-medium text-[#152A51] hover:bg-[#F3F6F6] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-          >
-            Upgrade
-          </button>
-          <button
-            type="button"
-            onClick={() => onCancel(subscription)}
-            disabled={subscription.cancelAtPeriodEnd}
-            className="w-full rounded-md border border-[#D5DFDE] bg-white px-4 py-2 text-sm text-[#152A51]/80 hover:bg-[#F3F6F6] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-          >
-            Cancel
-          </button>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row lg:shrink-0">
+            <button
+              type="button"
+              onClick={handleUpgrade}
+              disabled={!subscription.medicineId}
+              className="w-full rounded-md border border-[#152A51] px-4 py-2 text-sm font-medium text-[#152A51] hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+            >
+              Upgrade
+            </button>
+            <button
+              type="button"
+              onClick={() => onCancel(subscription)}
+              disabled={subscription.cancelAtPeriodEnd}
+              className="w-full rounded-md border border-[#D5DFDE] bg-white px-4 py-2 text-sm text-[#152A51]/80 hover:bg-[#E8EEED] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       </div>
     </article>
