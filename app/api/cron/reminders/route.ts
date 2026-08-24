@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { sendMissedOrderConfirmationEmails } from "@/lib/email/order-confirmation";
 import {
   sendIncompleteOrderReminders,
   sendOrderStatusEmails,
@@ -23,7 +24,14 @@ export async function GET(request: Request) {
     const incompleteOrders = await sendIncompleteOrderReminders();
     const refills = await sendRefillReminders();
     const orderStatuses = await sendOrderStatusEmails();
-    return NextResponse.json({ ok: true, incompleteOrders, refills, orderStatuses });
+    const orderConfirmations = await sendMissedOrderConfirmationEmails();
+    return NextResponse.json({
+      ok: true,
+      incompleteOrders,
+      refills,
+      orderStatuses,
+      orderConfirmations,
+    });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Reminder run failed." },

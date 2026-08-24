@@ -14,9 +14,8 @@ import AuthPageShell, {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { checkPatientEmail } from "@/lib/actions/patient-auth";
+import { checkPatientEmail, sendPatientLoginOtp } from "@/lib/actions/patient-auth";
 import { wrongPortalMessage } from "@/lib/auth/constants";
-import { createClient } from "@/lib/supabase/client";
 
 const emailSchema = z.object({
   email: z.string().trim().email("Enter a valid email"),
@@ -24,7 +23,6 @@ const emailSchema = z.object({
 
 export default function OtpLoginPage() {
   const router = useRouter();
-  const supabase = createClient();
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -60,12 +58,9 @@ export default function OtpLoginPage() {
         return;
       }
 
-      const { error } = await supabase.auth.signInWithOtp({
-        email: parsed.data.email,
-        options: { shouldCreateUser: false },
-      });
-      if (error) {
-        toast.error(error.message);
+      const sent = await sendPatientLoginOtp(parsed.data.email);
+      if (!sent.ok) {
+        toast.error(sent.message);
         return;
       }
 

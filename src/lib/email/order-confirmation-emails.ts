@@ -1,6 +1,6 @@
 import "server-only";
 
-import { emailButton, emailLayout, formatAmount } from "./layout";
+import { EMAIL_THEME, emailButton, emailLayout, formatAmount } from "./layout";
 
 function firstName(fullName: string | null | undefined): string {
   const first = (fullName ?? "").trim().split(/\s+/)[0];
@@ -29,7 +29,7 @@ export function orderConfirmedEmail(params: {
   const heading = params.isRefill ? "Your refill is confirmed" : "Your order is confirmed";
 
   const detailRow = (label: string, value: string) =>
-    `<tr><td style="padding:6px 0;color:#777777;">${label}</td><td style="padding:6px 0;text-align:right;font-weight:bold;color:#1a1a1a;">${value}</td></tr>`;
+    `<tr><td style="padding:6px 0;color:${EMAIL_THEME.navyFaint};">${label}</td><td style="padding:6px 0;text-align:right;font-weight:600;color:${EMAIL_THEME.navy};">${value}</td></tr>`;
 
   const details = [
     detailRow("Order", params.orderNumber),
@@ -42,10 +42,10 @@ export function orderConfirmedEmail(params: {
   const body = [
     `<p>Hi ${firstName(params.fullName)},</p>`,
     `<p>Thanks — we've received your payment and your order is confirmed.</p>`,
-    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;font-size:14px;border-top:1px solid #eeeeee;border-bottom:1px solid #eeeeee;">${details}</table>`,
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;font-size:14px;border-top:1px solid ${EMAIL_THEME.border};border-bottom:1px solid ${EMAIL_THEME.border};">${details}</table>`,
     `<p>${nextStepCopy(params.requiresConsultation)}</p>`,
     emailButton("Track my order", params.myMedsUrl),
-    `<p style="color:#999999;font-size:12px;">Your itemised invoice is sent separately by our payment processor, Stripe.</p>`,
+    `<p style="color:${EMAIL_THEME.navyFaint};font-size:12px;">Your itemised invoice is sent separately by our payment processor, Stripe.</p>`,
   ].join("");
 
   return {

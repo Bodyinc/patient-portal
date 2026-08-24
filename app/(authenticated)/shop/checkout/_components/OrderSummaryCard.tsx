@@ -29,12 +29,14 @@ export default function OrderSummaryCard({
           <span>Subtotal</span>
           <span>{formatUsd(subtotal)}</span>
         </div>
-        {consultation > 0 ? (
-          <div className="flex items-center justify-between border-b border-[#E8EEED] pb-2">
-            <span>Consultation fee</span>
+        <div className="flex items-center justify-between border-b border-[#E8EEED] pb-2">
+          <span>Consultation fee</span>
+          {consultation > 0 ? (
             <span>{formatUsd(consultation)}</span>
-          </div>
-        ) : null}
+          ) : (
+            <span className="font-medium text-[#34845F]">FREE</span>
+          )}
+        </div>
         <div className="flex items-center justify-between border-b border-[#E8EEED] pb-2">
           <span>Shipping</span>
           <span>{shipping > 0 ? formatUsd(shipping) : "Free"}</span>

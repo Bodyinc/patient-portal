@@ -20,6 +20,7 @@ import {
   changeCheckoutEmail,
   checkPatientEmail,
   reconcileCheckoutEmail,
+  sendPatientLoginOtp,
 } from "@/lib/actions/patient-auth";
 import { healProfileEmail } from "@/lib/actions/profile";
 import { createClient } from "@/lib/supabase/client";
@@ -30,10 +31,9 @@ const emailSchema = z.string().trim().email("Enter a valid email").max(255);
 
 // Supabase throttles auth emails (a short per-address cooldown plus an hourly cap on the
 // built-in mailer). Surface that as a clear message instead of a raw error.
-function describeSendError(error: { message?: string; status?: number }): string {
-  const m = (error.message ?? "").toLowerCase();
+function describeSendError(message: string): string {
+  const m = message.toLowerCase();
   if (
-    error.status === 429 ||
     m.includes("rate limit") ||
     m.includes("too many") ||
     m.includes("after") ||
@@ -41,7 +41,17 @@ function describeSendError(error: { message?: string; status?: number }): string
   ) {
     return "Too many code requests. Please wait about a minute, then try again.";
   }
-  return error.message || "Could not send the code. Please try again.";
+  return message || "Could not send the code. Please try again.";
+}
+
+async function verifyEmailOtp(
+  supabase: ReturnType<typeof createClient>,
+  email: string,
+  token: string,
+) {
+  const first = await supabase.auth.verifyOtp({ email, token, type: "magiclink" });
+  if (!first.error) return first;
+  return supabase.auth.verifyOtp({ email, token, type: "email" });
 }
 
 function OtpBoxes({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -95,12 +105,9 @@ export default function ProfileChangeEmailPage() {
   async function sendCurrentCode() {
     setBusy(true);
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: currentEmail,
-        options: { shouldCreateUser: false },
-      });
-      if (error) {
-        toast.error(describeSendError(error));
+      const sent = await sendPatientLoginOtp(currentEmail);
+      if (!sent.ok) {
+        toast.error(describeSendError(sent.message));
         return;
       }
       setOtp("");
@@ -118,11 +125,7 @@ export default function ProfileChangeEmailPage() {
     }
     setBusy(true);
     try {
-      const { error } = await supabase.auth.verifyOtp({
-        email: currentEmail,
-        token: otp,
-        type: "email",
-      });
+      const { error } = await verifyEmailOtp(supabase, currentEmail, otp);
       if (error) {
         toast.error(error.message);
         return;
@@ -169,16 +172,13 @@ export default function ProfileChangeEmailPage() {
         toast.error(result.message);
         return;
       }
-      const { error } = await supabase.auth.signInWithOtp({
-        email: result.email,
-        options: { shouldCreateUser: false },
-      });
-      if (error) {
+      const sent = await sendPatientLoginOtp(result.email);
+      if (!sent.ok) {
         // The login email was already re-pointed to the new address; if the code couldn't be
         // sent (e.g. rate limit), undo that so the account isn't stranded and a retry doesn't
         // collide with itself as "already in use".
         await healProfileEmail();
-        toast.error(describeSendError(error));
+        toast.error(describeSendError(sent.message));
         return;
       }
       setNewEmail(result.email);
@@ -197,11 +197,7 @@ export default function ProfileChangeEmailPage() {
     }
     setBusy(true);
     try {
-      const { error } = await supabase.auth.verifyOtp({
-        email: newEmail,
-        token: otp,
-        type: "email",
-      });
+      const { error } = await verifyEmailOtp(supabase, newEmail, otp);
       if (error) {
         toast.error(error.message);
         return;
@@ -216,12 +212,9 @@ export default function ProfileChangeEmailPage() {
   }
 
   async function resendNewCode() {
-    const { error } = await supabase.auth.signInWithOtp({
-      email: newEmail,
-      options: { shouldCreateUser: false },
-    });
-    if (error) {
-      toast.error(describeSendError(error));
+    const sent = await sendPatientLoginOtp(newEmail);
+    if (!sent.ok) {
+      toast.error(describeSendError(sent.message));
       return;
     }
     toast.success("Code resent");

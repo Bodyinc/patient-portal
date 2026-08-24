@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
+import AdditionalPaymentBanner from "@/components/AdditionalPaymentBanner";
 import type { PortalOfferDto } from "@/lib/offers/types";
 
 import CurrentMedicationCard, { ActiveMedicationsEmptyState } from "./CurrentMedicationCard";
@@ -22,6 +23,7 @@ type MyMedsPageClientProps = {
   referralLink: string;
   rewardCents: number;
   offer?: PortalOfferDto | null;
+  paymentJustCompleted?: boolean;
 };
 
 export default function MyMedsPageClient({
@@ -33,11 +35,24 @@ export default function MyMedsPageClient({
   referralLink,
   rewardCents,
   offer = null,
+  paymentJustCompleted = false,
 }: MyMedsPageClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [searchQuery, setSearchQuery] = useState(data.requests.query);
+  const stillDue = data.pendingPayments.length > 0;
+
+  useEffect(() => {
+    if (!paymentJustCompleted || !stillDue) return;
+    let attempts = 0;
+    const timer = window.setInterval(() => {
+      attempts += 1;
+      router.refresh();
+      if (attempts >= 5) window.clearInterval(timer);
+    }, 2000);
+    return () => window.clearInterval(timer);
+  }, [paymentJustCompleted, stillDue, router]);
 
   function updateParams(next: { page?: number; q?: string }) {
     const params = new URLSearchParams(searchParams.toString());
@@ -62,6 +77,14 @@ export default function MyMedsPageClient({
   return (
     <div className="space-y-4 px-4">
       <MyMedsHeader fullName={fullName} patientId={patientId} avatarUrl={avatarUrl} offer={offer} />
+
+      {paymentJustCompleted && !stillDue ? (
+        <p className="rounded-[16px] border border-[#C8E6D0] bg-[#E0FAE8] px-4 py-3 text-sm text-[#34845F]">
+          Payment received. Your care team can now continue your prescription.
+        </p>
+      ) : null}
+
+      <AdditionalPaymentBanner payments={data.pendingPayments} />
 
       <MyMedsReferralCard
         referralCode={referralCode}
@@ -98,8 +121,8 @@ export default function MyMedsPageClient({
         isPending={isPending}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        onSearchSubmit={() => updateParams({ q: searchQuery })}
         onChangePage={(page) => updateParams({ page })}
+        onSearchSubmit={() => updateParams({ q: searchQuery })}
       />
     </div>
   );

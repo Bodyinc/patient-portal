@@ -15,6 +15,14 @@ export type DashboardTreatmentDto = {
   imageSrc: string | null;
 };
 
+export type DashboardPendingPaymentDto = {
+  requestId: string;
+  orderNumber: string;
+  medicineName: string;
+  amountCents: number;
+  reason: string | null;
+};
+
 export type DashboardPageDataDto = {
   fullName: string;
   patientId: string;
@@ -25,4 +33,5 @@ export type DashboardPageDataDto = {
   treatment: DashboardTreatmentDto | null;
   /** Number of active/trialing/past_due subscriptions for “view all” hint. */
   activeTreatmentCount: number;
+  pendingPayments: DashboardPendingPaymentDto[];
 };

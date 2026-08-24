@@ -133,32 +133,34 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: updateError.message }, { status: 500 });
     }
 
-    void (async () => {
+    try {
       const stripeSubId = subscription.stripe_subscription_id;
-      if (!stripeSubId || (await wasEmailSent("cancellation_scheduled", stripeSubId))) return;
-      const patient = await patientEmailByUserId(user.id);
-      if (!patient) return;
-      let medicineName: string | null = null;
-      if (subscription.medicine_id) {
-        const { data: med } = await supabaseAdmin
-          .from("medicines")
-          .select("name")
-          .eq("id", subscription.medicine_id)
-          .maybeSingle();
-        medicineName = med?.name ?? null;
+      if (stripeSubId && !(await wasEmailSent("cancellation_scheduled", stripeSubId))) {
+        const patient = await patientEmailByUserId(user.id);
+        if (patient) {
+          let medicineName: string | null = null;
+          if (subscription.medicine_id) {
+            const { data: med } = await supabaseAdmin
+              .from("medicines")
+              .select("name")
+              .eq("id", subscription.medicine_id)
+              .maybeSingle();
+            medicineName = med?.name ?? null;
+          }
+          const { subject, html } = cancellationScheduledEmail({
+            fullName: patient.fullName,
+            medicineName,
+            periodEnd: currentPeriodEnd,
+            billingUrl: `${appUrl()}/billing`,
+          });
+          if (await sendTransactionalEmail({ to: patient.email, subject, html })) {
+            await markEmailSent("cancellation_scheduled", stripeSubId);
+          }
+        }
       }
-      const { subject, html } = cancellationScheduledEmail({
-        fullName: patient.fullName,
-        medicineName,
-        periodEnd: currentPeriodEnd,
-        billingUrl: `${appUrl()}/billing`,
-      });
-      if (await sendTransactionalEmail({ to: patient.email, subject, html })) {
-        await markEmailSent("cancellation_scheduled", stripeSubId);
-      }
-    })().catch((err) => {
+    } catch (err) {
       console.error("[email] cancel subscription notify failed:", err);
-    });
+    }
 
     return NextResponse.json({
       ok: true,

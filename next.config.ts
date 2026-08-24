@@ -14,6 +14,7 @@ const supabaseHostname = getSupabaseHostname();
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  serverExternalPackages: ["nodemailer"],
   // Profile avatar uploads go through a Server Action; default limit is 1 MB.
   experimental: {
     serverActions: {

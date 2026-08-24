@@ -9,6 +9,8 @@ import {
 } from "@/lib/auth/patient-email";
 import { claimIntakeSession } from "@/lib/actions/intake";
 import { requireIntakeSession } from "@/lib/intake/session";
+import { verificationCodeEmail } from "@/lib/email/auth-emails";
+import { sendTransactionalEmail } from "@/lib/email/send";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { userHasSetPassword } from "@/lib/auth/password-state";
@@ -395,4 +397,42 @@ export async function completePostCheckoutSignIn(): Promise<CompletePostCheckout
   }
 
   return { ok: true, email: accountResult.email, tokenHash };
+}
+
+/** Sends a login OTP using the Body Inc email theme (does not use the Supabase Auth template). */
+export async function sendPatientLoginOtp(
+  email: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const parsed = z.string().trim().email("Enter a valid email").safeParse(email);
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Enter a valid email" };
+  }
+
+  const { data, error } = await supabaseAdmin.auth.admin.generateLink({
+    type: "magiclink",
+    email: parsed.data,
+  });
+  if (error) return { ok: false, message: error.message };
+
+  const code = data?.properties?.email_otp?.trim();
+  if (!code) {
+    return { ok: false, message: "Could not send a verification code. Please try again." };
+  }
+
+  let fullName: string | null = null;
+  if (data.user?.id) {
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("full_name")
+      .eq("id", data.user.id)
+      .maybeSingle();
+    fullName = profile?.full_name ?? null;
+  }
+
+  const { subject, html } = verificationCodeEmail({ code, fullName });
+  const sent = await sendTransactionalEmail({ to: parsed.data, subject, html });
+  if (!sent) {
+    return { ok: false, message: "Could not send email. Please try again." };
+  }
+  return { ok: true };
 }

@@ -4,4 +4,5 @@ export type {
   MyMedsMedicationRequestsListDto,
   MyMedsPageDataDto,
   MyMedsPastMedicationDto,
+  MyMedsPendingPaymentDto,
 } from "@/lib/my-meds/types";

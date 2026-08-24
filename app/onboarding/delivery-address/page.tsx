@@ -9,6 +9,7 @@ import { PhoneField } from "@/components/phone-field";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ZipCodeInput } from "@/components/zip-code-input";
 import {
   Select,
   SelectContent,
@@ -21,6 +22,9 @@ import { saveIntakeAddress } from "@/lib/actions/intake";
 import {
   DEFAULT_PHONE_COUNTRY_CODE,
   PHONE_COUNTRY_CODE_SCHEMA,
+  ZIP_CODE_SCHEMA,
+  OPTIONAL_ZIP_CODE_SCHEMA,
+  digitsOnlyZip,
   isValidNationalPhone,
 } from "@/lib/validation";
 
@@ -38,14 +42,14 @@ const addressSchema = z
   .object({
     streetAddress: z.string().trim().min(1, "Enter your address"),
     apartment: z.string().trim().min(1, "Enter your apartment number"),
-    postalCode: z.string().trim().min(3, "Enter your ZIP code"),
+    postalCode: ZIP_CODE_SCHEMA,
     city: z.string().trim().min(1, "Enter your city"),
     phone: z.string().trim(),
     phoneCountryCode: PHONE_COUNTRY_CODE_SCHEMA,
     billingSameAsShipping: z.boolean(),
     billingStreetAddress: z.string().trim(),
     billingApartment: z.string().trim(),
-    billingPostalCode: z.string().trim(),
+    billingPostalCode: OPTIONAL_ZIP_CODE_SCHEMA,
     billingCity: z.string().trim(),
     billingStateCode: z.string().trim(),
     smsConsent: z.boolean(),
@@ -71,7 +75,7 @@ const addressSchema = z
       ["billingStreetAddress", "Enter your billing address"],
       ["billingCity", "Enter your billing city"],
       ["billingStateCode", "Select your billing state"],
-      ["billingPostalCode", "Enter your billing ZIP code"],
+      ["billingPostalCode", "Enter a billing ZIP code of up to 6 digits"],
     ];
     for (const [key, message] of required) {
       if (!String(data[key] ?? "").trim()) {
@@ -87,14 +91,14 @@ export default function DeliveryAddressPage() {
   const [form, setForm] = useState({
     streetAddress: state.streetAddress,
     apartment: state.apartment,
-    postalCode: state.postalCode,
+    postalCode: digitsOnlyZip(state.postalCode),
     city: state.city,
     phone: state.phone,
     phoneCountryCode: state.phoneCountryCode || DEFAULT_PHONE_COUNTRY_CODE,
     billingSameAsShipping: state.billingSameAsShipping,
     billingStreetAddress: state.billingStreetAddress,
     billingApartment: state.billingApartment,
-    billingPostalCode: state.billingPostalCode,
+    billingPostalCode: digitsOnlyZip(state.billingPostalCode),
     billingCity: state.billingCity,
     billingStateCode: state.billingStateCode,
     smsConsent: state.smsConsent,
@@ -106,14 +110,14 @@ export default function DeliveryAddressPage() {
     setForm({
       streetAddress: state.streetAddress,
       apartment: state.apartment,
-      postalCode: state.postalCode,
+      postalCode: digitsOnlyZip(state.postalCode),
       city: state.city,
       phone: state.phone,
       phoneCountryCode: state.phoneCountryCode || DEFAULT_PHONE_COUNTRY_CODE,
       billingSameAsShipping: state.billingSameAsShipping,
       billingStreetAddress: state.billingStreetAddress,
       billingApartment: state.billingApartment,
-      billingPostalCode: state.billingPostalCode,
+      billingPostalCode: digitsOnlyZip(state.billingPostalCode),
       billingCity: state.billingCity,
       billingStateCode: state.billingStateCode,
       smsConsent: state.smsConsent,
@@ -218,11 +222,10 @@ export default function DeliveryAddressPage() {
             <Label htmlFor="postalCode" className={fieldLabelClass}>
               Zip code <span className="text-[#152A51]/50">*</span>
             </Label>
-            <Input
+            <ZipCodeInput
               id="postalCode"
-              autoComplete="postal-code"
               value={form.postalCode}
-              onChange={(e) => setField("postalCode", e.target.value)}
+              onChange={(value) => setField("postalCode", value)}
               placeholder="90210"
               className={fieldControlClass}
             />
@@ -285,10 +288,10 @@ export default function DeliveryAddressPage() {
                 <Label htmlFor="billingPostalCode" className={fieldLabelClass}>
                   Zip code <span className="text-[#152A51]/50">*</span>
                 </Label>
-                <Input
+                <ZipCodeInput
                   id="billingPostalCode"
                   value={form.billingPostalCode}
-                  onChange={(e) => setField("billingPostalCode", e.target.value)}
+                  onChange={(value) => setField("billingPostalCode", value)}
                   placeholder="12345"
                   className={fieldControlClass}
                 />

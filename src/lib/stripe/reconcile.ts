@@ -4,6 +4,7 @@ import type Stripe from "stripe";
 import { stripe } from "./server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { recordPayment } from "./record-payment";
+import { sendOrderConfirmationEmail } from "@/lib/email/order-confirmation";
 import { maybeConvertReferral } from "@/lib/referrals";
 import { recordInvoiceWalletDebit } from "@/lib/wallet";
 import type { Json } from "@/lib/supabase/types";
@@ -233,7 +234,25 @@ export async function reconcileLatestSubscriptionForUser(userId: string): Promis
 
   // Once THIS subscription is active and its payment is recorded there is nothing to pull from
   // Stripe — skip the live round-trip so confirmation renders straight from the DB.
-  if (await subscriptionAlreadyReconciled(stripeSubscriptionId, status)) return;
+  if (await subscriptionAlreadyReconciled(stripeSubscriptionId, status)) {
+    // First pass sometimes records the payment before the order row exists, so the
+    // confirmation email is skipped. Retry now that the order should be there.
+    const { data: payment } = await supabaseAdmin
+      .from("payments")
+      .select("id")
+      .eq("stripe_subscription_id", stripeSubscriptionId)
+      .eq("status", "succeeded")
+      .limit(1)
+      .maybeSingle();
+    if (payment) {
+      try {
+        await sendOrderConfirmationEmail(payment.id);
+      } catch (error) {
+        console.error("[email] order confirmation retry failed:", error);
+      }
+    }
+    return;
+  }
 
   await backfillOrphanStripeRows(userId, sessionId);
 

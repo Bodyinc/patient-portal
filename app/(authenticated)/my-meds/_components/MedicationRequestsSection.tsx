@@ -135,13 +135,23 @@ export default function MedicationRequestsSection({
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
-                    <button
-                      type="button"
-                      onClick={() => setActive(request)}
-                      className="text-sm font-medium text-[#152A51] underline underline-offset-2 hover:text-[#152A51]/80"
-                    >
-                      Track request
-                    </button>
+                    <div className="flex items-center justify-end gap-3">
+                      {request.pendingPaymentCents ? (
+                        <Link
+                          href={`/orders/${request.id}/pay`}
+                          className="rounded-full bg-[#152A51] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#152A51]/90"
+                        >
+                          Pay now
+                        </Link>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => setActive(request)}
+                        className="text-sm font-medium text-[#152A51] underline underline-offset-2 hover:text-[#152A51]/80"
+                      >
+                        Track request
+                      </button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

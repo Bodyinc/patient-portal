@@ -10,9 +10,11 @@ import {
   uploadProfileAvatar,
   type EditableProfileDto,
 } from "@/lib/actions/profile";
+import { ZipCodeInput } from "@/components/zip-code-input";
 import { PROFILE_AVATAR_MAX_BYTES, PROFILE_AVATAR_MAX_LABEL } from "@/lib/profile/avatar";
 import { isExternalMedicineImage } from "@/lib/intake/medicine-image";
 import { fieldControlClass, fieldLabelClass } from "../../../onboarding/_lib/onboarding-theme";
+import { digitsOnlyZip } from "@/lib/validation";
 
 function toPatientId(userId: string) {
   const compact = userId.replace(/-/g, "").toUpperCase();
@@ -72,6 +74,12 @@ function Section({
                 <option value="female">Female</option>
                 <option value="other">Other</option>
               </select>
+            ) : field.key === "postalCode" ? (
+              <ZipCodeInput
+                value={form.postalCode}
+                onChange={(value) => onChange("postalCode", value)}
+                className={`w-full ${fieldControlClass}`}
+              />
             ) : (
               <input
                 type={field.type ?? "text"}
@@ -101,7 +109,10 @@ function initialsFromName(name: string) {
 }
 
 export default function ProfileEditor({ initialProfile }: { initialProfile: EditableProfileDto }) {
-  const [form, setForm] = useState<EditableProfileDto>(initialProfile);
+  const [form, setForm] = useState<EditableProfileDto>(() => ({
+    ...initialProfile,
+    postalCode: digitsOnlyZip(initialProfile.postalCode),
+  }));
   const [avatarPreview, setAvatarPreview] = useState(initialProfile.avatarUrl);
   const [saving, startSaveTransition] = useTransition();
   const [uploadingAvatar, startUploadTransition] = useTransition();
@@ -111,9 +122,10 @@ export default function ProfileEditor({ initialProfile }: { initialProfile: Edit
   const external = avatarPreview ? isExternalMedicineImage(avatarPreview) : false;
 
   function updateField(key: Exclude<keyof EditableProfileDto, "id" | "avatarUrl">, value: string) {
+    const next = key === "postalCode" ? digitsOnlyZip(value) : value;
     setForm((prev) => ({
       ...prev,
-      [key]: key === "sex" ? ((value || null) as EditableProfileDto["sex"]) : value,
+      [key]: key === "sex" ? ((next || null) as EditableProfileDto["sex"]) : next,
     }));
   }
 

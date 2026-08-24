@@ -10,7 +10,11 @@ import { Button } from "@/components/ui/button";
 import { InputOTP, InputOTPSlot } from "@/components/ui/input-otp";
 import { OTP_LENGTH } from "@/lib/auth/constants";
 import { onLoginSuccess } from "@/lib/auth/on-login-success";
-import { hasPassword, reconcileCheckoutEmail } from "@/lib/actions/patient-auth";
+import {
+  hasPassword,
+  reconcileCheckoutEmail,
+  sendPatientLoginOtp,
+} from "@/lib/actions/patient-auth";
 import { createClient } from "@/lib/supabase/client";
 
 function VerifyOTPContent() {
@@ -40,11 +44,18 @@ function VerifyOTPContent() {
       const { error } = await supabase.auth.verifyOtp({
         email,
         token: otp,
-        type: "email",
+        type: "magiclink",
       });
       if (error) {
-        toast.error(error.message);
-        return;
+        const fallback = await supabase.auth.verifyOtp({
+          email,
+          token: otp,
+          type: "email",
+        });
+        if (fallback.error) {
+          toast.error(fallback.error.message);
+          return;
+        }
       }
 
       if (searchParams.get("sync") === "email") {
@@ -76,12 +87,9 @@ function VerifyOTPContent() {
 
   async function resend() {
     // By the time we're on this screen the account exists, so never create one on resend.
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { shouldCreateUser: false },
-    });
-    if (error) {
-      toast.error(error.message);
+    const sent = await sendPatientLoginOtp(email);
+    if (!sent.ok) {
+      toast.error(sent.message);
       return;
     }
     toast.success("Code resent");

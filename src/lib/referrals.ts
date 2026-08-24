@@ -234,6 +234,6 @@ export async function maybeConvertReferral(referredUserId: string): Promise<void
       fullName: referrerProfile.full_name,
       amountCents: rewardCents,
     });
-    void sendTransactionalEmail({ to: referrerProfile.email, subject, html });
+    await sendTransactionalEmail({ to: referrerProfile.email, subject, html });
   }
 }

@@ -2,6 +2,10 @@ import "server-only";
 
 import { calculateBmiFromMetric } from "@/lib/intake/conversions";
 import { DEFAULT_MEDICINE_IMAGE, resolveMedicineImageSrc } from "@/lib/intake/medicine-image";
+import {
+  fetchPendingAdditionalPayments,
+  maybeReconcileAdditionalPayments,
+} from "@/lib/orders/additional-payment";
 import { fetchActiveMedications } from "@/lib/my-meds/service-data";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -133,10 +137,18 @@ async function fetchClaimedIntakeExtras(userId: string): Promise<{
 }
 
 export async function fetchDashboardPageData(userId: string): Promise<DashboardPageDataDto> {
-  const [{ data: profile }, activeMeds, intake] = await Promise.all([
+  await maybeReconcileAdditionalPayments(userId).catch((err) => {
+    console.error("[additional_payments] dashboard reconcile failed:", err);
+  });
+
+  const [{ data: profile }, activeMeds, intake, pendingPayments] = await Promise.all([
     supabaseAdmin.from("profiles").select("full_name, avatar_url").eq("id", userId).maybeSingle(),
     fetchActiveMedications(userId).catch(() => []),
     fetchClaimedIntakeExtras(userId),
+    fetchPendingAdditionalPayments(userId).catch((err) => {
+      console.error("[additional_payments] dashboard load failed:", err);
+      return [];
+    }),
   ]);
 
   const currentMed = activeMeds[0] ?? null;
@@ -165,5 +177,6 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
     goals: intake.goals,
     treatment,
     activeTreatmentCount: activeMeds.length,
+    pendingPayments,
   };
 }

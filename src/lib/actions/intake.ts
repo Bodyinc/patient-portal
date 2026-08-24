@@ -45,7 +45,10 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
   DOB_SCHEMA,
   OPTIONAL_PHONE_SCHEMA,
+  OPTIONAL_ZIP_CODE_SCHEMA,
   PHONE_COUNTRY_CODE_SCHEMA,
+  ZIP_CODE_SCHEMA,
+  digitsOnlyZip,
   isValidNationalPhone,
 } from "@/lib/validation";
 import type { Json } from "@/lib/supabase/types";
@@ -278,13 +281,13 @@ async function buildIntakeSummary(
     streetAddress: session.street_address,
     apartment: session.apartment,
     city: session.city,
-    postalCode: session.postal_code,
+    postalCode: digitsOnlyZip(session.postal_code ?? ""),
     billingSameAsShipping: session.billing_same_as_shipping,
     billingStreetAddress: session.billing_street_address,
     billingApartment: session.billing_apartment,
     billingCity: session.billing_city,
     billingStateCode: session.billing_state_code,
-    billingPostalCode: session.billing_postal_code,
+    billingPostalCode: digitsOnlyZip(session.billing_postal_code ?? ""),
     smsConsent: session.sms_consent,
     marketingConsent: session.marketing_consent,
     medicineId: medicine?.id ?? null,
@@ -803,7 +806,7 @@ const addressSchema = z
     streetAddress: z.string().trim().min(1, "Enter your address").max(255),
     apartment: z.string().trim().min(1, "Enter your apartment number").max(60),
     city: z.string().trim().min(1, "Enter your city").max(120),
-    postalCode: z.string().trim().min(3, "Enter your ZIP code").max(20),
+    postalCode: ZIP_CODE_SCHEMA,
     phone: z.string().trim(),
     phoneCountryCode: PHONE_COUNTRY_CODE_SCHEMA,
     billingSameAsShipping: z.boolean(),
@@ -811,7 +814,7 @@ const addressSchema = z
     billingApartment: z.string().trim().max(60).optional().or(z.literal("")),
     billingCity: z.string().trim().max(120).optional().or(z.literal("")),
     billingStateCode: z.string().trim().max(2).optional().or(z.literal("")),
-    billingPostalCode: z.string().trim().max(20).optional().or(z.literal("")),
+    billingPostalCode: OPTIONAL_ZIP_CODE_SCHEMA,
     smsConsent: z.boolean(),
     marketingConsent: z.boolean(),
   })
@@ -835,7 +838,7 @@ const addressSchema = z
       ["billingStreetAddress", "Enter your billing address"],
       ["billingCity", "Enter your billing city"],
       ["billingStateCode", "Select your billing state"],
-      ["billingPostalCode", "Enter your billing ZIP code"],
+      ["billingPostalCode", "Enter a billing ZIP code of up to 6 digits"],
     ];
     for (const [key, message] of required) {
       if (!String(data[key] ?? "").trim()) {

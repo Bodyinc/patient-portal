@@ -4,9 +4,9 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { formatOrderId } from "@/lib/orders/order-id";
 import { sendTransactionalEmail } from "./send";
 import { incompleteOrderEmail, refillReminderEmail } from "./reminder-emails";
-import { orderStatusEmail, providerCaseAssignedEmail } from "./order-status-emails";
+import { orderStatusEmail } from "./order-status-emails";
 import { alreadySentKeys, markEmailSent } from "./idempotency";
-import { adminAppUrl, appUrl, patientEmailByUserId, providerEmailByUserId } from "./recipients";
+import { appUrl, patientEmailByUserId } from "./recipients";
 
 const INCOMPLETE_ORDER_DELAY_HOURS = 24;
 const REFILL_WINDOW_DAYS = 5;
@@ -178,11 +178,6 @@ export async function sendOrderStatusEmails(now = new Date()): Promise<ReminderR
     : { data: [] };
   const medicineById = new Map((medicines ?? []).map((m) => [m.id, m.name]));
 
-  const providerSentKeys = await alreadySentKeys(
-    "provider_assigned",
-    candidates.filter((e) => e.status === "provider_assigned").map((e) => e.id),
-  );
-
   let sent = 0;
   for (const event of candidates) {
     const request = requestById.get(event.request_id);
@@ -230,34 +225,6 @@ export async function sendOrderStatusEmails(now = new Date()): Promise<ReminderR
             sentKeys.add(`${event.id}|`);
           }
         }
-      }
-    }
-
-    if (event.status === "provider_assigned" && request?.provider_id) {
-      if (providerSentKeys.has(`${event.id}|`)) continue;
-      const provider = await providerEmailByUserId(request.provider_id);
-      if (!provider) continue;
-
-      const patientProfile = request.user_id ? await patientEmailByUserId(request.user_id) : null;
-      const base = adminAppUrl();
-      const caseUrl = base ? `${base}/cases/${request.id}` : null;
-      const providerMail = providerCaseAssignedEmail({
-        providerName: provider.fullName,
-        medicineName,
-        orderNumber,
-        patientName: patientProfile?.fullName ?? null,
-        caseUrl,
-      });
-      if (
-        await sendTransactionalEmail({
-          to: provider.email,
-          subject: providerMail.subject,
-          html: providerMail.html,
-        })
-      ) {
-        await markEmailSent("provider_assigned", event.id, "");
-        providerSentKeys.add(`${event.id}|`);
-        sent += 1;
       }
     }
   }

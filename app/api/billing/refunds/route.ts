@@ -106,38 +106,38 @@ export async function POST(request: Request) {
     );
   }
 
-  void (async () => {
+  try {
     const patient = await patientEmailByUserId(user.id);
-    if (!patient) return;
-
-    const currency = payment.currency || "usd";
-    const { subject, html } = refundRequestReceivedEmail({
-      fullName: patient.fullName,
-      amountCents: payment.amount_cents,
-      currency,
-      billingUrl: `${appUrl()}/billing`,
-    });
-    await sendTransactionalEmail({ to: patient.email, subject, html });
-
-    const adminTo = adminNotifyEmail();
-    if (adminTo) {
-      const adminMail = refundRequestAdminEmail({
-        patientEmail: patient.email,
-        patientName: patient.fullName,
+    if (patient) {
+      const currency = payment.currency || "usd";
+      const { subject, html } = refundRequestReceivedEmail({
+        fullName: patient.fullName,
         amountCents: payment.amount_cents,
         currency,
-        reason,
-        paymentId: payment.id,
+        billingUrl: `${appUrl()}/billing`,
       });
-      await sendTransactionalEmail({
-        to: adminTo,
-        subject: adminMail.subject,
-        html: adminMail.html,
-      });
+      await sendTransactionalEmail({ to: patient.email, subject, html });
+
+      const adminTo = adminNotifyEmail();
+      if (adminTo) {
+        const adminMail = refundRequestAdminEmail({
+          patientEmail: patient.email,
+          patientName: patient.fullName,
+          amountCents: payment.amount_cents,
+          currency,
+          reason,
+          paymentId: payment.id,
+        });
+        await sendTransactionalEmail({
+          to: adminTo,
+          subject: adminMail.subject,
+          html: adminMail.html,
+        });
+      }
     }
-  })().catch((err) => {
+  } catch (err) {
     console.error("[email] refund request notify failed:", err);
-  });
+  }
 
   return NextResponse.json({ ok: true });
 }

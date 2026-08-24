@@ -55,6 +55,12 @@ function HealthGoalHeroCard({ name, imageSrc }: { name: string; imageSrc: string
 
 export default function DashboardPageClient({ data }: DashboardPageClientProps) {
   const router = useRouter();
+  const duePayment = data.pendingPayments[0] ?? null;
+  const dueAmount = duePayment
+    ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
+        duePayment.amountCents / 100,
+      )
+    : null;
   const canRefill = Boolean(data.treatment?.medicineId);
 
   const treatmentFields = data.treatment
@@ -92,18 +98,52 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
           <div className="mb-3 flex items-center justify-between gap-3 text-xs font-semibold text-[#152A51]/60 sm:text-sm">
             <span>Next step</span>
           </div>
-          <h3 className="text-lg font-medium leading-snug tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
-            Ready to begin your treatment journey?
-          </h3>
-          <p className="mt-3 max-w-xl text-sm leading-relaxed text-[#152A51]/80 sm:text-[15px] sm:leading-7">
-            Your clinician review is scheduled once your intake is complete. Please answer all
-            questions to the best of your ability.
-          </p>
-          <div className="mt-auto pt-5">
-            <Button className="h-[46px] w-full rounded-full bg-[#E3E084] px-6 text-sm font-medium text-[#152A51] hover:bg-[#D9D674] sm:w-fit">
-              Complete intake form
-            </Button>
-          </div>
+          {duePayment ? (
+            <>
+              <h3 className="text-lg font-medium leading-snug tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
+                Additional payment required
+              </h3>
+              <p className="mt-3 max-w-xl text-sm leading-relaxed text-[#152A51]/80 sm:text-[15px] sm:leading-7">
+                {dueAmount} is due to continue your {duePayment.medicineName} prescription
+                {duePayment.orderNumber ? ` (${duePayment.orderNumber})` : ""}. Pay now so your care
+                team can send it to the pharmacy.
+                {data.pendingPayments.length > 1
+                  ? ` You have ${data.pendingPayments.length} payments waiting.`
+                  : ""}
+              </p>
+              <div className="mt-auto flex flex-col gap-3 pt-5 sm:flex-row sm:items-center">
+                <Button
+                  asChild
+                  className="h-[46px] w-full rounded-full bg-[#152A51] px-6 text-sm font-medium text-white hover:bg-[#152A51]/90 sm:w-fit"
+                >
+                  <Link href={`/orders/${duePayment.requestId}/pay`}>Pay now</Link>
+                </Button>
+                {data.pendingPayments.length > 1 ? (
+                  <Link
+                    href="/my-meds"
+                    className="text-sm font-medium text-[#152A51] underline underline-offset-2 hover:text-[#152A51]/80"
+                  >
+                    View all on My Meds
+                  </Link>
+                ) : null}
+              </div>
+            </>
+          ) : (
+            <>
+              <h3 className="text-lg font-medium leading-snug tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
+                Ready to begin your treatment journey?
+              </h3>
+              <p className="mt-3 max-w-xl text-sm leading-relaxed text-[#152A51]/80 sm:text-[15px] sm:leading-7">
+                Your clinician review is scheduled once your intake is complete. Please answer all
+                questions to the best of your ability.
+              </p>
+              <div className="mt-auto pt-5">
+                <Button className="h-[46px] w-full rounded-full bg-[#E3E084] px-6 text-sm font-medium text-[#152A51] hover:bg-[#D9D674] sm:w-fit">
+                  Complete intake form
+                </Button>
+              </div>
+            </>
+          )}
         </section>
 
         <aside className="flex min-w-0 flex-col">
