@@ -2,6 +2,7 @@ import "server-only";
 
 import nodemailer from "nodemailer";
 import type { Transporter } from "nodemailer";
+import type SMTPTransport from "nodemailer/lib/smtp-transport";
 
 const BREVO_SMTP_HOST = "smtp-relay.brevo.com";
 const BREVO_SMTP_PORT = 587;
@@ -19,13 +20,13 @@ function getTransporter(login: string, key: string): Transporter {
       host: BREVO_SMTP_HOST,
       port: BREVO_SMTP_PORT,
       secure: false,
-      // Windows often stalls ~20–60s on IPv6 to smtp-relay.brevo.com before falling back.
-      family: 4,
       connectionTimeout: 15000,
       greetingTimeout: 10000,
       socketTimeout: 20000,
       auth: { user: login, pass: key },
-    });
+      // Windows often stalls ~20–60s on IPv6 to smtp-relay.brevo.com before falling back.
+      family: 4,
+    } as SMTPTransport.Options);
     transporterAuth = auth;
   }
   return transporter;
