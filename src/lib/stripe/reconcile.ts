@@ -5,6 +5,7 @@ import { stripe } from "./server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { recordPayment } from "./record-payment";
 import { sendOrderConfirmationEmail } from "@/lib/email/order-confirmation";
+import { sendUnsentOrderStatusEmailsForPayment } from "@/lib/email/reminders";
 import { maybeConvertReferral } from "@/lib/referrals";
 import { recordInvoiceWalletDebit } from "@/lib/wallet";
 import type { Json } from "@/lib/supabase/types";
@@ -249,6 +250,11 @@ export async function reconcileLatestSubscriptionForUser(userId: string): Promis
         await sendOrderConfirmationEmail(payment.id);
       } catch (error) {
         console.error("[email] order confirmation retry failed:", error);
+      }
+      try {
+        await sendUnsentOrderStatusEmailsForPayment(payment.id);
+      } catch (error) {
+        console.error("[email] order status retry failed:", error);
       }
     }
     return;

@@ -21,6 +21,8 @@ export async function GET(request: Request) {
   }
 
   try {
+    // Immediate sends happen on payment / admin actions. This job is the daily backup
+    // plus time-based mail (incomplete checkout after 24h, refill before renewal).
     const incompleteOrders = await sendIncompleteOrderReminders();
     const refills = await sendRefillReminders();
     const orderStatuses = await sendOrderStatusEmails();

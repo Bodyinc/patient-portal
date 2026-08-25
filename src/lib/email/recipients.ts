@@ -50,6 +50,21 @@ export async function patientEmailByStripeCustomer(
   return null;
 }
 
+export async function patientEmailByIntakeSession(sessionId: string | null | undefined): Promise<{
+  email: string;
+  fullName: string | null;
+} | null> {
+  if (!sessionId) return null;
+  const { data } = await supabaseAdmin
+    .from("intake_sessions")
+    .select("email, full_name")
+    .eq("id", sessionId)
+    .maybeSingle();
+  const email = data?.email?.trim();
+  if (!email) return null;
+  return { email, fullName: data?.full_name ?? null };
+}
+
 export async function providerEmailByUserId(providerId: string | null | undefined): Promise<{
   email: string;
   fullName: string | null;

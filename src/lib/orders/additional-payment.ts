@@ -3,6 +3,7 @@ import "server-only";
 import type Stripe from "stripe";
 
 import { additionalPaymentReceivedEmail } from "@/lib/email/lifecycle-emails";
+import { sendUnsentOrderStatusEmails } from "@/lib/email/reminders";
 import { appUrl, patientEmailByUserId } from "@/lib/email/recipients";
 import { sendTransactionalEmail } from "@/lib/email/send";
 import { formatOrderId } from "@/lib/orders/order-id";
@@ -264,6 +265,12 @@ export async function fulfillAdditionalPayment(pi: Stripe.PaymentIntent): Promis
 
   if (becamePaid) {
     await notifyAdditionalPaymentReceived(row);
+  }
+
+  try {
+    await sendUnsentOrderStatusEmails({ requestId: row.request_id });
+  } catch (error) {
+    console.error("[email] additional payment status flush failed:", error);
   }
 
   return true;

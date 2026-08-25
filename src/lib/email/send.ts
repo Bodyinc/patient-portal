@@ -43,41 +43,60 @@ function parseFromAddress(from: string): { email: string; name?: string } {
   return { email: trimmed };
 }
 
+function restApiKey(): string | null {
+  const key = process.env.BREVO_API_KEY?.trim();
+  if (!key) return null;
+  // SMTP keys 401 the REST API. Do not even try them there.
+  if (key.startsWith("xsmtpsib-")) {
+    console.error(
+      "[email] BREVO_API_KEY is an SMTP key (xsmtpsib-). Use a REST API key (xkeysib-) from Brevo → SMTP & API → API keys.",
+    );
+    return null;
+  }
+  return key;
+}
+
+function smtpAuth(): { user: string; pass: string } | null {
+  const login = process.env.BREVO_SMTP_LOGIN?.trim();
+  const pass = process.env.BREVO_SMTP_KEY?.trim();
+  if (!login || !pass) return null;
+  // The host is hardcoded above. Using it as the username always 535s and can stall serverless.
+  if (login === BREVO_SMTP_HOST || /smtp-relay\.brevo\.com/i.test(login)) {
+    console.error(
+      "[email] BREVO_SMTP_LOGIN is the relay host, not the SMTP login. Use the Login value from Brevo → SMTP & API → SMTP (looks like xxx@smtp-brevo.com).",
+    );
+    return null;
+  }
+  return { user: login, pass };
+}
+
 async function sendViaBrevoApi(params: {
   to: string;
   subject: string;
   html: string;
   from: string;
-}): Promise<"sent" | "unavailable" | "failed"> {
-  const apiKey = process.env.BREVO_API_KEY?.trim();
-  if (!apiKey) return "unavailable";
-  // SMTP keys (xsmtpsib-…) 401 the REST API and then stall on the SMTP fallback.
-
-  try {
-    const res = await fetch(BREVO_API_URL, {
-      method: "POST",
-      headers: {
-        accept: "application/json",
-        "content-type": "application/json",
-        "api-key": apiKey,
-      },
-      body: JSON.stringify({
-        sender: parseFromAddress(params.from),
-        to: [{ email: params.to }],
-        subject: params.subject,
-        htmlContent: params.html,
-      }),
-    });
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      console.error(`[email] Brevo API ${res.status}:`, text.slice(0, 400));
-      return "failed";
-    }
-    return "sent";
-  } catch (error) {
-    console.error("[email] Brevo API request error:", error);
-    return "failed";
+  apiKey: string;
+}): Promise<boolean> {
+  const res = await fetch(BREVO_API_URL, {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json",
+      "api-key": params.apiKey,
+    },
+    body: JSON.stringify({
+      sender: parseFromAddress(params.from),
+      to: [{ email: params.to }],
+      subject: params.subject,
+      htmlContent: params.html,
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    console.error(`[email] Brevo API ${res.status}:`, text.slice(0, 400));
+    return false;
   }
+  return true;
 }
 
 // Logs instead of throwing so Stripe webhooks and checkout never fail because of mail.
@@ -86,23 +105,27 @@ export async function sendTransactionalEmail(params: {
   subject: string;
   html: string;
 }): Promise<boolean> {
-  const login = process.env.BREVO_SMTP_LOGIN;
-  const key = process.env.BREVO_SMTP_KEY;
-  const from = process.env.EMAIL_FROM;
-  if (!from || (!process.env.BREVO_API_KEY && (!login || !key))) {
+  const from = process.env.EMAIL_FROM?.trim();
+  const apiKey = restApiKey();
+  const smtp = smtpAuth();
+
+  if (!from) {
+    console.warn(`[email] EMAIL_FROM not set — skipped "${params.subject}" to ${params.to}`);
+    return false;
+  }
+  if (!apiKey && !smtp) {
     console.warn(
-      `[email] BREVO_SMTP_LOGIN/BREVO_SMTP_KEY/EMAIL_FROM not set — skipped "${params.subject}" to ${params.to}`,
+      `[email] set BREVO_API_KEY (preferred) or BREVO_SMTP_LOGIN + BREVO_SMTP_KEY — skipped "${params.subject}" to ${params.to}`,
     );
     return false;
   }
 
   try {
     // HTTP is much faster than SMTP on serverless (no TLS handshake to the relay).
-    const apiResult = await sendViaBrevoApi({ ...params, from });
-    if (apiResult === "sent") return true;
+    if (apiKey && (await sendViaBrevoApi({ ...params, from, apiKey }))) return true;
 
-    if (!login || !key) return false;
-    await getTransporter(login, key).sendMail({
+    if (!smtp) return false;
+    await getTransporter(smtp.user, smtp.pass).sendMail({
       from,
       to: params.to,
       subject: params.subject,

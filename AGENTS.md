@@ -22,7 +22,8 @@ npm run dev
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY` (server-only, required for signup)
 - `NEXT_PUBLIC_APP_URL` (patient portal base URL for email links)
-- `BREVO_SMTP_LOGIN` / `BREVO_SMTP_KEY` / `EMAIL_FROM` (transactional email via Brevo SMTP)
+- `BREVO_API_KEY` (preferred; REST API key `xkeysib-…` for transactional email)
+- `BREVO_SMTP_LOGIN` / `BREVO_SMTP_KEY` / `EMAIL_FROM` (SMTP fallback; login is `…@smtp-brevo.com`, not the relay host)
 - `CRON_SECRET` (Bearer token for `/api/cron/reminders`)
 - `ADMIN_NOTIFY_EMAIL` (ops inbox for refund requests and failed payment alerts)
 - `ADMIN_APP_URL` (optional; deep links in provider case-assigned emails)
