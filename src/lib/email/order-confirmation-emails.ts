@@ -1,6 +1,6 @@
 import "server-only";
 
-import { EMAIL_THEME, emailButton, emailLayout, formatAmount } from "./layout";
+import { EMAIL_THEME, emailButton, emailLayout, emailSoftPanel, formatAmount } from "./layout";
 
 function firstName(fullName: string | null | undefined): string {
   const first = (fullName ?? "").trim().split(/\s+/)[0];
@@ -42,7 +42,9 @@ export function orderConfirmedEmail(params: {
   const body = [
     `<p>Hi ${firstName(params.fullName)},</p>`,
     `<p>Thanks — we've received your payment and your order is confirmed.</p>`,
-    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;font-size:14px;border-top:1px solid ${EMAIL_THEME.border};border-bottom:1px solid ${EMAIL_THEME.border};">${details}</table>`,
+    emailSoftPanel(
+      `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;">${details}</table>`,
+    ),
     `<p>${nextStepCopy(params.requiresConsultation)}</p>`,
     emailButton("Track my order", params.myMedsUrl),
     `<p style="color:${EMAIL_THEME.navyFaint};font-size:12px;">Your itemised invoice is sent separately by our payment processor, Stripe.</p>`,

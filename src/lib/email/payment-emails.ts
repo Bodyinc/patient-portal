@@ -1,6 +1,6 @@
 import "server-only";
 
-import { EMAIL_THEME, emailLayout, formatAmount } from "./layout";
+import { EMAIL_THEME, emailLayout, emailSoftPanel, formatAmount } from "./layout";
 
 export function paymentReceiptEmail(params: {
   amountCents: number;
@@ -12,7 +12,9 @@ export function paymentReceiptEmail(params: {
   const amount = formatAmount(params.amountCents, params.currency);
   const rows = [
     `<p>Thank you for your payment. Here's your confirmation:</p>`,
-    `<p style="font-size:24px;font-weight:600;color:${EMAIL_THEME.navy};margin:16px 0;">${amount}</p>`,
+    emailSoftPanel(
+      `<p style="margin:0;font-size:24px;font-weight:600;color:${EMAIL_THEME.navy};">${amount}</p>`,
+    ),
     params.description ? `<p><strong>For:</strong> ${params.description}</p>` : "",
     params.invoiceNumber ? `<p><strong>Invoice:</strong> ${params.invoiceNumber}</p>` : "",
     params.invoiceUrl
@@ -36,7 +38,9 @@ export function refundNotificationEmail(params: {
     : "your original payment method";
   const body = [
     `<p>We've issued a refund to ${destination}:</p>`,
-    `<p style="font-size:24px;font-weight:600;color:${EMAIL_THEME.navy};margin:16px 0;">${amount}</p>`,
+    emailSoftPanel(
+      `<p style="margin:0;font-size:24px;font-weight:600;color:${EMAIL_THEME.navy};">${amount}</p>`,
+    ),
     `<p>Depending on your bank, it can take 5–10 business days for the refund to appear on your statement.</p>`,
   ].join("");
   return {
