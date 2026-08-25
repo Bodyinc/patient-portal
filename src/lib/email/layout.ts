@@ -33,7 +33,16 @@ function applyBodyStyles(html: string): string {
 }
 
 function appOrigin(): string {
-  return (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/$/, "");
+  const configured = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "") ?? "";
+  const vercelHost = (process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL || "")
+    .trim()
+    .replace(/^https?:\/\//, "")
+    .replace(/\/$/, "");
+
+  // Prefer a public https origin. Localhost URLs cannot load in Gmail.
+  if (configured && !/localhost|127\.0\.0\.1/i.test(configured)) return configured;
+  if (vercelHost) return `https://${vercelHost}`;
+  return configured;
 }
 
 /** Hosted PNG of `public/logo.svg` — Gmail/Outlook do not render SVG in mail. */
