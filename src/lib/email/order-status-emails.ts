@@ -1,7 +1,7 @@
 import "server-only";
 
 import { patientStatusLabel } from "@/lib/orders/status";
-import { EMAIL_THEME, emailButton, emailLayout } from "./layout";
+import { emailButton, emailChip, emailLayout } from "./layout";
 
 function firstName(fullName: string | null | undefined): string {
   const first = (fullName ?? "").trim().split(/\s+/)[0];
@@ -49,7 +49,7 @@ export function orderStatusEmail(params: {
   const body = [
     `<p>Hi ${firstName(params.fullName)},</p>`,
     `<p>${bodyFn(params.medicineName)}</p>`,
-    `<p style="color:${EMAIL_THEME.navyFaint};font-size:13px;">Order ${params.orderNumber}</p>`,
+    emailChip(`Order ${params.orderNumber}`),
     tracking,
     emailButton(ctaLabel, params.ctaUrl),
   ].join("");
