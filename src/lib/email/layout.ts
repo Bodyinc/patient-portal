@@ -32,6 +32,28 @@ function applyBodyStyles(html: string): string {
     .replace(/<strong(?![^>]*\sstyle=)/gi, `<strong style="color:${t.navy};font-weight:600;"`);
 }
 
+function appOrigin(): string {
+  const configured = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "") ?? "";
+  const vercelHost = (process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL || "")
+    .trim()
+    .replace(/^https?:\/\//, "")
+    .replace(/\/$/, "");
+
+  // Prefer a public https origin. Localhost URLs cannot load in Gmail.
+  if (configured && !/localhost|127\.0\.0\.1/i.test(configured)) return configured;
+  if (vercelHost) return `https://${vercelHost}`;
+  return configured;
+}
+
+/** Hosted PNG of `public/logo.svg` — Gmail/Outlook do not render SVG in mail. */
+function emailLogoHtml(): string {
+  const t = EMAIL_THEME;
+  const origin = appOrigin();
+  const wordmark = `<span style="font-size:18px;font-weight:700;letter-spacing:0.08em;line-height:1;color:${t.navy};font-family:${FONT};">BODY INC.</span>`;
+  if (!origin) return wordmark;
+  return `<img src="${origin}/email-logo.png" width="140" height="49" alt="BODY INC." class="email-logo" style="display:block;border:0;outline:none;text-decoration:none;height:36px;width:auto;max-width:140px;" />`;
+}
+
 function darkModeLock(selectorList: string, declarations: string): string {
   const selectors = selectorList
     .split(",")
@@ -98,6 +120,7 @@ export function emailLayout(title: string, bodyHtml: string): string {
       .email-btn-cell { background-color: ${t.cta} !important; }
       .email-chip { background-color: ${t.inputBg} !important; color: ${t.navy} !important; }
       .email-panel { background-color: ${t.inputBg} !important; }
+      .email-logo { filter: none !important; }
       ${darkModeLock(
         ".email-page",
         `background-color:${t.page} !important;background:${t.page} !important;color:${t.navy} !important;`,
@@ -115,8 +138,8 @@ export function emailLayout(title: string, bodyHtml: string): string {
       <tr><td align="center">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${t.card}" class="email-card" style="max-width:560px;background-color:${t.card};background:${t.card};border-radius:20px;border:1px solid ${t.border};overflow:hidden;">
           <tr>
-            <td class="email-header" bgcolor="${t.card}" style="background-color:${t.card};background:${t.card};padding:22px 28px 16px;">
-              <span style="font-size:18px;font-weight:700;letter-spacing:0.08em;line-height:1;color:${t.navy};font-family:${FONT};">BODY INC.</span>
+            <td class="email-header" bgcolor="${t.card}" style="background-color:${t.card};background:${t.card};padding:20px 28px 14px;">
+              ${emailLogoHtml()}
             </td>
           </tr>
           <tr>
