@@ -6,6 +6,7 @@ import {
   planTitleFromDuration,
   priceLabelFromDuration,
 } from "@/lib/pricing";
+import { getPlatformSettings } from "@/lib/settings/platform-settings";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { Json } from "@/lib/supabase/types";
 import type {
@@ -125,15 +126,35 @@ export async function fetchShopCatalogData(options: {
 
   const validMeds = medicines ?? [];
   const medicineIds = validMeds.map((medicine) => medicine.id);
+
+  const [categoryNamesResult, variantRowsResult] = await Promise.all([
+    !selectedCategoryName && medicineIds.length > 0
+      ? supabaseAdmin
+          .from("medication_category_medicines")
+          .select("medicine_id, category_id")
+          .in("medicine_id", medicineIds)
+      : Promise.resolve({ data: [] as Array<{ medicine_id: string; category_id: string }> }),
+    medicineIds.length > 0
+      ? supabaseAdmin
+          .from("medicine_variants")
+          .select("id, medicine_id, name, from_price_cents")
+          .in("medicine_id", medicineIds)
+          .eq("is_active", true)
+          .order("sort_order", { ascending: true })
+      : Promise.resolve({
+          data: [] as Array<{
+            id: string;
+            medicine_id: string;
+            name: string;
+            from_price_cents: number | null;
+          }>,
+        }),
+  ]);
+
   let categoryNameByMedicineId = new Map<string, string>();
-
-  if (!selectedCategoryName && medicineIds.length > 0) {
-    const { data: links } = await supabaseAdmin
-      .from("medication_category_medicines")
-      .select("medicine_id, category_id")
-      .in("medicine_id", medicineIds);
-
-    const categoryIds = [...new Set((links ?? []).map((link) => link.category_id))];
+  if (!selectedCategoryName) {
+    const links = categoryNamesResult.data ?? [];
+    const categoryIds = [...new Set(links.map((link) => link.category_id))];
     if (categoryIds.length > 0) {
       const { data: categories } = await supabaseAdmin
         .from("medication_categories")
@@ -144,7 +165,7 @@ export async function fetchShopCatalogData(options: {
         (categories ?? []).map((category) => [category.id, category.name]),
       );
       categoryNameByMedicineId = new Map(
-        (links ?? [])
+        links
           .filter((link) => categoryMap.has(link.category_id))
           .map((link) => [link.medicine_id, categoryMap.get(link.category_id)!]),
       );
@@ -152,22 +173,14 @@ export async function fetchShopCatalogData(options: {
   }
 
   const variantsByMedicineId = new Map<string, ShopMedicineVariantOption[]>();
-  if (medicineIds.length > 0) {
-    const { data: variantRows } = await supabaseAdmin
-      .from("medicine_variants")
-      .select("id, medicine_id, name, from_price_cents")
-      .in("medicine_id", medicineIds)
-      .eq("is_active", true)
-      .order("sort_order", { ascending: true });
-    for (const v of variantRows ?? []) {
-      const list = variantsByMedicineId.get(v.medicine_id) ?? [];
-      list.push({
-        id: v.id,
-        name: v.name,
-        fromPriceCents: v.from_price_cents == null ? null : Number(v.from_price_cents),
-      });
-      variantsByMedicineId.set(v.medicine_id, list);
-    }
+  for (const v of variantRowsResult.data ?? []) {
+    const list = variantsByMedicineId.get(v.medicine_id) ?? [];
+    list.push({
+      id: v.id,
+      name: v.name,
+      fromPriceCents: v.from_price_cents == null ? null : Number(v.from_price_cents),
+    });
+    variantsByMedicineId.set(v.medicine_id, list);
   }
 
   const total = count ?? 0;
@@ -201,13 +214,18 @@ export async function fetchShopCheckoutBootstrapData(options: {
 }): Promise<ShopCheckoutBootstrapDto> {
   const { medicineId, variantId } = options;
 
-  const { data: medicine, error: medicineError } = await supabaseAdmin
-    .from("medicines")
-    .select("id, name, short_description, image_url, from_price_cents")
-    .eq("id", medicineId)
-    .eq("is_active", true)
-    .eq("status", "active")
-    .maybeSingle();
+  const [platformSettings, medicineResult] = await Promise.all([
+    getPlatformSettings(),
+    supabaseAdmin
+      .from("medicines")
+      .select("id, name, short_description, image_url, from_price_cents")
+      .eq("id", medicineId)
+      .eq("is_active", true)
+      .eq("status", "active")
+      .maybeSingle(),
+  ]);
+
+  const { data: medicine, error: medicineError } = medicineResult;
 
   if (medicineError || !medicine) throw new Error("Medicine not found.");
 
@@ -290,6 +308,13 @@ export async function fetchShopCheckoutBootstrapData(options: {
   // Default to the highlighted plan, else the first available one; keyed by plan id so any
   // set of durations selects cleanly.
   const defaultPlan = plans.find((p) => p.badge) ?? plans[0];
+  const rewardDollars = new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(platformSettings.referral_reward_cents / 100);
+  const referralHint = platformSettings.referral_enabled
+    ? `Invite a friend and you'll both receive a $${rewardDollars} account credit.`
+    : "Invite a friend and earn account credits.";
 
   return {
     product: {
@@ -306,7 +331,7 @@ export async function fetchShopCheckoutBootstrapData(options: {
       { id: "alt", title: "Alternative Payment", subtitle: "Apple Pay / PayPal" },
       { id: "new", title: "Add Payment Method", subtitle: "" },
     ],
-    referralHint: "Invite a friend and you'll both receive a $50 account credit.",
+    referralHint,
     defaultSelectedPlan: defaultPlan?.id ?? "",
   };
 }

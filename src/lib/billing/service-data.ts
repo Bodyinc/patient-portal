@@ -1,11 +1,13 @@
 import "server-only";
 
 import { resolveMedicineImageSrc } from "@/lib/intake/medicine-image";
+import { healAndFetchPendingAdditionalPayments } from "@/lib/orders/additional-payment";
 import { formatOrderId } from "@/lib/orders/order-id";
 import { planTitleFromDuration } from "@/lib/pricing";
 import { getPlatformSettings, effectiveShippingCents } from "@/lib/settings/platform-settings";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { maybeReconcileIncompleteSubscription } from "@/lib/stripe/reconcile";
+import { maybeSyncSubscriptionPeriodEnds } from "@/lib/stripe/sync-period-end";
 import type { Json } from "@/lib/supabase/types";
 import type {
   BillingCancelSubscriptionDto,
@@ -13,11 +15,9 @@ import type {
   BillingPaymentDto,
   BillingPaymentsListDto,
   BillingSubscriptionDto,
-  RefundRequestDto,
 } from "./types";
 
 const ACTIVE_SUBSCRIPTION_STATUSES = ["active", "trialing", "past_due"];
-const REFUNDABLE_PAYMENT_STATUSES = ["succeeded", "paid"];
 
 function formatPaymentMethod(rawEvent: Json | null): string {
   if (!rawEvent || typeof rawEvent !== "object" || Array.isArray(rawEvent)) {
@@ -105,6 +105,7 @@ function parsePaymentDescription(rawEvent: Json | null, fallback: string): strin
 function normalizeStatus(status: string): string {
   if (!status) return "Unknown";
   if (status === "succeeded" || status === "paid") return "Paid";
+  if (status === "refunded") return "Refunded";
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
@@ -180,37 +181,33 @@ export async function fetchBillingSubscriptions(userId: string): Promise<Billing
       upcomingCharge: pkg ? planDollars + shippingDollars : planDollars,
       status: subscription.status,
       cancelAtPeriodEnd: subscription.cancel_at_period_end,
+      hasPendingAdditionalPayment: false,
     };
   });
 }
 
-export async function fetchBillingPayments(
-  userId: string,
-  options: { page?: number; pageSize?: number; query?: string } = {},
-): Promise<BillingPaymentsListDto> {
-  const page = Math.max(1, options.page ?? 1);
-  const pageSize = Math.max(1, Math.min(50, options.pageSize ?? 10));
-  const query = (options.query ?? "").trim();
+type PaymentRow = {
+  id: string;
+  amount_cents: number;
+  status: string;
+  created_at: string;
+  stripe_subscription_id: string | null;
+  stripe_invoice_id: string | null;
+  raw_event: Json | null;
+  plan_id: string | null;
+};
 
-  const { data: payments, error } = await supabaseAdmin
-    .from("payments")
-    .select(
-      "id, amount_cents, status, created_at, stripe_subscription_id, stripe_invoice_id, raw_event, plan_id",
-    )
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false });
+const PAYMENT_SELECT =
+  "id, amount_cents, status, created_at, stripe_subscription_id, stripe_invoice_id, raw_event, plan_id";
 
-  if (error) throw new Error(error.message);
-
+async function enrichBillingPayments(payments: PaymentRow[]): Promise<BillingPaymentDto[]> {
   const subscriptionIds = [
-    ...new Set((payments ?? []).map((payment) => payment.stripe_subscription_id).filter(Boolean)),
+    ...new Set(payments.map((payment) => payment.stripe_subscription_id).filter(Boolean)),
   ] as string[];
   const packageIds = [
-    ...new Set((payments ?? []).map((payment) => payment.plan_id).filter(Boolean)),
+    ...new Set(payments.map((payment) => payment.plan_id).filter(Boolean)),
   ] as string[];
 
-  // Two parallel round trips (was three sequential waves): the medicine name rides
-  // along on the subscriptions query as an embedded select.
   const [{ data: subscriptions }, { data: packages }] = await Promise.all([
     subscriptionIds.length
       ? supabaseAdmin
@@ -241,14 +238,13 @@ export async function fetchBillingPayments(
     (subscriptions ?? []).map((sub) => [sub.stripe_subscription_id, sub]),
   );
 
-  const enriched: BillingPaymentDto[] = (payments ?? []).map((payment) => {
+  return payments.map((payment) => {
     const subscription = payment.stripe_subscription_id
       ? subscriptionByStripeId.get(payment.stripe_subscription_id)
       : undefined;
     const medicine = (subscription as { medicines?: { name: string } | null } | undefined)
       ?.medicines;
     const pkg = payment.plan_id ? packageById.get(payment.plan_id) : undefined;
-    // Description = the product (medicine); fall back to the Stripe line / package name.
     const description =
       medicine?.name ??
       pkg?.name ??
@@ -279,16 +275,48 @@ export async function fetchBillingPayments(
       stripeInvoiceId: payment.stripe_invoice_id,
       invoiceUrl,
       invoicePdfUrl,
-      // Filled in by fetchBillingPageData once refund requests resolve (they load in
-      // parallel with payments rather than before them).
-      refundStatus: null,
-      refundable: REFUNDABLE_PAYMENT_STATUSES.includes(payment.status),
     };
   });
+}
 
-  const filtered = query
-    ? enriched.filter((payment) => matchesPaymentQuery(payment, query))
-    : enriched;
+export async function fetchBillingPayments(
+  userId: string,
+  options: { page?: number; pageSize?: number; query?: string } = {},
+): Promise<BillingPaymentsListDto> {
+  const page = Math.max(1, options.page ?? 1);
+  const pageSize = Math.max(1, Math.min(50, options.pageSize ?? 10));
+  const query = (options.query ?? "").trim();
+
+  if (!query) {
+    const start = (page - 1) * pageSize;
+    const {
+      data: payments,
+      error,
+      count,
+    } = await supabaseAdmin
+      .from("payments")
+      .select(PAYMENT_SELECT, { count: "exact" })
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .range(start, start + pageSize - 1);
+    if (error) throw new Error(error.message);
+
+    const items = await enrichBillingPayments((payments ?? []) as PaymentRow[]);
+    const total = count ?? 0;
+    const totalPages = total === 0 ? 0 : Math.ceil(total / pageSize);
+    return { items, total, page, pageSize, totalPages, query };
+  }
+
+  const { data: payments, error } = await supabaseAdmin
+    .from("payments")
+    .select(PAYMENT_SELECT)
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(200);
+  if (error) throw new Error(error.message);
+
+  const enriched = await enrichBillingPayments((payments ?? []) as PaymentRow[]);
+  const filtered = enriched.filter((payment) => matchesPaymentQuery(payment, query));
   const total = filtered.length;
   const totalPages = total === 0 ? 0 : Math.ceil(total / pageSize);
   const start = (page - 1) * pageSize;
@@ -304,57 +332,40 @@ export async function fetchBillingPayments(
   };
 }
 
-export async function fetchRefundRequests(userId: string): Promise<RefundRequestDto[]> {
-  const { data, error } = await supabaseAdmin
-    .from("refund_requests")
-    .select("id, payment_id, amount_cents, status, reason, admin_note, created_at, reviewed_at")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false });
-
-  if (error) throw new Error(error.message);
-
-  return (data ?? []).map((request) => ({
-    id: request.id,
-    paymentId: request.payment_id,
-    amount: Number(request.amount_cents) / 100,
-    status: request.status,
-    reason: request.reason,
-    adminNote: request.admin_note,
-    createdAt: request.created_at,
-    reviewedAt: request.reviewed_at,
-  }));
-}
-
 export async function fetchBillingPageData(
   userId: string,
   options: { page?: number; pageSize?: number; query?: string } = {},
 ): Promise<BillingPageDataDto> {
-  await maybeReconcileIncompleteSubscription(userId);
+  const [, pendingAdditional] = await Promise.all([
+    maybeReconcileIncompleteSubscription(userId),
+    healAndFetchPendingAdditionalPayments(userId).catch((err) => {
+      console.error("[additional_payments] billing load failed:", err);
+      return [];
+    }),
+    maybeSyncSubscriptionPeriodEnds(userId).catch((err) => {
+      console.error("[subscriptions] billing period sync failed:", err);
+    }),
+  ]);
 
-  // All three sections in one parallel wave; refund state is merged into the
-  // payment rows afterwards instead of gating them behind a sequential fetch.
-  const [refundRequests, subscriptions, payments] = await Promise.all([
-    fetchRefundRequests(userId),
+  const [subscriptions, payments] = await Promise.all([
     fetchBillingSubscriptions(userId),
     fetchBillingPayments(userId, options),
   ]);
 
-  const refundByPayment = new Map<string, string>();
-  for (const request of refundRequests) {
-    // requests are newest-first, so the first seen per payment is the latest
-    if (!refundByPayment.has(request.paymentId)) {
-      refundByPayment.set(request.paymentId, request.status);
-    }
+  const pendingMedicineIds = new Set(
+    pendingAdditional.map((p) => p.medicineId).filter((id): id is string => Boolean(id)),
+  );
+  const pendingSubscriptionIds = new Set(
+    pendingAdditional.map((p) => p.subscriptionId).filter((id): id is string => Boolean(id)),
+  );
+
+  for (const subscription of subscriptions) {
+    subscription.hasPendingAdditionalPayment =
+      pendingSubscriptionIds.has(subscription.id) ||
+      (subscription.medicineId != null && pendingMedicineIds.has(subscription.medicineId));
   }
 
-  for (const payment of payments.items) {
-    const refundStatus = refundByPayment.get(payment.id) ?? null;
-    payment.refundStatus = refundStatus;
-    payment.refundable =
-      payment.refundable && (refundStatus === null || refundStatus === "rejected");
-  }
-
-  return { subscriptions, payments, refundRequests };
+  return { subscriptions, payments };
 }
 
 export async function getBillingSubscriptionForCancel(options: {
@@ -366,7 +377,7 @@ export async function getBillingSubscriptionForCancel(options: {
   const { data: subscription, error } = await supabaseAdmin
     .from("subscriptions")
     .select(
-      "id, medicine_id, stripe_subscription_id, status, current_period_end, cancel_at_period_end",
+      "id, medicine_id, stripe_subscription_id, status, current_period_end, cancel_at_period_end, medicines(name)",
     )
     .eq("id", subscriptionId)
     .eq("user_id", userId)
@@ -375,15 +386,9 @@ export async function getBillingSubscriptionForCancel(options: {
   if (error) throw new Error(error.message);
   if (!subscription) return null;
 
-  let medicineName = "Treatment Subscription";
-  if (subscription.medicine_id) {
-    const { data: medicine } = await supabaseAdmin
-      .from("medicines")
-      .select("name")
-      .eq("id", subscription.medicine_id)
-      .maybeSingle();
-    if (medicine?.name) medicineName = medicine.name;
-  }
+  const medicineName =
+    (subscription as { medicines?: { name: string } | null }).medicines?.name ??
+    "Treatment Subscription";
 
   return {
     id: subscription.id,

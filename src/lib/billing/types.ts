@@ -21,6 +21,8 @@ export type BillingSubscriptionDto = {
   upcomingCharge: number;
   status: string;
   cancelAtPeriodEnd: boolean;
+  /** True when this medicine/subscription has an unpaid Workflow C additional payment. */
+  hasPendingAdditionalPayment: boolean;
 };
 
 export type BillingPaymentDto = {
@@ -37,19 +39,6 @@ export type BillingPaymentDto = {
   stripeInvoiceId: string | null;
   invoiceUrl: string | null;
   invoicePdfUrl: string | null;
-  refundStatus: string | null;
-  refundable: boolean;
-};
-
-export type RefundRequestDto = {
-  id: string;
-  paymentId: string;
-  amount: number;
-  status: string;
-  reason: string | null;
-  adminNote: string | null;
-  createdAt: string;
-  reviewedAt: string | null;
 };
 
 export type BillingPaymentsListDto = {
@@ -64,5 +53,4 @@ export type BillingPaymentsListDto = {
 export type BillingPageDataDto = {
   subscriptions: BillingSubscriptionDto[];
   payments: BillingPaymentsListDto;
-  refundRequests: RefundRequestDto[];
 };

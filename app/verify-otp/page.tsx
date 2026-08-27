@@ -87,7 +87,9 @@ function VerifyOTPContent() {
 
   async function resend() {
     // By the time we're on this screen the account exists, so never create one on resend.
-    const sent = await sendPatientLoginOtp(email);
+    const sent = await sendPatientLoginOtp(email, {
+      purpose: searchParams.get("sync") === "email" ? "change_email" : "login",
+    });
     if (!sent.ok) {
       toast.error(sent.message);
       return;

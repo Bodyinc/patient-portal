@@ -15,6 +15,7 @@ import {
 } from "@/lib/email/lifecycle-emails";
 import { markEmailSent, wasEmailSent } from "@/lib/email/idempotency";
 import {
+  adminAppUrl,
   adminNotifyEmail,
   appUrl,
   patientEmailByStripeCustomer,
@@ -354,6 +355,7 @@ async function notifyPaymentFailed(invoice: Stripe.Invoice, userId: string | nul
       amountCents,
       currency: invoice.currency ?? "usd",
       stripeInvoiceId: invoice.id,
+      adminUrl: adminAppUrl(),
     });
     await sendTransactionalEmail({ to: adminTo, subject, html });
   }

@@ -3,5 +3,4 @@ export type {
   BillingPaymentDto,
   BillingPaymentsListDto,
   BillingSubscriptionDto,
-  RefundRequestDto,
 } from "@/lib/billing/types";

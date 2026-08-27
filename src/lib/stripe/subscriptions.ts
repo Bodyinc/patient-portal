@@ -219,13 +219,39 @@ export async function ensureNoActiveDuplicate(
   return { alreadyPaid: false };
 }
 
+/**
+ * Schedule cancellation at the end of the current paid period (no immediate refund).
+ * If Stripe is managing the subscription via a schedule (e.g. after a medicine/plan
+ * change), release the schedule first — cancel_at_period_end cannot be set while a
+ * schedule owns the subscription.
+ */
 export async function cancelSubscriptionAtPeriodEnd(
   stripeSubscriptionId: string,
   cancellationDetails?: {
     feedback?: Stripe.SubscriptionUpdateParams.CancellationDetails["feedback"];
     comment?: string;
   },
-) {
+): Promise<Stripe.Subscription> {
+  const existing = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+  const scheduleRef = (
+    existing as Stripe.Subscription & { schedule?: string | { id?: string } | null }
+  ).schedule;
+
+  if (scheduleRef) {
+    const scheduleId = typeof scheduleRef === "string" ? scheduleRef : scheduleRef.id;
+    if (scheduleId) {
+      try {
+        await stripe.subscriptionSchedules.release(scheduleId);
+      } catch (error) {
+        // Already released / completed — fall through and cancel on the subscription.
+        const message = error instanceof Error ? error.message : String(error);
+        if (!/already.?released|not.?active|no such/i.test(message)) {
+          throw error;
+        }
+      }
+    }
+  }
+
   return stripe.subscriptions.update(stripeSubscriptionId, {
     cancel_at_period_end: true,
     ...(cancellationDetails ? { cancellation_details: cancellationDetails } : {}),

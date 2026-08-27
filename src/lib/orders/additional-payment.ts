@@ -30,6 +30,8 @@ export type AdditionalPaymentIntent = {
 export type PendingAdditionalPaymentDto = {
   requestId: string;
   orderNumber: string;
+  medicineId: string | null;
+  subscriptionId: string | null;
   medicineName: string;
   amountCents: number;
   reason: string | null;
@@ -288,43 +290,22 @@ export async function fulfillAdditionalPaymentByIntentId(
   }
 }
 
-// Pull Stripe truth for this patient's pending additional charges so My Meds / dashboard
-// don't stay on "Additional payment required" when the webhook is delayed or missed.
-export async function maybeReconcileAdditionalPayments(userId: string): Promise<void> {
-  const { data: pending, error } = await supabaseAdmin
-    .from("additional_payments")
-    .select("id, stripe_payment_intent_id")
-    .eq("user_id", userId)
-    .eq("status", "pending");
-  if (error) {
-    console.error("[stripe] maybeReconcileAdditionalPayments failed:", error.message);
-    return;
-  }
+type PendingPayRow = {
+  request_id: string;
+  amount_cents: number;
+  reason: string | null;
+  stripe_payment_intent_id: string | null;
+};
 
-  for (const row of pending ?? []) {
-    if (!row.stripe_payment_intent_id) continue;
-    await fulfillAdditionalPaymentByIntentId(row.stripe_payment_intent_id);
-  }
-}
-
-export async function fetchPendingAdditionalPayments(
-  userId: string,
+async function mapPendingAdditionalPayments(
+  rows: PendingPayRow[],
 ): Promise<PendingAdditionalPaymentDto[]> {
-  const { data: pays, error } = await supabaseAdmin
-    .from("additional_payments")
-    .select("request_id, amount_cents, reason")
-    .eq("user_id", userId)
-    .eq("status", "pending")
-    .order("created_at", { ascending: false });
-  if (error) throw new Error(error.message);
-
-  const rows = pays ?? [];
   if (rows.length === 0) return [];
 
   const requestIds = [...new Set(rows.map((p) => p.request_id))];
   const { data: requests } = await supabaseAdmin
     .from("medication_requests")
-    .select("id, medicine_id")
+    .select("id, medicine_id, subscription_id")
     .in("id", requestIds);
 
   const medicineIds = [
@@ -344,9 +325,82 @@ export async function fetchPendingAdditionalPayments(
     return {
       requestId: p.request_id,
       orderNumber: formatOrderId(p.request_id),
+      medicineId: req?.medicine_id ?? null,
+      subscriptionId: req?.subscription_id ?? null,
       medicineName: (req?.medicine_id ? medById.get(req.medicine_id) : null) ?? "Medication",
       amountCents: p.amount_cents,
       reason: p.reason,
     };
   });
+}
+
+// Pull Stripe truth for this patient's pending additional charges so My Meds / dashboard
+// don't stay on "Additional payment required" when the webhook is delayed or missed.
+export async function maybeReconcileAdditionalPayments(userId: string): Promise<boolean> {
+  const { data: pending, error } = await supabaseAdmin
+    .from("additional_payments")
+    .select("id, stripe_payment_intent_id")
+    .eq("user_id", userId)
+    .eq("status", "pending");
+  if (error) {
+    console.error("[stripe] maybeReconcileAdditionalPayments failed:", error.message);
+    return false;
+  }
+
+  const intentIds = [
+    ...new Set(
+      (pending ?? [])
+        .map((row) => row.stripe_payment_intent_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  if (intentIds.length === 0) return false;
+
+  const results = await Promise.all(intentIds.map((id) => fulfillAdditionalPaymentByIntentId(id)));
+  return results.some(Boolean);
+}
+
+export async function fetchPendingAdditionalPayments(
+  userId: string,
+): Promise<PendingAdditionalPaymentDto[]> {
+  const { data: pays, error } = await supabaseAdmin
+    .from("additional_payments")
+    .select("request_id, amount_cents, reason, stripe_payment_intent_id")
+    .eq("user_id", userId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return mapPendingAdditionalPayments(pays ?? []);
+}
+
+/** One pending-payments round trip, then Stripe only when a PaymentIntent is already on file. */
+export async function healAndFetchPendingAdditionalPayments(
+  userId: string,
+): Promise<PendingAdditionalPaymentDto[]> {
+  const { data: pays, error } = await supabaseAdmin
+    .from("additional_payments")
+    .select("request_id, amount_cents, reason, stripe_payment_intent_id")
+    .eq("user_id", userId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+  if (error) {
+    console.error("[additional_payments] pending load failed:", error.message);
+    return [];
+  }
+
+  const rows = pays ?? [];
+  const intentIds = [
+    ...new Set(
+      rows.map((row) => row.stripe_payment_intent_id).filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  if (intentIds.length === 0) {
+    return mapPendingAdditionalPayments(rows);
+  }
+
+  const healed = (
+    await Promise.all(intentIds.map((id) => fulfillAdditionalPaymentByIntentId(id)))
+  ).some(Boolean);
+  if (healed) return fetchPendingAdditionalPayments(userId);
+  return mapPendingAdditionalPayments(rows);
 }

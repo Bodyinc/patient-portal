@@ -4,11 +4,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
 import BillingHeader from "./BillingHeader";
+import BillingSupportNote from "./BillingSupportNote";
 import CancelSubscriptionModal from "./CancelSubscriptionModal";
 // import BillingReferralCard from "./BillingReferralCard";
 import PaymentHistorySection from "./PaymentHistorySection";
 import PaymentMethodSection from "./PaymentMethodSection";
-import RefundRequestsSection from "./RefundRequestsSection";
 import SubscriptionsSection from "./SubscriptionsSection";
 import WalletCard from "./WalletCard";
 import type { BillingPageDataDto, BillingSubscriptionDto } from "./types";
@@ -83,7 +83,8 @@ export default function BillingPageClient({
 
       {cancelled ? (
         <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          Your subscription will cancel at the end of the current billing period.
+          Your subscription will cancel at the end of the current billing period. Access to the
+          already-paid period continues until then; future renewals will not be charged.
         </div>
       ) : null}
 
@@ -95,13 +96,14 @@ export default function BillingPageClient({
         isPending={isPending}
         onChangePage={(page) => updateParams({ page })}
       />
-      <RefundRequestsSection requests={data.refundRequests} />
+      <BillingSupportNote />
 
       {cancelling ? (
         <CancelSubscriptionModal
           open
           subscriptionId={cancelling.id}
           medicineName={cancelling.medicineName}
+          nextBillingDate={cancelling.nextBillingDate}
           onOpenChange={(open) => {
             if (!open) setCancelling(null);
           }}

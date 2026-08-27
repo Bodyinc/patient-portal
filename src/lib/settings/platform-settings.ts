@@ -24,7 +24,14 @@ const DEFAULTS: PlatformSettings = {
   new_signups_enabled: true,
 };
 
+const SETTINGS_TTL_MS = 30_000;
+let settingsCache: { value: PlatformSettings; expiresAt: number } | null = null;
+
 export async function getPlatformSettings(): Promise<PlatformSettings> {
+  if (settingsCache && settingsCache.expiresAt > Date.now()) {
+    return settingsCache.value;
+  }
+
   const { data, error } = await supabaseAdmin.from("platform_settings").select("key, value");
   if (error) {
     console.error("[platform-settings] read failed:", error.message);
@@ -37,6 +44,7 @@ export async function getPlatformSettings(): Promise<PlatformSettings> {
       (result as Record<string, unknown>)[row.key] = row.value;
     }
   }
+  settingsCache = { value: result, expiresAt: Date.now() + SETTINGS_TTL_MS };
   return result;
 }
 

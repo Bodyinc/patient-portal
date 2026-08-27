@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Lock } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -202,13 +203,10 @@ export default function BillingCheckoutPage() {
   }
 
   const paymentReady = Boolean(clientSecret) && !paymentLoading && !paymentError;
-  const showPaymentForm = paymentReady && consentAccepted;
-  const showSkeleton = !paymentError && (!consentAccepted || !paymentReady);
-  const skeletonHint = !consentAccepted
-    ? paymentReady
-      ? "Accept the Terms & Conditions above to enter your card details."
-      : "Preparing secure payment…"
-    : paymentLoading || !packageId
+  const showSkeleton = consentAccepted && !paymentError && !paymentReady;
+  const showCollapsedCard = !consentAccepted && !paymentError;
+  const skeletonHint =
+    paymentLoading || !packageId
       ? "Loading secure payment form…"
       : "Updating payment for your promo…";
 
@@ -270,6 +268,20 @@ export default function BillingCheckoutPage() {
             <TermsCheckbox checked={consentAccepted} onChange={setConsentAccepted} />
 
             <div className="relative shrink-0">
+              {showCollapsedCard ? (
+                <div className="rounded-[14px] border border-[#E8E8E8] bg-white p-4 onboarding-font">
+                  <div className="mb-2 flex items-center justify-between border-b border-[#E8E8E8] pb-2">
+                    <h2 className="text-[15px] font-medium text-[#152A51] sm:text-[16px]">
+                      Payment Details
+                    </h2>
+                    <Lock size={16} className="text-[#152A51]/50" aria-hidden />
+                  </div>
+                  <p className="text-[12px] text-[#152A51]/70">
+                    Check the terms box above to expand and enter your payment details.
+                  </p>
+                </div>
+              ) : null}
+
               {paymentError ? (
                 <div className="rounded-[14px] border border-[#E8E8E8] bg-white p-4 onboarding-font">
                   <h2 className="mb-2 text-[15px] font-medium text-[#152A51] sm:text-[16px]">
@@ -289,11 +301,8 @@ export default function BillingCheckoutPage() {
               ) : null}
 
               {/* Mount as soon as clientSecret exists so Stripe iframes warm under the skeleton. */}
-              {clientSecret && !paymentError ? (
-                <div
-                  className={showPaymentForm ? undefined : "pointer-events-none select-none"}
-                  aria-hidden={!showPaymentForm || undefined}
-                >
+              {clientSecret && consentAccepted && !paymentError ? (
+                <div>
                   <OnboardingPaymentForm
                     key={clientSecret}
                     clientSecret={clientSecret}

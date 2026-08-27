@@ -2,11 +2,9 @@ import "server-only";
 
 import { calculateBmiFromMetric } from "@/lib/intake/conversions";
 import { DEFAULT_MEDICINE_IMAGE, resolveMedicineImageSrc } from "@/lib/intake/medicine-image";
-import {
-  fetchPendingAdditionalPayments,
-  maybeReconcileAdditionalPayments,
-} from "@/lib/orders/additional-payment";
+import { healAndFetchPendingAdditionalPayments } from "@/lib/orders/additional-payment";
 import { fetchActiveMedications } from "@/lib/my-meds/service-data";
+import { maybeReconcileIncompleteSubscription } from "@/lib/stripe/reconcile";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 import type { DashboardGoalDto, DashboardPageDataDto, DashboardTreatmentDto } from "./types";
@@ -137,18 +135,20 @@ async function fetchClaimedIntakeExtras(userId: string): Promise<{
 }
 
 export async function fetchDashboardPageData(userId: string): Promise<DashboardPageDataDto> {
-  await maybeReconcileAdditionalPayments(userId).catch((err) => {
-    console.error("[additional_payments] dashboard reconcile failed:", err);
-  });
-
-  const [{ data: profile }, activeMeds, intake, pendingPayments] = await Promise.all([
-    supabaseAdmin.from("profiles").select("full_name, avatar_url").eq("id", userId).maybeSingle(),
-    fetchActiveMedications(userId).catch(() => []),
-    fetchClaimedIntakeExtras(userId),
-    fetchPendingAdditionalPayments(userId).catch((err) => {
+  const [, pendingPayments] = await Promise.all([
+    maybeReconcileIncompleteSubscription(userId).catch((err) => {
+      console.error("[stripe] dashboard incomplete reconcile failed:", err);
+    }),
+    healAndFetchPendingAdditionalPayments(userId).catch((err) => {
       console.error("[additional_payments] dashboard load failed:", err);
       return [];
     }),
+  ]);
+
+  const [{ data: profile }, activeMeds, intake] = await Promise.all([
+    supabaseAdmin.from("profiles").select("full_name, avatar_url").eq("id", userId).maybeSingle(),
+    fetchActiveMedications(userId, { reconcile: false }).catch(() => []),
+    fetchClaimedIntakeExtras(userId),
   ]);
 
   const currentMed = activeMeds[0] ?? null;
