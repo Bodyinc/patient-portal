@@ -40,6 +40,7 @@ export function paymentFailedAdminEmail(params: {
   amountCents: number;
   currency: string;
   stripeInvoiceId?: string | null;
+  adminUrl?: string | null;
 }): { subject: string; html: string } {
   const amount = formatAmount(params.amountCents, params.currency);
   const body = [
@@ -47,6 +48,7 @@ export function paymentFailedAdminEmail(params: {
     `<p><strong>Amount:</strong> ${amount}</p>`,
     `<p><strong>Patient:</strong> ${params.patientEmail ?? "unknown"}</p>`,
     params.stripeInvoiceId ? `<p><strong>Invoice:</strong> ${params.stripeInvoiceId}</p>` : "",
+    params.adminUrl ? emailButton("Open admin", params.adminUrl) : "",
   ].join("");
   return {
     subject: `[Body Inc] Payment failed — ${amount}`,
@@ -117,6 +119,7 @@ export function refundRequestAdminEmail(params: {
   currency: string;
   reason: string | null;
   paymentId: string;
+  adminUrl?: string | null;
 }): { subject: string; html: string } {
   const amount = formatAmount(params.amountCents, params.currency);
   const body = [
@@ -125,6 +128,7 @@ export function refundRequestAdminEmail(params: {
     `<p><strong>Amount:</strong> ${amount}</p>`,
     `<p><strong>Reason:</strong> ${params.reason?.trim() || "—"}</p>`,
     `<p><strong>Payment ID:</strong> ${params.paymentId}</p>`,
+    params.adminUrl ? emailButton("Open admin", params.adminUrl) : "",
   ].join("");
   return {
     subject: `[Body Inc] Refund request — ${amount}`,

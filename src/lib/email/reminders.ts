@@ -4,9 +4,15 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { formatOrderId } from "@/lib/orders/order-id";
 import { sendTransactionalEmail } from "./send";
 import { incompleteOrderEmail, refillReminderEmail } from "./reminder-emails";
-import { orderStatusEmail } from "./order-status-emails";
+import { orderStatusEmail, providerCaseAssignedEmail } from "./order-status-emails";
 import { alreadySentKeys, markEmailSent } from "./idempotency";
-import { appUrl, patientEmailByIntakeSession, patientEmailByUserId } from "./recipients";
+import {
+  adminAppUrl,
+  adminNotifyEmail,
+  appUrl,
+  patientEmailsByIntakeSessionIds,
+  patientEmailsByUserIds,
+} from "./recipients";
 
 const INCOMPLETE_ORDER_DELAY_HOURS = 24;
 const REFILL_WINDOW_DAYS = 5;
@@ -15,7 +21,7 @@ const REFILL_WINDOW_DAYS = 5;
 const ORDER_EVENT_LOOKBACK_HOURS = 72;
 const ACTIVE_INTAKE_STATUSES = ["in_progress", "payment_pending"] as const;
 
-const ORDER_STATUS_EMAIL_STATUSES = new Set([
+const ORDER_STATUS_EMAIL_STATUS_LIST = [
   "provider_assigned",
   "pending_review",
   "awaiting_additional_payment",
@@ -26,7 +32,7 @@ const ORDER_STATUS_EMAIL_STATUSES = new Set([
   "delivered",
   "rejected",
   "cancelled",
-]);
+] as const;
 
 export type ReminderRunResult = { candidates: number; sent: number };
 
@@ -147,16 +153,6 @@ export async function sendRefillReminders(now = new Date()): Promise<ReminderRun
   return { candidates: candidates.length, sent };
 }
 
-async function resolveOrderStatusRecipient(request: {
-  user_id: string | null;
-  session_id: string | null;
-}): Promise<{ email: string; fullName: string | null } | null> {
-  return (
-    (await patientEmailByUserId(request.user_id)) ??
-    (await patientEmailByIntakeSession(request.session_id))
-  );
-}
-
 export async function sendUnsentOrderStatusEmails(opts?: {
   requestId?: string;
   since?: Date;
@@ -164,6 +160,7 @@ export async function sendUnsentOrderStatusEmails(opts?: {
   let query = supabaseAdmin
     .from("medication_request_events")
     .select("id, request_id, status, created_at")
+    .in("status", [...ORDER_STATUS_EMAIL_STATUS_LIST])
     .order("created_at", { ascending: true });
 
   if (opts?.requestId) {
@@ -176,74 +173,156 @@ export async function sendUnsentOrderStatusEmails(opts?: {
   const { data: events, error } = await query;
   if (error) throw new Error(error.message);
 
-  const candidates = (events ?? []).filter((ev) => ORDER_STATUS_EMAIL_STATUSES.has(ev.status));
-  const sentKeys = await alreadySentKeys(
-    "order_status",
-    candidates.map((e) => e.id),
-  );
-
+  const candidates = events ?? [];
   const requestIds = [...new Set(candidates.map((e) => e.request_id))];
-  const { data: requests } = requestIds.length
-    ? await supabaseAdmin
-        .from("medication_requests")
-        .select("id, user_id, session_id, medicine_id, tracking_number")
-        .in("id", requestIds)
-    : { data: [] };
+  const providerEventIds = candidates
+    .filter((e) => e.status === "provider_assigned")
+    .map((e) => e.id);
 
-  const requestById = new Map((requests ?? []).map((r) => [r.id, r]));
+  const [sentKeys, providerSentKeys, adminSentKeys, requestsResult] = await Promise.all([
+    alreadySentKeys(
+      "order_status",
+      candidates.map((e) => e.id),
+    ),
+    alreadySentKeys("provider_assigned", providerEventIds),
+    alreadySentKeys("admin_case_assigned", providerEventIds),
+    requestIds.length
+      ? supabaseAdmin
+          .from("medication_requests")
+          .select("id, user_id, session_id, medicine_id, provider_id, tracking_number")
+          .in("id", requestIds)
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const requestById = new Map((requestsResult.data ?? []).map((r) => [r.id, r]));
   const medicineIds = [
-    ...new Set((requests ?? []).map((r) => r.medicine_id).filter(Boolean)),
+    ...new Set((requestsResult.data ?? []).map((r) => r.medicine_id).filter(Boolean)),
   ] as string[];
-  const { data: medicines } = medicineIds.length
-    ? await supabaseAdmin.from("medicines").select("id, name").in("id", medicineIds)
-    : { data: [] };
+  const userIds = [
+    ...new Set(
+      (requestsResult.data ?? [])
+        .flatMap((r) => [r.user_id, r.provider_id])
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const sessionIds = [
+    ...new Set(
+      (requestsResult.data ?? [])
+        .map((r) => r.session_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+
+  const [{ data: medicines }, profileById, sessionById] = await Promise.all([
+    medicineIds.length
+      ? supabaseAdmin.from("medicines").select("id, name").in("id", medicineIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; name: string }> }),
+    patientEmailsByUserIds(userIds),
+    patientEmailsByIntakeSessionIds(sessionIds),
+  ]);
   const medicineById = new Map((medicines ?? []).map((m) => [m.id, m.name]));
 
   let sent = 0;
   for (const event of candidates) {
-    if (sentKeys.has(`${event.id}|`)) continue;
-
     const request = requestById.get(event.request_id);
     const medicineName =
       (request?.medicine_id ? medicineById.get(request.medicine_id) : null) ?? "your treatment";
     const orderNumber = request ? formatOrderId(request.id) : formatOrderId(event.request_id);
+    const patient = request
+      ? ((request.user_id ? profileById.get(request.user_id) : undefined) ??
+        (request.session_id ? sessionById.get(request.session_id) : undefined) ??
+        null)
+      : null;
 
-    const patient = request ? await resolveOrderStatusRecipient(request) : null;
-    if (!patient) {
-      console.warn("[email] order status skipped: no recipient yet", event.id);
-      continue;
+    if (!sentKeys.has(`${event.id}|`)) {
+      if (!patient) {
+        console.warn("[email] order status skipped: no recipient yet", event.id);
+      } else {
+        const ctaUrl =
+          event.status === "awaiting_additional_payment" && request
+            ? `${appUrl()}/orders/${request.id}/pay`
+            : `${appUrl()}/my-meds`;
+
+        const mail = orderStatusEmail({
+          fullName: patient.fullName,
+          medicineName,
+          status: event.status,
+          orderNumber,
+          ctaUrl,
+          trackingNumber: request?.tracking_number,
+        });
+
+        if (!mail) {
+          await markEmailSent("order_status", event.id, "");
+          sentKeys.add(`${event.id}|`);
+        } else if (
+          await sendTransactionalEmail({
+            to: patient.email,
+            subject: mail.subject,
+            html: mail.html,
+          })
+        ) {
+          await markEmailSent("order_status", event.id, "");
+          sentKeys.add(`${event.id}|`);
+          sent += 1;
+        }
+      }
     }
 
-    const ctaUrl =
-      event.status === "awaiting_additional_payment" && request
-        ? `${appUrl()}/orders/${request.id}/pay`
-        : `${appUrl()}/my-meds`;
+    if (event.status === "provider_assigned" && request) {
+      const base = adminAppUrl();
+      const caseUrl = base ? `${base}/cases/${request.id}` : null;
+      const providerId = request.provider_id ?? null;
+      let providerEmail: string | null = null;
+      const provider = providerId ? (profileById.get(providerId) ?? null) : null;
 
-    const mail = orderStatusEmail({
-      fullName: patient.fullName,
-      medicineName,
-      status: event.status,
-      orderNumber,
-      ctaUrl,
-      trackingNumber: request?.tracking_number,
-    });
+      if (provider && !providerSentKeys.has(`${event.id}|`)) {
+        providerEmail = provider.email;
+        const providerMail = providerCaseAssignedEmail({
+          providerName: provider.fullName,
+          medicineName,
+          orderNumber,
+          patientName: patient?.fullName ?? null,
+          caseUrl,
+        });
+        if (
+          await sendTransactionalEmail({
+            to: provider.email,
+            subject: providerMail.subject,
+            html: providerMail.html,
+          })
+        ) {
+          await markEmailSent("provider_assigned", event.id, "");
+          providerSentKeys.add(`${event.id}|`);
+          sent += 1;
+        }
+      }
 
-    if (!mail) {
-      await markEmailSent("order_status", event.id, "");
-      sentKeys.add(`${event.id}|`);
-      continue;
-    }
-
-    if (
-      await sendTransactionalEmail({
-        to: patient.email,
-        subject: mail.subject,
-        html: mail.html,
-      })
-    ) {
-      await markEmailSent("order_status", event.id, "");
-      sentKeys.add(`${event.id}|`);
-      sent += 1;
+      const adminTo = adminNotifyEmail();
+      if (
+        adminTo &&
+        adminTo.toLowerCase() !== providerEmail?.toLowerCase() &&
+        !adminSentKeys.has(`${event.id}|`)
+      ) {
+        const adminMail = providerCaseAssignedEmail({
+          providerName: "team",
+          medicineName,
+          orderNumber,
+          patientName: patient?.fullName ?? null,
+          caseUrl,
+        });
+        if (
+          await sendTransactionalEmail({
+            to: adminTo,
+            subject: `[Body Inc] New case — ${orderNumber}`,
+            html: adminMail.html,
+          })
+        ) {
+          await markEmailSent("admin_case_assigned", event.id, "");
+          adminSentKeys.add(`${event.id}|`);
+          sent += 1;
+        }
+      }
     }
   }
 

@@ -22,19 +22,38 @@ export function adminNotifyEmail(): string | null {
   return email || null;
 }
 
+type EmailRecipient = {
+  email: string;
+  fullName: string | null;
+};
+
 export async function patientEmailByUserId(userId: string | null | undefined): Promise<{
   email: string;
   fullName: string | null;
 } | null> {
   if (!userId) return null;
+  const byId = await patientEmailsByUserIds([userId]);
+  return byId.get(userId) ?? null;
+}
+
+export async function patientEmailsByUserIds(
+  userIds: string[],
+): Promise<Map<string, EmailRecipient>> {
+  const ids = [...new Set(userIds.filter(Boolean))];
+  const map = new Map<string, EmailRecipient>();
+  if (ids.length === 0) return map;
+
   const { data } = await supabaseAdmin
     .from("profiles")
-    .select("email, full_name")
-    .eq("id", userId)
-    .maybeSingle();
-  const email = data?.email?.trim();
-  if (!email) return null;
-  return { email, fullName: data?.full_name ?? null };
+    .select("id, email, full_name")
+    .in("id", ids);
+
+  for (const row of data ?? []) {
+    const email = row.email?.trim();
+    if (!email) continue;
+    map.set(row.id, { email, fullName: row.full_name ?? null });
+  }
+  return map;
 }
 
 export async function patientEmailByStripeCustomer(
@@ -55,14 +74,28 @@ export async function patientEmailByIntakeSession(sessionId: string | null | und
   fullName: string | null;
 } | null> {
   if (!sessionId) return null;
+  const byId = await patientEmailsByIntakeSessionIds([sessionId]);
+  return byId.get(sessionId) ?? null;
+}
+
+export async function patientEmailsByIntakeSessionIds(
+  sessionIds: string[],
+): Promise<Map<string, EmailRecipient>> {
+  const ids = [...new Set(sessionIds.filter(Boolean))];
+  const map = new Map<string, EmailRecipient>();
+  if (ids.length === 0) return map;
+
   const { data } = await supabaseAdmin
     .from("intake_sessions")
-    .select("email, full_name")
-    .eq("id", sessionId)
-    .maybeSingle();
-  const email = data?.email?.trim();
-  if (!email) return null;
-  return { email, fullName: data?.full_name ?? null };
+    .select("id, email, full_name")
+    .in("id", ids);
+
+  for (const row of data ?? []) {
+    const email = row.email?.trim();
+    if (!email) continue;
+    map.set(row.id, { email, fullName: row.full_name ?? null });
+  }
+  return map;
 }
 
 export async function providerEmailByUserId(providerId: string | null | undefined): Promise<{

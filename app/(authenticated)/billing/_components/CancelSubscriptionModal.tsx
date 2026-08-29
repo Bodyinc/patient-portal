@@ -16,12 +16,14 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { CANCELLATION_REASONS, type CancellationReasonId } from "@/lib/billing/cancel-reasons";
+import { formatPortalDate } from "@/lib/date-format";
 import { cn } from "@/lib/utils";
 
 type CancelSubscriptionModalProps = {
   open: boolean;
   subscriptionId: string;
   medicineName: string;
+  nextBillingDate?: string | null;
   onOpenChange: (open: boolean) => void;
 };
 
@@ -29,6 +31,7 @@ export default function CancelSubscriptionModal({
   open,
   subscriptionId,
   medicineName,
+  nextBillingDate = null,
   onOpenChange,
 }: CancelSubscriptionModalProps) {
   const router = useRouter();
@@ -36,6 +39,7 @@ export default function CancelSubscriptionModal({
   const [selectedReasons, setSelectedReasons] = useState<CancellationReasonId[]>([]);
   const [otherText, setOtherText] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const periodEndLabel = nextBillingDate ? formatPortalDate(nextBillingDate) : null;
 
   function resetForm() {
     setSelectedReasons([]);
@@ -118,6 +122,11 @@ export default function CancelSubscriptionModal({
               Help us improve by sharing why you&apos;re cancelling.
             </DialogDescription>
             <p className="mt-1 text-xs text-[#152A51]/60">{medicineName}</p>
+            <p className="mt-3 rounded-md border border-[#E8EEED] bg-[#F3F6F6] px-3 py-2 text-left text-xs leading-relaxed text-[#152A51]/75">
+              Cancelling stops the upcoming renewal
+              {periodEndLabel ? ` (next charge on ${periodEndLabel})` : ""}. Your already-paid
+              current period stays active until then. This does not refund past payments.
+            </p>
           </div>
 
           <div className="mt-6 space-y-3">

@@ -18,6 +18,7 @@ export default async function PrescriptionPage({
     .from("prescriptions")
     .select("id, user_id, provider_id, medicine_name, directions, created_at")
     .eq("id", id)
+    .eq("user_id", user.id)
     .maybeSingle();
 
   if (!rx || rx.user_id !== user.id) {

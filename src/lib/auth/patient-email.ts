@@ -14,27 +14,44 @@ export type CheckEmailResult =
   | { status: "invalid" }
   | { status: "error" };
 
+async function findAuthUserWithoutProfile(normalized: string) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "");
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return { user: null, error: null };
+
+  try {
+    const res = await fetch(
+      `${url}/auth/v1/admin/users?page=1&per_page=2&email=${encodeURIComponent(normalized)}`,
+      {
+        headers: { Authorization: `Bearer ${key}`, apikey: key },
+        cache: "no-store",
+      },
+    );
+    if (!res.ok) return { user: null, error: null };
+    const body = (await res.json()) as {
+      users?: Array<{ id: string; email?: string | null }>;
+    };
+    const found = body.users?.find((u) => (u.email ?? "").toLowerCase() === normalized);
+    if (found) return { user: { id: found.id, email: found.email ?? normalized }, error: null };
+  } catch {
+    // Best-effort — treat as not found rather than paging the whole user list.
+  }
+  return { user: null, error: null };
+}
+
 export async function findAuthUserByEmail(email: string) {
   const normalized = email.toLowerCase();
 
-  // profiles.email mirrors auth and is queryable in one round trip — avoids paging
-  // through the entire auth user list just to classify a duplicate-email signup.
+  // profiles.email is unique and stored lowercase — one indexed lookup instead of ILIKE
+  // or paging through Auth Admin users on every login / signup check.
   const { data: profile } = await supabaseAdmin
     .from("profiles")
     .select("id, email")
-    .ilike("email", normalized)
+    .eq("email", normalized)
     .maybeSingle();
   if (profile) return { user: { id: profile.id, email: profile.email }, error: null };
 
-  // Auth user without a profile row (edge case) — fall back to the scan.
-  for (let page = 1; page <= 5; page++) {
-    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 200 });
-    if (error) return { user: null, error };
-    const found = data.users.find((u) => (u.email ?? "").toLowerCase() === normalized);
-    if (found) return { user: found, error: null };
-    if (data.users.length < 200) break;
-  }
-  return { user: null, error: null };
+  return findAuthUserWithoutProfile(normalized);
 }
 
 // Classifies an email against the auth system so login (password + OTP) and the onboarding

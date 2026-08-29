@@ -12,10 +12,9 @@ import AuthPageShell, {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createClient } from "@/lib/supabase/client";
+import { sendPatientPasswordReset } from "@/lib/actions/patient-auth";
 
 export default function ForgotPasswordPage() {
-  const supabase = createClient();
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
@@ -25,11 +24,9 @@ export default function ForgotPasswordPage() {
     if (!email.trim()) return;
     setBusy(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
-      });
-      if (error) {
-        toast.error(error.message);
+      const result = await sendPatientPasswordReset(email.trim());
+      if (!result.ok) {
+        toast.error(result.message);
         return;
       }
       setSent(true);

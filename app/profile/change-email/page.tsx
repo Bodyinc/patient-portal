@@ -105,7 +105,7 @@ export default function ProfileChangeEmailPage() {
   async function sendCurrentCode() {
     setBusy(true);
     try {
-      const sent = await sendPatientLoginOtp(currentEmail);
+      const sent = await sendPatientLoginOtp(currentEmail, { purpose: "change_email" });
       if (!sent.ok) {
         toast.error(describeSendError(sent.message));
         return;
@@ -172,7 +172,7 @@ export default function ProfileChangeEmailPage() {
         toast.error(result.message);
         return;
       }
-      const sent = await sendPatientLoginOtp(result.email);
+      const sent = await sendPatientLoginOtp(result.email, { purpose: "change_email" });
       if (!sent.ok) {
         // The login email was already re-pointed to the new address; if the code couldn't be
         // sent (e.g. rate limit), undo that so the account isn't stranded and a retry doesn't
@@ -212,7 +212,7 @@ export default function ProfileChangeEmailPage() {
   }
 
   async function resendNewCode() {
-    const sent = await sendPatientLoginOtp(newEmail);
+    const sent = await sendPatientLoginOtp(newEmail, { purpose: "change_email" });
     if (!sent.ok) {
       toast.error(describeSendError(sent.message));
       return;

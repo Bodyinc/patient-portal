@@ -33,9 +33,10 @@ function formatCurrency(amount: number): string {
 export default function SubscriptionRow({ subscription, onCancel }: SubscriptionRowProps) {
   const router = useRouter();
   const imageSrc = getDbMedicineImageSrc(subscription.imageSrc);
+  const upgradeBlocked = subscription.hasPendingAdditionalPayment;
 
   function handleUpgrade() {
-    if (!subscription.medicineId) return;
+    if (!subscription.medicineId || upgradeBlocked) return;
     router.push(
       buildShopCheckoutHref({
         medicineId: subscription.medicineId,
@@ -84,6 +85,9 @@ export default function SubscriptionRow({ subscription, onCancel }: Subscription
                 Cancels at end of billing period
               </p>
             ) : null}
+            {upgradeBlocked ? (
+              <p className="mt-1 text-xs font-medium text-amber-700">Your payment is pending.</p>
+            ) : null}
           </div>
 
           <div className="grid grid-cols-2 gap-4 lg:min-w-[280px]">
@@ -105,7 +109,8 @@ export default function SubscriptionRow({ subscription, onCancel }: Subscription
             <button
               type="button"
               onClick={handleUpgrade}
-              disabled={!subscription.medicineId}
+              disabled={!subscription.medicineId || upgradeBlocked}
+              title={upgradeBlocked ? "Your payment is pending." : undefined}
               className="w-full rounded-md border border-[#152A51] px-4 py-2 text-sm font-medium text-[#152A51] hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
             >
               Upgrade

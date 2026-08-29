@@ -1,7 +1,7 @@
 "use server";
 
 import { z } from "zod";
-import { PORTAL_ROLE } from "@/lib/auth/constants";
+import { PORTAL_ROLE, wrongPortalMessage } from "@/lib/auth/constants";
 import {
   classifyPatientEmail,
   findAuthUserByEmail,
@@ -9,7 +9,12 @@ import {
 } from "@/lib/auth/patient-email";
 import { claimIntakeSession } from "@/lib/actions/intake";
 import { requireIntakeSession } from "@/lib/intake/session";
-import { verificationCodeEmail } from "@/lib/email/auth-emails";
+import {
+  passwordResetEmail,
+  verificationCodeEmail,
+  type VerificationEmailPurpose,
+} from "@/lib/email/auth-emails";
+import { appUrl } from "@/lib/email/recipients";
 import { sendTransactionalEmail } from "@/lib/email/send";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -402,6 +407,7 @@ export async function completePostCheckoutSignIn(): Promise<CompletePostCheckout
 /** Sends a login OTP using the Body Inc email theme (does not use the Supabase Auth template). */
 export async function sendPatientLoginOtp(
   email: string,
+  opts?: { purpose?: VerificationEmailPurpose },
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const parsed = z.string().trim().email("Enter a valid email").safeParse(email);
   if (!parsed.success) {
@@ -429,7 +435,64 @@ export async function sendPatientLoginOtp(
     fullName = profile?.full_name ?? null;
   }
 
-  const { subject, html } = verificationCodeEmail({ code, fullName });
+  const { subject, html } = verificationCodeEmail({
+    code,
+    fullName,
+    purpose: opts?.purpose ?? "login",
+  });
+  const sent = await sendTransactionalEmail({ to: parsed.data, subject, html });
+  if (!sent) {
+    return { ok: false, message: "Could not send email. Please try again." };
+  }
+  return { ok: true };
+}
+
+/** Sends a password-reset link using the Body Inc email theme (not the Supabase Auth template). */
+export async function sendPatientPasswordReset(
+  email: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const parsed = z.string().trim().email("Enter a valid email").safeParse(email);
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Enter a valid email" };
+  }
+
+  const check = await classifyPatientEmail(parsed.data);
+  if (check.status === "invalid") {
+    return { ok: false, message: "Enter a valid email" };
+  }
+  if (check.status === "error") {
+    return { ok: false, message: "Could not send email. Please try again." };
+  }
+  if (check.status === "wrong_portal") {
+    return { ok: false, message: wrongPortalMessage(check.role) };
+  }
+  // Same as the built-in reset: do not reveal whether the address has an account.
+  if (check.status !== "patient") {
+    return { ok: true };
+  }
+
+  const redirectTo = `${appUrl()}/auth/callback?next=/reset-password`;
+  const { data, error } = await supabaseAdmin.auth.admin.generateLink({
+    type: "recovery",
+    email: parsed.data,
+    options: { redirectTo },
+  });
+  const resetUrl = data?.properties?.action_link?.trim();
+  if (error || !resetUrl) {
+    return { ok: false, message: "Could not send a reset link. Please try again." };
+  }
+
+  let fullName: string | null = null;
+  if (data.user?.id) {
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("full_name")
+      .eq("id", data.user.id)
+      .maybeSingle();
+    fullName = profile?.full_name ?? null;
+  }
+
+  const { subject, html } = passwordResetEmail({ resetUrl, fullName });
   const sent = await sendTransactionalEmail({ to: parsed.data, subject, html });
   if (!sent) {
     return { ok: false, message: "Could not send email. Please try again." };

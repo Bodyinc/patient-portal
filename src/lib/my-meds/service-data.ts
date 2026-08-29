@@ -3,11 +3,9 @@ import "server-only";
 import { resolveMedicineImageSrc } from "@/lib/intake/medicine-image";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { fetchPatientOrders } from "@/lib/orders/service-data";
-import {
-  fetchPendingAdditionalPayments,
-  maybeReconcileAdditionalPayments,
-} from "@/lib/orders/additional-payment";
+import { healAndFetchPendingAdditionalPayments } from "@/lib/orders/additional-payment";
 import { maybeReconcileIncompleteSubscription } from "@/lib/stripe/reconcile";
+import { maybeSyncSubscriptionPeriodEnds } from "@/lib/stripe/sync-period-end";
 import type { Json } from "@/lib/supabase/types";
 import type {
   MyMedsCurrentMedicationDto,
@@ -148,18 +146,14 @@ function mapPastMedication(subscription: SubscriptionRow): MyMedsPastMedicationD
   };
 }
 
-/** Newest active subscription only — used by Dashboard treatment block. */
-export async function fetchCurrentMedication(
-  userId: string,
-): Promise<MyMedsCurrentMedicationDto | null> {
-  const active = await fetchActiveMedications(userId);
-  return active[0] ?? null;
-}
-
+/** Newest active subscriptions — used by Dashboard treatment block. */
 export async function fetchActiveMedications(
   userId: string,
+  options: { reconcile?: boolean } = {},
 ): Promise<MyMedsCurrentMedicationDto[]> {
-  await maybeReconcileIncompleteSubscription(userId);
+  if (options.reconcile !== false) {
+    await maybeReconcileIncompleteSubscription(userId);
+  }
 
   const { data: subscriptions, error } = await supabaseAdmin
     .from("subscriptions")
@@ -172,35 +166,6 @@ export async function fetchActiveMedications(
   if (!subscriptions?.length) return [];
 
   return (subscriptions as SubscriptionRow[]).map(mapActiveMedication);
-}
-
-export async function fetchPastMedications(
-  userId: string,
-  activeMedicineIds: Set<string> = new Set(),
-): Promise<MyMedsPastMedicationDto[]> {
-  // Load all non-active via client-side filter — PostgREST `not.in` string quoting is brittle.
-  const { data: subscriptions, error } = await supabaseAdmin
-    .from("subscriptions")
-    .select(SUBSCRIPTION_SELECT)
-    .eq("user_id", userId)
-    .order("updated_at", { ascending: false });
-
-  if (error) throw new Error(error.message);
-  if (!subscriptions?.length) return [];
-
-  const activeStatusSet = new Set(ACTIVE_SUBSCRIPTION_STATUSES);
-  const seenMedicineIds = new Set<string>(activeMedicineIds);
-  const past: MyMedsPastMedicationDto[] = [];
-
-  for (const row of subscriptions as SubscriptionRow[]) {
-    if (activeStatusSet.has(row.status)) continue;
-    const medicineId = row.medicine_id;
-    if (medicineId && seenMedicineIds.has(medicineId)) continue;
-    if (medicineId) seenMedicineIds.add(medicineId);
-    past.push(mapPastMedication(row));
-  }
-
-  return past;
 }
 
 export async function fetchMedicationRequests(
@@ -256,20 +221,24 @@ export async function fetchMyMedsPageData(
   userId: string,
   options: { page?: number; pageSize?: number; query?: string } = {},
 ): Promise<MyMedsPageDataDto> {
-  await maybeReconcileIncompleteSubscription(userId);
-  await maybeReconcileAdditionalPayments(userId);
+  const [, pendingPayments] = await Promise.all([
+    maybeReconcileIncompleteSubscription(userId),
+    healAndFetchPendingAdditionalPayments(userId).catch((err) => {
+      console.error("[additional_payments] My Meds load failed:", err);
+      return [];
+    }),
+    maybeSyncSubscriptionPeriodEnds(userId).catch((err) => {
+      console.error("[subscriptions] my-meds period sync failed:", err);
+    }),
+  ]);
 
-  const [subscriptionsResult, requests, pendingPayments] = await Promise.all([
+  const [subscriptionsResult, requests] = await Promise.all([
     supabaseAdmin
       .from("subscriptions")
       .select(SUBSCRIPTION_SELECT)
       .eq("user_id", userId)
       .order("created_at", { ascending: false }),
     fetchMedicationRequests(userId, options),
-    fetchPendingAdditionalPayments(userId).catch((err) => {
-      console.error("[additional_payments] My Meds load failed:", err);
-      return [];
-    }),
   ]);
 
   if (subscriptionsResult.error) throw new Error(subscriptionsResult.error.message);

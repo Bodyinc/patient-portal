@@ -167,9 +167,12 @@ export async function POST(request: Request) {
       currentPeriodEnd,
     });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unable to cancel subscription." },
-      { status: 500 },
-    );
+    const message =
+      error && typeof error === "object" && "message" in error
+        ? String((error as { message?: unknown }).message)
+        : error instanceof Error
+          ? error.message
+          : "Unable to cancel subscription.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

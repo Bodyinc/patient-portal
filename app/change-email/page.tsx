@@ -40,7 +40,7 @@ function ChangeEmailContent() {
         return;
       }
 
-      const sent = await sendPatientLoginOtp(result.email);
+      const sent = await sendPatientLoginOtp(result.email, { purpose: "change_email" });
       if (!sent.ok) {
         toast.error(sent.message);
         return;
