@@ -1,7 +1,7 @@
 import "server-only";
 
 import { patientStatusLabel } from "@/lib/orders/status";
-import { emailButton, emailChip, emailLayout } from "./layout";
+import { emailButton, emailChip, emailLayout, emailSoftPanel } from "./layout";
 
 function firstName(fullName: string | null | undefined): string {
   const first = (fullName ?? "").trim().split(/\s+/)[0];
@@ -26,6 +26,25 @@ const STATUS_BODY: Record<string, (medicineName: string) => string> = {
   cancelled: (m) => `Your <strong>${m}</strong> medication request was cancelled.`,
 };
 
+function dispatchedDetailsBlock(orderNumber: string, trackingNumber?: string | null): string {
+  const trackingValue = trackingNumber?.trim();
+  const trackingUrl = trackingValue && /^https?:\/\//i.test(trackingValue) ? trackingValue : null;
+
+  const lines = [`<p style="margin:0 0 8px;"><strong>Order ID:</strong> ${orderNumber}</p>`];
+
+  if (trackingValue) {
+    if (trackingUrl) {
+      lines.push(
+        `<p style="margin:0;"><strong>Tracking:</strong> <a href="${trackingUrl}" target="_blank" rel="noopener noreferrer">Track your shipment</a></p>`,
+      );
+    } else {
+      lines.push(`<p style="margin:0;"><strong>Tracking:</strong> ${trackingValue}</p>`);
+    }
+  }
+
+  return emailSoftPanel(lines.join(""));
+}
+
 export function orderStatusEmail(params: {
   fullName: string | null;
   medicineName: string;
@@ -41,16 +60,15 @@ export function orderStatusEmail(params: {
   const ctaLabel =
     params.status === "awaiting_additional_payment" ? "Complete payment" : "View my meds";
 
-  const tracking =
-    params.status === "dispatched" && params.trackingNumber
-      ? `<p><strong>Tracking:</strong> ${params.trackingNumber}</p>`
-      : "";
+  const orderDetails =
+    params.status === "dispatched"
+      ? dispatchedDetailsBlock(params.orderNumber, params.trackingNumber)
+      : emailChip(`Order ${params.orderNumber}`);
 
   const body = [
     `<p>Hi ${firstName(params.fullName)},</p>`,
     `<p>${bodyFn(params.medicineName)}</p>`,
-    emailChip(`Order ${params.orderNumber}`),
-    tracking,
+    orderDetails,
     emailButton(ctaLabel, params.ctaUrl),
   ].join("");
 

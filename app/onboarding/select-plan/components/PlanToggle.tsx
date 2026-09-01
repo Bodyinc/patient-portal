@@ -18,11 +18,6 @@ function formatMoney(amount: number) {
 export default function PlanToggle({ packages, selectedPackageId, onChange }: PlanToggleProps) {
   if (packages.length === 0) return null;
 
-  const hasMostPopular = packages.some((p) => p.isMostPopular);
-  const recommendedId = hasMostPopular
-    ? packages.find((p) => !p.isMostPopular)?.id
-    : packages[0]?.id;
-
   return (
     <div className="flex w-full flex-col gap-4 onboarding-font">
       <h2 className="text-left text-[16px] font-medium text-[#152A51] sm:text-[18px]">
@@ -34,8 +29,7 @@ export default function PlanToggle({ packages, selectedPackageId, onChange }: Pl
           const selected = selectedPackageId === pkg.id;
           const savings = pkg.originalPrice > pkg.price ? pkg.originalPrice - pkg.price : 0;
           const monthly = pkg.durationMonths > 0 ? pkg.price / pkg.durationMonths : pkg.price;
-          const showMostPopular = pkg.isMostPopular;
-          const showRecommended = !showMostPopular && pkg.id === recommendedId;
+          const showRecommended = pkg.isMostPopular;
 
           return (
             <button
@@ -50,11 +44,6 @@ export default function PlanToggle({ packages, selectedPackageId, onChange }: Pl
                   : "border-[#E8E8E8] hover:border-[#152A51]/30",
               )}
             >
-              {showMostPopular ? (
-                <span className="absolute -top-3 left-4 rounded-[10px] rounded-b-none bg-[#E8EEED] px-4 py-2 text-[12px] font-medium leading-none text-[#152A51]">
-                  Most popular
-                </span>
-              ) : null}
               {showRecommended ? (
                 <span className="absolute mt-0.5 -top-0.5 left-15 rounded-[10px] rounded-t-none bg-[#6A9B9C] px-4 py-2 text-[12px] font-medium leading-none text-white">
                   Recommended
