@@ -67,45 +67,49 @@ export default function DemographicsPage() {
       return;
     }
 
+    const patch = {
+      state: parsed.data.state,
+      sex: parsed.data.sex,
+      dob: parsed.data.dob,
+    };
+    const nextState = { ...state, ...patch };
+    const next = getNextStepPath("/onboarding/demographics", nextState);
+
+    if (
+      state.state === parsed.data.state &&
+      state.sex === parsed.data.sex &&
+      state.dob === parsed.data.dob
+    ) {
+      if (next) pushOnboardingRoute(router, next);
+      return;
+    }
+
     setSaving(true);
     try {
-      const result = await saveIntakeDemographics({
+      const savePromise = saveIntakeDemographics({
         stateCode: parsed.data.state,
         sex: parsed.data.sex,
         dob: parsed.data.dob,
       });
+      updateState(patch);
+      if (next) pushOnboardingRoute(router, next);
 
+      const result = await savePromise;
       if (!result.ok) {
         toast.error(result.message);
-        return;
+        pushOnboardingRoute(router, "/onboarding/demographics");
       }
-
-      const patch = {
-        state: parsed.data.state,
-        sex: parsed.data.sex,
-        dob: parsed.data.dob,
-      };
-      const nextState = { ...state, ...patch };
-      updateState(patch);
-      const next = getNextStepPath("/onboarding/demographics", nextState);
-      if (next) await pushOnboardingRoute(router, next);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to save demographics.");
-    } finally {
-      setSaving(false);
+      pushOnboardingRoute(router, "/onboarding/demographics");
     }
-  }
-
-  async function handleBack() {
-    const prev = getPrevStepPath("/onboarding/demographics", state);
-    if (prev) await pushOnboardingRoute(router, prev);
   }
 
   return (
     <OnboardingStepLayout
       title="We need to make sure we can support you"
       description="*Required fields are marked with *."
-      onBack={handleBack}
+      backHref={getPrevStepPath("/onboarding/demographics", state)}
       onContinue={handleContinue}
       continueDisabled={saving}
       continueLabel="Continue"

@@ -135,23 +135,27 @@ async function fetchClaimedIntakeExtras(userId: string): Promise<{
 }
 
 export async function fetchDashboardPageData(userId: string): Promise<DashboardPageDataDto> {
-  const [, pendingPayments] = await Promise.all([
+  const [didReconcile, pendingPayments, profileResult, activeMeds, intake] = await Promise.all([
     maybeReconcileIncompleteSubscription(userId).catch((err) => {
       console.error("[stripe] dashboard incomplete reconcile failed:", err);
+      return false;
     }),
     healAndFetchPendingAdditionalPayments(userId).catch((err) => {
       console.error("[additional_payments] dashboard load failed:", err);
-      return [];
+      return [] as Awaited<ReturnType<typeof healAndFetchPendingAdditionalPayments>>;
     }),
-  ]);
-
-  const [{ data: profile }, activeMeds, intake] = await Promise.all([
     supabaseAdmin.from("profiles").select("full_name, avatar_url").eq("id", userId).maybeSingle(),
     fetchActiveMedications(userId, { reconcile: false }).catch(() => []),
     fetchClaimedIntakeExtras(userId),
   ]);
 
-  const currentMed = activeMeds[0] ?? null;
+  const meds =
+    didReconcile === true
+      ? await fetchActiveMedications(userId, { reconcile: false }).catch(() => activeMeds)
+      : activeMeds;
+  const profile = profileResult.data;
+
+  const currentMed = meds[0] ?? null;
   const treatmentFromSub: DashboardTreatmentDto | null = currentMed
     ? {
         medicineId: currentMed.medicineId,
@@ -176,7 +180,7 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
     bmiCategory: getBmiCategory(intake.bmi),
     goals: intake.goals,
     treatment,
-    activeTreatmentCount: activeMeds.length,
+    activeTreatmentCount: meds.length,
     pendingPayments,
   };
 }

@@ -336,21 +336,21 @@ export async function fetchBillingPageData(
   userId: string,
   options: { page?: number; pageSize?: number; query?: string } = {},
 ): Promise<BillingPageDataDto> {
-  const [, pendingAdditional] = await Promise.all([
+  const [didReconcile, pendingAdditional, subscriptions, payments] = await Promise.all([
     maybeReconcileIncompleteSubscription(userId),
     healAndFetchPendingAdditionalPayments(userId).catch((err) => {
       console.error("[additional_payments] billing load failed:", err);
       return [];
     }),
+    fetchBillingSubscriptions(userId),
+    fetchBillingPayments(userId, options),
     maybeSyncSubscriptionPeriodEnds(userId).catch((err) => {
       console.error("[subscriptions] billing period sync failed:", err);
     }),
   ]);
 
-  const [subscriptions, payments] = await Promise.all([
-    fetchBillingSubscriptions(userId),
-    fetchBillingPayments(userId, options),
-  ]);
+  const resolvedSubscriptions =
+    didReconcile === true ? await fetchBillingSubscriptions(userId) : subscriptions;
 
   const pendingMedicineIds = new Set(
     pendingAdditional.map((p) => p.medicineId).filter((id): id is string => Boolean(id)),
@@ -359,13 +359,13 @@ export async function fetchBillingPageData(
     pendingAdditional.map((p) => p.subscriptionId).filter((id): id is string => Boolean(id)),
   );
 
-  for (const subscription of subscriptions) {
+  for (const subscription of resolvedSubscriptions) {
     subscription.hasPendingAdditionalPayment =
       pendingSubscriptionIds.has(subscription.id) ||
       (subscription.medicineId != null && pendingMedicineIds.has(subscription.medicineId));
   }
 
-  return { subscriptions, payments };
+  return { subscriptions: resolvedSubscriptions, payments };
 }
 
 export async function getBillingSubscriptionForCancel(options: {

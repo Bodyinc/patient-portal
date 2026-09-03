@@ -9,7 +9,7 @@ import { Ruler, Weight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { saveIntakeBmi, evaluateMedicineEligibility } from "@/lib/actions/intake";
+import { saveIntakeBmi } from "@/lib/actions/intake";
 import { intakeQueryKeys } from "@/lib/intake/query-keys";
 
 import BmiGauge from "../_components/BmiGauge";
@@ -105,6 +105,21 @@ export default function BmiPage() {
       return;
     }
 
+    if (feet === state.heightFeet && inches === state.heightInches && weight === state.weightLbs) {
+      if (state.eligibilityResult === "ineligible") {
+        const reason =
+          ineligibleReason ?? "Based on your profile, you are not eligible for this treatment.";
+        setIneligibleReason(reason);
+        toast.error(reason);
+        return;
+      }
+      if (state.eligibilityResult === "eligible" || state.eligibilityResult === "needs_review") {
+        const next = getNextStepPath("/onboarding/bmi", state);
+        if (next) pushOnboardingRoute(router, next);
+        return;
+      }
+    }
+
     setSaving(true);
     setIneligibleReason(null);
 
@@ -120,20 +135,12 @@ export default function BmiPage() {
       return;
     }
 
-    // Category rules (BMI / age / sex / state) before questionnaire — no point asking
-    // clinical questions if the patient already fails hard eligibility.
-    const eligibility = await evaluateMedicineEligibility(null);
-    setSaving(false);
+    const eligibility = result.data.eligibility;
 
-    if (!eligibility.ok) {
-      toast.error(eligibility.message);
-      return;
-    }
-
-    if (eligibility.data.result === "ineligible") {
+    if (eligibility.result === "ineligible") {
+      setSaving(false);
       const reason =
-        eligibility.data.reason ??
-        "Based on your profile, you are not eligible for this treatment.";
+        eligibility.reason ?? "Based on your profile, you are not eligible for this treatment.";
       setIneligibleReason(reason);
       toast.error(reason);
       updateState({
@@ -152,23 +159,18 @@ export default function BmiPage() {
       heightInches: inches,
       weightLbs: weight,
       bmi: result.data.bmi,
-      eligibilityResult: eligibility.data.result,
+      eligibilityResult: eligibility.result,
     };
     updateState(patch);
     const next = getNextStepPath("/onboarding/bmi", { ...state, ...patch });
-    if (next) await pushOnboardingRoute(router, next);
-  }
-
-  async function handleBack() {
-    const prev = getPrevStepPath("/onboarding/bmi", state);
-    if (prev) await pushOnboardingRoute(router, prev);
+    if (next) pushOnboardingRoute(router, next);
   }
 
   return (
     <OnboardingStepLayout
       title="Let's understand your starting point."
       description="These measurements help us personalize your treatment recommendations."
-      onBack={handleBack}
+      backHref={getPrevStepPath("/onboarding/bmi", state)}
       onContinue={handleContinue}
       continueDisabled={saving}
       continueLabel="Continue"

@@ -153,31 +153,47 @@ export default function DeliveryAddressPage() {
     }
 
     const patch = parsed.data;
+    const next = getNextStepPath("/onboarding/delivery-address", { ...state, ...patch });
 
-    setSaving(true);
-    const result = await saveIntakeAddress(patch);
-    setSaving(false);
-
-    if (!result.ok) {
-      toast.error(result.message);
+    if (
+      state.streetAddress === patch.streetAddress &&
+      state.apartment === patch.apartment &&
+      digitsOnlyZip(state.postalCode) === patch.postalCode &&
+      state.city === patch.city &&
+      state.phone === patch.phone &&
+      state.phoneCountryCode === patch.phoneCountryCode &&
+      state.billingSameAsShipping === patch.billingSameAsShipping &&
+      state.smsConsent === patch.smsConsent &&
+      state.marketingConsent === patch.marketingConsent &&
+      (patch.billingSameAsShipping ||
+        (state.billingStreetAddress === patch.billingStreetAddress &&
+          state.billingApartment === patch.billingApartment &&
+          digitsOnlyZip(state.billingPostalCode) === patch.billingPostalCode &&
+          state.billingCity === patch.billingCity &&
+          state.billingStateCode === patch.billingStateCode))
+    ) {
+      if (next) pushOnboardingRoute(router, next);
       return;
     }
 
+    setSaving(true);
+    const savePromise = saveIntakeAddress(patch);
     updateState(patch);
-    const next = getNextStepPath("/onboarding/delivery-address", { ...state, ...patch });
-    if (next) await pushOnboardingRoute(router, next);
-  }
+    if (next) pushOnboardingRoute(router, next);
 
-  async function handleBack() {
-    const prev = getPrevStepPath("/onboarding/delivery-address", state);
-    if (prev) await pushOnboardingRoute(router, prev);
+    const result = await savePromise;
+
+    if (!result.ok) {
+      toast.error(result.message);
+      pushOnboardingRoute(router, "/onboarding/delivery-address");
+    }
   }
 
   return (
     <OnboardingStepLayout
       title="Where should we ship your prescription?"
       description="If your treatment is approved by a licensed provider, we'll securely ship it to this address."
-      onBack={handleBack}
+      backHref={getPrevStepPath("/onboarding/delivery-address", state)}
       onContinue={handleContinue}
       continueLabel="Find your treatment"
       continueDisabled={saving}

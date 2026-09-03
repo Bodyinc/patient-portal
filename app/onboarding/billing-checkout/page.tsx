@@ -197,11 +197,6 @@ export default function BillingCheckoutPage() {
     router.push(ORDER_CONFIRMATION_REDIRECT);
   }
 
-  function handleBack() {
-    const prev = getPrevStepPath("/onboarding/billing-checkout", state);
-    if (prev) router.push(prev);
-  }
-
   const paymentReady = Boolean(clientSecret) && !paymentLoading && !paymentError;
   const showSkeleton = consentAccepted && !paymentError && !paymentReady;
   const showCollapsedCard = !consentAccepted && !paymentError;
@@ -217,7 +212,13 @@ export default function BillingCheckoutPage() {
   return (
     <OnboardingFrame
       showProgress={false}
-      footer={<OnboardingFooter onBack={handleBack} showContinue={false} variant="figma" />}
+      footer={
+        <OnboardingFooter
+          backHref={getPrevStepPath("/onboarding/billing-checkout", state)}
+          showContinue={false}
+          variant="figma"
+        />
+      }
     >
       {/* Wrapper scrolls on small screens; desktop keeps the original fixed two-column layout. */}
       <div className="flex h-full w-full flex-col gap-2 overflow-y-auto scrollbar-hide lg:gap-3 lg:overflow-hidden">

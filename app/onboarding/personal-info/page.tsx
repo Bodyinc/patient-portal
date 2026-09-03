@@ -11,8 +11,6 @@ import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { saveIntakeContact } from "@/lib/actions/intake";
-import { checkPatientEmail } from "@/lib/actions/patient-auth";
-import { wrongPortalMessage } from "@/lib/auth/constants";
 
 import OnboardingStepLayout from "../_components/OnboardingStepLayout";
 import {
@@ -68,46 +66,39 @@ export default function PersonalInfoPage() {
       return;
     }
 
-    setSaving(true);
-
-    // Onboarding is for NEW patients only. Block an email that already has an account
-    // (surface it inline under the field) and send them to log in instead.
-    const check = await checkPatientEmail(parsed.data.email);
-    if (check.status === "patient") {
-      setSaving(false);
-      setEmailError(
-        <>
-          An account with this email already exists.{" "}
-          <Link href="/auth" className="font-semibold underline underline-offset-2">
-            Log in instead
-          </Link>
-          .
-        </>,
-      );
-      return;
-    }
-    if (check.status === "wrong_portal") {
-      setSaving(false);
-      setEmailError(wrongPortalMessage(check.role));
-      return;
-    }
-    if (check.status === "invalid" || check.status === "error") {
-      setSaving(false);
-      setEmailError("Could not verify that email. Please try again.");
-      return;
-    }
-
-    // Phone is collected on delivery-address — do not forward leftover state.phone here or
-    // saveIntakeContact will reject it with "Enter a valid phone number".
     const contact = {
       fullName: parsed.data.fullName,
       email: parsed.data.email,
     };
+
+    if (
+      state.fullName === contact.fullName &&
+      state.email.toLowerCase() === contact.email.toLowerCase()
+    ) {
+      const next = getNextStepPath("/onboarding/personal-info", { ...state, ...contact });
+      if (next) pushOnboardingRoute(router, next);
+      return;
+    }
+
+    setSaving(true);
+
     const result = await saveIntakeContact(contact);
-    setSaving(false);
 
     if (!result.ok) {
-      if (result.code === "email_exists" || result.code === "wrong_portal") {
+      setSaving(false);
+      if (result.code === "email_exists") {
+        setEmailError(
+          <>
+            An account with this email already exists.{" "}
+            <Link href="/auth" className="font-semibold underline underline-offset-2">
+              Log in instead
+            </Link>
+            .
+          </>,
+        );
+        return;
+      }
+      if (result.code === "wrong_portal") {
         setEmailError(result.message);
         return;
       }
@@ -116,20 +107,14 @@ export default function PersonalInfoPage() {
     }
 
     updateState(contact);
-    // Next step is shipping; medicine/packages come later in the flow.
     const next = getNextStepPath("/onboarding/personal-info", { ...state, ...contact });
-    if (next) await pushOnboardingRoute(router, next);
-  }
-
-  async function handleBack() {
-    const prev = getPrevStepPath("/onboarding/personal-info", state);
-    if (prev) await pushOnboardingRoute(router, prev);
+    if (next) pushOnboardingRoute(router, next);
   }
 
   return (
     <OnboardingStepLayout
       title="Personal information"
-      onBack={handleBack}
+      backHref={getPrevStepPath("/onboarding/personal-info", state)}
       onContinue={handleContinue}
       continueDisabled={saving}
       continueLabel="Continue"

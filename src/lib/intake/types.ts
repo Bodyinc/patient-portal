@@ -34,6 +34,16 @@ export type MedicineDto = {
 
 export type QuestionType = "text" | "number" | "boolean" | "single_select" | "multi_select";
 
+export type QuestionDisqualifyRules = {
+  /** Admin questionnaire form: Disqualify when → Answer is Yes */
+  if_yes?: boolean;
+  /** Admin questionnaire form: Disqualify when → Answer is No */
+  if_no?: boolean;
+  disqualify_when?: boolean | string | number;
+  disqualify_when_true?: boolean;
+  disqualify_when_false?: boolean;
+};
+
 export type QuestionOptionDto = {
   id: string;
   label: string;
@@ -46,6 +56,7 @@ export type QuestionDto = {
   questionType: QuestionType;
   isRequired: boolean;
   options: QuestionOptionDto[];
+  disqualifyRules: QuestionDisqualifyRules;
 };
 
 export type QuestionnaireDto = {

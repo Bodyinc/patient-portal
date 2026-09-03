@@ -40,9 +40,12 @@ function PricePair({
   }
 
   return (
-    <span className="flex items-baseline gap-2">
-      <span className="text-[13px] font-normal text-[#152A51]/50 line-through">
-        {formatMoney(original)}
+    <span className="flex items-end gap-3">
+      <span className="flex flex-col items-end gap-0.5">
+        <span className="text-[12px] font-bold leading-none text-[#152A51]/70">Original price</span>
+        <span className="text-[16px] font-bold leading-none text-[#152A51]/70 line-through sm:text-[17px]">
+          {formatMoney(original)}
+        </span>
       </span>
       <span className={finalClassName}>{formatMoney(final)}</span>
     </span>

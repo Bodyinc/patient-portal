@@ -1,6 +1,47 @@
-import type { QuestionnaireAnswerValue, QuestionType } from "@/lib/intake/types";
+import type {
+  QuestionnaireAnswerValue,
+  QuestionDisqualifyRules,
+  QuestionType,
+} from "@/lib/intake/types";
 
-export { type QuestionType } from "@/lib/intake/types";
+export type { QuestionDisqualifyRules, QuestionType } from "@/lib/intake/types";
+
+function isYesValue(value: unknown): boolean {
+  return value === true || value === "true" || value === "yes" || value === 1;
+}
+
+function isNoValue(value: unknown): boolean {
+  return value === false || value === "false" || value === "no" || value === 0;
+}
+
+export function parseDisqualifyRules(value: unknown): QuestionDisqualifyRules {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return value as QuestionDisqualifyRules;
+}
+
+/** Admin yes/no form writes `{ if_yes: true }` / `{ if_no: true }`; older keys still evaluate. */
+export function booleanAnswerIsDisqualifying(
+  answer: boolean,
+  rules: QuestionDisqualifyRules,
+): boolean {
+  if (
+    answer &&
+    (rules.if_yes === true ||
+      rules.disqualify_when_true === true ||
+      isYesValue(rules.disqualify_when))
+  ) {
+    return true;
+  }
+  if (
+    !answer &&
+    (rules.if_no === true ||
+      rules.disqualify_when_false === true ||
+      isNoValue(rules.disqualify_when))
+  ) {
+    return true;
+  }
+  return false;
+}
 
 export function normalizeQuestionType(raw: string): QuestionType {
   switch (raw) {

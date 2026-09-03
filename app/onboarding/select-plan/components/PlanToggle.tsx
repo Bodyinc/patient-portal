@@ -38,7 +38,7 @@ export default function PlanToggle({ packages, selectedPackageId, onChange }: Pl
               onClick={() => onChange(pkg.id)}
               aria-pressed={selected}
               className={cn(
-                "relative w-full rounded-[14px] border bg-white px-4 py-4 text-left transition sm:px-5 sm:py-5",
+                "relative w-full rounded-[14px] border bg-white px-4 py-4 text-left sm:px-5 sm:py-5",
                 selected
                   ? "border-[#152A51] shadow-[0_2px_12px_rgba(21,42,81,0.08)]"
                   : "border-[#E8E8E8] hover:border-[#152A51]/30",

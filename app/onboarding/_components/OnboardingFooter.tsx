@@ -1,12 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { Lock } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+import { markOnboardingNavigation } from "../_lib/onboarding-navigation";
+
 type OnboardingFooterProps = {
   onBack?: () => void;
+  backHref?: string | null;
   onContinue?: () => void;
   continueLabel?: string;
   continueDisabled?: boolean;
@@ -18,6 +22,7 @@ type OnboardingFooterProps = {
 
 export default function OnboardingFooter({
   onBack,
+  backHref,
   onContinue,
   continueLabel = "Continue →",
   continueDisabled = false,
@@ -28,19 +33,22 @@ export default function OnboardingFooter({
 }: OnboardingFooterProps) {
   const isFigma = variant === "figma";
 
+  const backClassName = isFigma
+    ? "h-[46px] w-full rounded-full border-[#152A51]/30 bg-transparent px-[19px] text-[14px] font-medium leading-none text-[#152A51] shadow-none hover:bg-[#152A51]/5 sm:w-auto"
+    : "w-full border-[#152A51] text-[#152A51] sm:w-auto";
+
   const backButton = showBack ? (
-    <Button
-      type="button"
-      variant="outline"
-      onClick={() => onBack?.()}
-      className={
-        isFigma
-          ? "h-[46px] w-full rounded-full border-[#152A51]/30 bg-transparent px-[19px] text-[14px] font-medium leading-none text-[#152A51] shadow-none hover:bg-[#152A51]/5 sm:w-auto"
-          : "w-full border-[#152A51] text-[#152A51] sm:w-auto"
-      }
-    >
-      ← Previous
-    </Button>
+    backHref ? (
+      <Button asChild variant="outline" className={backClassName}>
+        <Link href={backHref} prefetch onClick={() => markOnboardingNavigation()}>
+          ← Previous
+        </Link>
+      </Button>
+    ) : (
+      <Button type="button" variant="outline" onClick={() => onBack?.()} className={backClassName}>
+        ← Previous
+      </Button>
+    )
   ) : null;
 
   const continueButton = showContinue ? (

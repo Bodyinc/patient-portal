@@ -4,9 +4,13 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import { evaluateMedicineEligibility, saveQuestionnaireResponses } from "@/lib/actions/intake";
-import { isQuestionAnswered } from "@/lib/intake/questionnaire";
-import type { QuestionnaireAnswerValue, QuestionnaireResponseInput } from "@/lib/intake/types";
+import { saveQuestionnaireResponses } from "@/lib/actions/intake";
+import { booleanAnswerIsDisqualifying, isQuestionAnswered } from "@/lib/intake/questionnaire";
+import type {
+  QuestionDto,
+  QuestionnaireAnswerValue,
+  QuestionnaireResponseInput,
+} from "@/lib/intake/types";
 
 import OnboardingStepLayout from "../_components/OnboardingStepLayout";
 import QuestionInput from "../_components/QuestionInput";
@@ -54,6 +58,23 @@ function normalizeStoredAnswers(
   );
 }
 
+function findDisqualifyingAnswer(
+  questions: QuestionDto[],
+  answers: Record<string, QuestionnaireAnswerValue>,
+): string | null {
+  for (const question of questions) {
+    const answer = answers[question.id];
+    if (
+      question.questionType === "boolean" &&
+      (answer?.boolean === true || answer?.boolean === false) &&
+      booleanAnswerIsDisqualifying(answer.boolean, question.disqualifyRules ?? {})
+    ) {
+      return question.text;
+    }
+  }
+  return null;
+}
+
 export default function QuestionnairePage() {
   const router = useRouter();
   const { state, updateState, hydrated } = useOnboarding();
@@ -61,6 +82,11 @@ export default function QuestionnairePage() {
     normalizeStoredAnswers(state.questionnaireAnswers),
   );
   const [saving, setSaving] = useState(false);
+  const [ineligibleReason, setIneligibleReason] = useState<string | null>(
+    state.eligibilityResult === "ineligible" && Object.keys(state.questionnaireAnswers).length > 0
+      ? "Based on your answers, you are not eligible for this treatment."
+      : null,
+  );
 
   const {
     data: questionnaire,
@@ -104,12 +130,13 @@ export default function QuestionnairePage() {
   ]);
 
   function updateAnswer(questionId: string, value: QuestionnaireAnswerValue) {
+    setIneligibleReason(null);
     setAnswers((prev) => ({ ...prev, [questionId]: value }));
   }
 
   async function handleContinue() {
     if (!questionnaire) {
-      await pushOnboardingRoute(router, "/onboarding/personal-info");
+      pushOnboardingRoute(router, "/onboarding/personal-info");
       return;
     }
 
@@ -118,6 +145,19 @@ export default function QuestionnairePage() {
         toast.error("Please answer all required questions before continuing");
         return;
       }
+    }
+
+    if (
+      state.questionnaireComplete &&
+      state.eligibilityResult !== "ineligible" &&
+      JSON.stringify(answers) === JSON.stringify(normalizeStoredAnswers(state.questionnaireAnswers))
+    ) {
+      const next = getNextStepPath("/onboarding/questionnaire", {
+        ...state,
+        questionnaireComplete: true,
+      });
+      if (next) pushOnboardingRoute(router, next);
+      return;
     }
 
     setSaving(true);
@@ -133,38 +173,36 @@ export default function QuestionnairePage() {
       return;
     }
 
-    const eligibilityResult = await evaluateMedicineEligibility(null);
-    setSaving(false);
+    const eligibility = saveResult.data.eligibility;
 
-    if (!eligibilityResult.ok) {
-      toast.error(eligibilityResult.message);
-      return;
-    }
-
-    if (eligibilityResult.data.result === "ineligible") {
-      toast.error(eligibilityResult.data.reason ?? "You are not eligible for this treatment.");
+    if (
+      eligibility.result === "ineligible" ||
+      findDisqualifyingAnswer(questionnaire.questions, answers)
+    ) {
+      setSaving(false);
+      const reason =
+        eligibility.reason ?? "Based on your answers, you are not eligible for this treatment.";
+      setIneligibleReason(reason);
+      toast.error(reason);
       updateState({
         questionnaireAnswers: answers,
-        eligibilityResult: eligibilityResult.data.result,
+        eligibilityResult: "ineligible",
         questionnaireComplete: false,
       });
       // Stay on questionnaire — do not open personal info / shipping / medicine.
       return;
     }
 
+    setIneligibleReason(null);
+
     const patch = {
       questionnaireAnswers: answers,
-      eligibilityResult: eligibilityResult.data.result,
+      eligibilityResult: eligibility.result,
       questionnaireComplete: true,
     };
     updateState(patch);
     const next = getNextStepPath("/onboarding/questionnaire", { ...state, ...patch });
-    if (next) await pushOnboardingRoute(router, next);
-  }
-
-  async function handleBack() {
-    const prev = getPrevStepPath("/onboarding/questionnaire", state);
-    if (prev) await pushOnboardingRoute(router, prev);
+    if (next) pushOnboardingRoute(router, next);
   }
 
   if (!hydrated || !state.goalId || isLoading) {
@@ -200,20 +238,27 @@ export default function QuestionnairePage() {
     );
   }
 
+  const disqualifyingPrompt = findDisqualifyingAnswer(questionnaire.questions, answers);
+  const blockedReason =
+    ineligibleReason ??
+    (disqualifyingPrompt
+      ? "Based on your answers, you are not eligible for this treatment."
+      : null);
+
   return (
     <OnboardingStepLayout
       title={questionnaire.title}
       description="A short screening is required for your selected health goal. Answer each question below."
-      onBack={handleBack}
+      backHref={getPrevStepPath("/onboarding/questionnaire", state)}
       onContinue={handleContinue}
       continueLabel="Continue"
       continueDisabled={saving}
       maxWidth="2xl"
       variant="bare"
       align="center"
-      layout="centered"
+      layout="fill"
     >
-      <div className="space-y-6 pb-10 text-left sm:space-y-7">
+      <div className="space-y-6 pb-6 text-left sm:space-y-7">
         {questionnaire.questions.map((question, index) => (
           <div key={question.id} className="space-y-4">
             <p className="text-[15px] font-medium leading-snug text-[#152A51] sm:text-[16px]">
@@ -230,6 +275,14 @@ export default function QuestionnairePage() {
             />
           </div>
         ))}
+        {blockedReason ? (
+          <div className="rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-4 text-center">
+            <p className="text-sm font-medium text-amber-900">{blockedReason}</p>
+            <p className="mt-1 text-sm text-amber-800">
+              Change a disqualifying answer, go back, or choose a different health goal.
+            </p>
+          </div>
+        ) : null}
       </div>
     </OnboardingStepLayout>
   );
