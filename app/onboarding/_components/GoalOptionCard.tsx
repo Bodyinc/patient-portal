@@ -33,12 +33,12 @@ export default function GoalOptionCard({ goal, selected, dimmed, onClick }: Goal
       type="button"
       onClick={onClick}
       aria-pressed={selected}
-      className="group relative w-full text-left transition-all"
+      className="group relative w-full text-left"
     >
       <div className="relative w-full">
         <div
           className={cn(
-            "relative w-full overflow-hidden transition-opacity duration-300 ease-out",
+            "relative w-full overflow-hidden",
             IMAGE_RADIUS,
             dimmed ? "opacity-70" : "opacity-100",
           )}
@@ -49,7 +49,7 @@ export default function GoalOptionCard({ goal, selected, dimmed, onClick }: Goal
                 src={imageSrc}
                 alt={goal.name}
                 className={cn(
-                  "absolute inset-0 h-full w-full object-cover transition-all duration-300 ease-out",
+                  "absolute inset-0 h-full w-full object-cover",
                   dimmed
                     ? "blur-[5px] scale-[1.04] saturate-100 brightness-100"
                     : "blur-0 scale-100",
@@ -73,12 +73,7 @@ export default function GoalOptionCard({ goal, selected, dimmed, onClick }: Goal
         ) : null}
       </div>
 
-      <div
-        className={cn(
-          "mt-3 transition-opacity duration-300",
-          dimmed ? "opacity-50" : "opacity-100",
-        )}
-      >
+      <div className={cn("mt-3", dimmed ? "opacity-50" : "opacity-100")}>
         <h3 className="text-[16px] font-medium leading-tight tracking-[-0.25px] text-[#152A51] sm:text-[18px]">
           {goal.name}
         </h3>

@@ -19,7 +19,7 @@ type QuestionInputProps = {
 
 const optionButtonClass = (selected: boolean) =>
   cn(
-    "flex w-full cursor-pointer items-center gap-3 rounded-[14px] border px-3 py-3 transition",
+    "flex w-full cursor-pointer items-center gap-3 rounded-[14px] border px-3 py-3",
     selected
       ? "border-[#152A51] bg-[#E8EEED]"
       : "border-[#E8E8E8] bg-white hover:border-[#152A51]/30",

@@ -11,6 +11,7 @@ type OnboardingStepLayoutProps = {
   description?: string;
   children: ReactNode;
   onBack?: () => void;
+  backHref?: string | null;
   onContinue?: () => void;
   continueLabel?: string;
   continueDisabled?: boolean;
@@ -43,6 +44,7 @@ export default function OnboardingStepLayout({
   description,
   children,
   onBack,
+  backHref,
   onContinue,
   continueLabel,
   continueDisabled,
@@ -80,6 +82,7 @@ export default function OnboardingStepLayout({
   const footer = onContinue ? (
     <OnboardingFooter
       onBack={onBack}
+      backHref={backHref}
       onContinue={onContinue}
       continueLabel={continueLabel}
       continueDisabled={continueDisabled}

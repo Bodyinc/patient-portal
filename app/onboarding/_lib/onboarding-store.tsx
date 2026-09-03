@@ -23,6 +23,7 @@ import {
   canAccessStep,
   getEarliestIncompleteStep,
   isOnboardingNavigationPending,
+  prefetchAdjacentOnboardingSteps,
   replaceOnboardingRoute,
 } from "./onboarding-navigation";
 
@@ -191,6 +192,10 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    prefetchAdjacentOnboardingSteps(router, pathname);
+  }, [router, pathname]);
 
   useEffect(() => {
     setState(loadState());

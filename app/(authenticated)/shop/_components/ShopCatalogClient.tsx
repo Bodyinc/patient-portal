@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import type { PortalOfferDto } from "@/lib/offers/types";
@@ -40,7 +40,6 @@ export default function ShopCatalogClient({
   avatarUrl,
   offer = null,
 }: ShopCatalogClientProps) {
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -104,9 +103,9 @@ export default function ShopCatalogClient({
     const nextUrl = `${pathname}${href.replace("/shop", "")}`;
     const currentUrl = `${pathname}?${searchParams.toString()}`;
     if (nextUrl !== currentUrl) {
-      router.replace(nextUrl, { scroll: false });
+      window.history.replaceState(window.history.state, "", nextUrl);
     }
-  }, [category, sortBy, page, debouncedSearch, pathname, router, searchParams]);
+  }, [category, sortBy, page, debouncedSearch, pathname, searchParams]);
 
   const list = catalogQuery.data ?? initialList;
   const isPending = catalogQuery.isFetching;

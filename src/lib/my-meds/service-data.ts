@@ -221,25 +221,31 @@ export async function fetchMyMedsPageData(
   userId: string,
   options: { page?: number; pageSize?: number; query?: string } = {},
 ): Promise<MyMedsPageDataDto> {
-  const [, pendingPayments] = await Promise.all([
+  const [didReconcile, pendingPayments, initialSubs, requests] = await Promise.all([
     maybeReconcileIncompleteSubscription(userId),
     healAndFetchPendingAdditionalPayments(userId).catch((err) => {
       console.error("[additional_payments] My Meds load failed:", err);
       return [];
     }),
-    maybeSyncSubscriptionPeriodEnds(userId).catch((err) => {
-      console.error("[subscriptions] my-meds period sync failed:", err);
-    }),
-  ]);
-
-  const [subscriptionsResult, requests] = await Promise.all([
     supabaseAdmin
       .from("subscriptions")
       .select(SUBSCRIPTION_SELECT)
       .eq("user_id", userId)
       .order("created_at", { ascending: false }),
     fetchMedicationRequests(userId, options),
+    maybeSyncSubscriptionPeriodEnds(userId).catch((err) => {
+      console.error("[subscriptions] my-meds period sync failed:", err);
+    }),
   ]);
+
+  const subscriptionsResult =
+    didReconcile === true
+      ? await supabaseAdmin
+          .from("subscriptions")
+          .select(SUBSCRIPTION_SELECT)
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+      : initialSubs;
 
   if (subscriptionsResult.error) throw new Error(subscriptionsResult.error.message);
 

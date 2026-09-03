@@ -14,7 +14,7 @@ import PlanToggle from "./components/PlanToggle";
 import PricingCard from "./components/PricingCard";
 import TreatmentSummary from "./components/TreatmentSummary";
 import { useMedicinesForCategory, usePackages } from "../_hooks/use-intake-catalog";
-import { invalidateIntakeSummary, prefetchIntakeSummary } from "../_lib/intake-query";
+import { invalidateIntakeSummary } from "../_lib/intake-query";
 import {
   getNextStepPath,
   getPrevStepPath,
@@ -61,35 +61,38 @@ export default function SelectPlanPage() {
       return;
     }
 
+    if (state.selectedPackageId === selectedPackageId) {
+      const next = getNextStepPath("/onboarding/select-plan", {
+        ...state,
+        selectedPackageId,
+      });
+      if (next) pushOnboardingRoute(router, next);
+      return;
+    }
+
     setSaving(true);
     const result = await saveSelectedPlan(selectedPackageId);
-    setSaving(false);
 
     if (!result.ok) {
+      setSaving(false);
       toast.error(result.message);
       return;
     }
 
     updateState({ selectedPackageId, checkoutConfirmed: false });
-    await invalidateIntakeSummary(queryClient);
-    await prefetchIntakeSummary(queryClient);
+    void invalidateIntakeSummary(queryClient);
     const next = getNextStepPath("/onboarding/select-plan", {
       ...state,
       selectedPackageId,
     });
-    if (next) await pushOnboardingRoute(router, next);
-  }
-
-  async function handleBack() {
-    const prev = getPrevStepPath("/onboarding/select-plan", state);
-    if (prev) await pushOnboardingRoute(router, prev);
+    if (next) pushOnboardingRoute(router, next);
   }
 
   return (
     <OnboardingFrame
       footer={
         <OnboardingFooter
-          onBack={handleBack}
+          backHref={getPrevStepPath("/onboarding/select-plan", state)}
           onContinue={handleContinue}
           continueLabel="Continue"
           continueDisabled={!selectedPackageId || saving || isLoading}

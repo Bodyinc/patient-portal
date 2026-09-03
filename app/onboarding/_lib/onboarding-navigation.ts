@@ -168,9 +168,33 @@ export function getProgressForPath(pathname: string) {
 type OnboardingRouter = {
   push: (href: string) => unknown;
   replace: (href: string) => unknown;
+  prefetch?: (href: string) => unknown;
 };
 
 let navigationGraceUntil = 0;
+
+/** Prefetch nearby steps only — prefetching the whole funnel on first paint saturates the network. */
+export function prefetchAdjacentOnboardingSteps(
+  router: Pick<OnboardingRouter, "prefetch">,
+  pathname: string,
+) {
+  if (!router.prefetch) return;
+  const index = getStepIndex(pathname);
+  if (index < 0) {
+    void router.prefetch(ONBOARDING_STEPS[0].path);
+    void router.prefetch(ONBOARDING_STEPS[1].path);
+    return;
+  }
+  const targets = [
+    ONBOARDING_STEPS[index - 1]?.path,
+    ONBOARDING_STEPS[index + 1]?.path,
+    ONBOARDING_STEPS[index + 2]?.path,
+    ONBOARDING_STEPS[index + 3]?.path,
+  ];
+  for (const path of targets) {
+    if (path) void router.prefetch(path);
+  }
+}
 
 export function markOnboardingNavigation() {
   navigationGraceUntil = Date.now() + 1500;
@@ -192,15 +216,13 @@ async function runNavAction(_method: "push" | "replace", action: () => unknown, 
   }
 }
 
-/** Await navigation so rejections stay inside handleContinue (avoids Next.js [object Event] overlay). */
-export async function pushOnboardingRoute(router: Pick<OnboardingRouter, "push">, href: string) {
+/** Start navigation immediately — do not await this from Continue/Previous. */
+export function pushOnboardingRoute(router: Pick<OnboardingRouter, "push">, href: string) {
   markOnboardingNavigation();
-  await runNavAction("push", () => router.push(href), href);
+  void runNavAction("push", () => router.push(href), href);
 }
 
-export async function replaceOnboardingRoute(
-  router: Pick<OnboardingRouter, "replace">,
-  href: string,
-) {
-  await runNavAction("replace", () => router.replace(href), href);
+export function replaceOnboardingRoute(router: Pick<OnboardingRouter, "replace">, href: string) {
+  markOnboardingNavigation();
+  void runNavAction("replace", () => router.replace(href), href);
 }

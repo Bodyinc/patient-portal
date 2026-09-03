@@ -27,7 +27,7 @@ export default function OnboardingProgress() {
         aria-label={`Step ${current} of ${total}`}
       >
         <div
-          className="h-full rounded-full bg-[#152A51] transition-all duration-300"
+          className="h-full rounded-full bg-[#152A51] transition-[width] duration-150"
           style={{ width: `${percent}%` }}
         />
       </div>

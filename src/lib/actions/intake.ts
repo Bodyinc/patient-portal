@@ -36,7 +36,7 @@ import type {
   QuestionnaireDto,
   QuestionnaireResponseInput,
 } from "@/lib/intake/types";
-import { normalizeQuestionType } from "@/lib/intake/questionnaire";
+import { normalizeQuestionType, parseDisqualifyRules } from "@/lib/intake/questionnaire";
 import { resolveMedicineImageSrc } from "@/lib/intake/medicine-image";
 import { formatPortalDate } from "@/lib/date-format";
 import { formatOrderId } from "@/lib/orders/order-id";
@@ -136,6 +136,7 @@ type EmbeddedQuestion = {
   question_type: string;
   is_required: boolean;
   sort_order: number;
+  disqualify_rules: Json;
   questionnaire_question_options: EmbeddedQuestionOption[] | null;
 };
 
@@ -157,6 +158,7 @@ function mapQuestionnaireDto(questionnaire: {
       description: q.description,
       questionType: normalizeQuestionType(q.question_type),
       isRequired: q.is_required,
+      disqualifyRules: parseDisqualifyRules(q.disqualify_rules),
       options: [...(q.questionnaire_question_options ?? [])]
         .sort((a, b) => a.sort_order - b.sort_order)
         .map((o) => ({ id: o.id, label: o.label })),
@@ -172,7 +174,7 @@ async function loadQuestionnaireDto(
   const { data: questionnaire, error } = await supabaseAdmin
     .from("questionnaires")
     .select(
-      "id, name, questionnaire_questions(id, prompt, description, question_type, is_required, sort_order, questionnaire_question_options(id, question_id, label, sort_order))",
+      "id, name, questionnaire_questions(id, prompt, description, question_type, is_required, sort_order, disqualify_rules, questionnaire_question_options(id, question_id, label, sort_order))",
     )
     .in("id", questionnaireIds)
     .eq("is_active", true)
@@ -214,8 +216,15 @@ async function buildIntakeSummary(
   // One parallel wave (was three sequential ones): the medicine rides along on the
   // link query as an embedded select, and eligibility is fetched per-session then
   // matched to the current medicine in JS.
-  const [categoryLink, medicineLinkResult, packageResult, eligibilityResult] = await Promise.all([
-    getSessionCategory(sessionId),
+  const categoryPromise = getSessionCategory(sessionId);
+  const [
+    categoryLink,
+    medicineLinkResult,
+    packageResult,
+    eligibilityResult,
+    requiresQuestionnaire,
+  ] = await Promise.all([
+    categoryPromise,
     supabaseAdmin
       .from("intake_session_medicines")
       .select("medicine_id, medicines(id, name)")
@@ -237,6 +246,9 @@ async function buildIntakeSummary(
       .order("evaluated_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    categoryPromise.then((link) =>
+      link?.category_id ? categoryHasActiveQuestionnaire(link.category_id) : false,
+    ),
   ]);
 
   const medicineId = medicineLinkResult.data?.medicine_id ?? null;
@@ -254,10 +266,6 @@ async function buildIntakeSummary(
       medicineId === null)
       ? eligibilityRaw
       : null;
-
-  const requiresQuestionnaire = categoryLink?.category_id
-    ? await categoryHasActiveQuestionnaire(categoryLink.category_id)
-    : false;
 
   const bmi =
     session.height_cm !== null && session.weight_kg !== null
@@ -626,7 +634,7 @@ const bmiSchema = z.object({
 
 export async function saveIntakeBmi(
   input: z.infer<typeof bmiSchema>,
-): Promise<IntakeActionResult<{ bmi: number }>> {
+): Promise<IntakeActionResult<{ bmi: number; eligibility: EligibilityResultDto }>> {
   const sessionResult = await requireIntakeSession();
   if ("error" in sessionResult) {
     return { ok: false, code: "session_error", message: sessionResult.error };
@@ -658,7 +666,16 @@ export async function saveIntakeBmi(
     return { ok: false, code: "save_error", message: error.message };
   }
 
-  return { ok: true, data: { bmi } };
+  const eligibility = await evaluateEligibilityForSession(
+    {
+      ...sessionResult.session,
+      height_cm: heightCm,
+      weight_kg: weightKg,
+    },
+    null,
+  );
+
+  return { ok: true, data: { bmi, eligibility } };
 }
 
 export async function saveIntakeMedicine(
@@ -980,7 +997,7 @@ export async function getQuestionnaireForMedicine(
 export async function saveQuestionnaireResponses(
   medicineId: string | null,
   responses: QuestionnaireResponseInput[],
-): Promise<IntakeActionResult<{ saved: number }>> {
+): Promise<IntakeActionResult<{ saved: number; eligibility: EligibilityResultDto }>> {
   const sessionResult = await requireIntakeSession();
   if ("error" in sessionResult) {
     return { ok: false, code: "session_error", message: sessionResult.error };
@@ -1015,7 +1032,8 @@ export async function saveQuestionnaireResponses(
   });
 
   if (rows.length === 0) {
-    return { ok: true, data: { saved: 0 } };
+    const eligibility = await evaluateEligibilityForSession(sessionResult.session, medicineId);
+    return { ok: true, data: { saved: 0, eligibility } };
   }
 
   const { error } = await supabaseAdmin.from("intake_session_questionnaire_responses").insert(rows);
@@ -1024,7 +1042,8 @@ export async function saveQuestionnaireResponses(
     return { ok: false, code: "save_error", message: error.message };
   }
 
-  return { ok: true, data: { saved: rows.length } };
+  const eligibility = await evaluateEligibilityForSession(sessionResult.session, medicineId);
+  return { ok: true, data: { saved: rows.length, eligibility } };
 }
 
 /**
@@ -1032,30 +1051,27 @@ export async function saveQuestionnaireResponses(
  * Pass `medicineId: null` for goal-level evaluation before medicine selection.
  * Responses are loaded session-wide (goal-level questionnaire).
  */
-export async function evaluateMedicineEligibility(
-  medicineId: string | null = null,
-): Promise<IntakeActionResult<EligibilityResultDto>> {
-  const sessionResult = await requireIntakeSession();
-  if ("error" in sessionResult) {
-    return { ok: false, code: "session_error", message: sessionResult.error };
-  }
+async function evaluateEligibilityForSession(
+  session: IntakeSessionRow,
+  medicineId: string | null,
+): Promise<EligibilityResultDto> {
+  const [categoryLink, responsesResult] = await Promise.all([
+    getSessionCategory(session.id),
+    supabaseAdmin
+      .from("intake_session_questionnaire_responses")
+      .select("question_id, answer_option_ids, answer_boolean, answer_text, answer_number")
+      .eq("session_id", session.id),
+  ]);
 
-  const session = sessionResult.session;
-  const categoryLink = await getSessionCategory(session.id);
   const rules = parseEligibilityRules(categoryLink?.medication_categories?.eligibility_rules ?? {});
-
   const categoryResult = evaluateCategoryRules(session, rules);
-
-  const { data: responses } = await supabaseAdmin
-    .from("intake_session_questionnaire_responses")
-    .select("question_id, answer_option_ids, answer_boolean, answer_text, answer_number")
-    .eq("session_id", session.id);
+  const responses = responsesResult.data ?? [];
 
   let questionnaireResult: EligibilityResultDto = { result: "eligible", reason: null };
 
-  if (hasQuestionnaireResponses(responses ?? [])) {
-    const optionIds = (responses ?? []).flatMap((r) => r.answer_option_ids);
-    const questionIds = [...new Set((responses ?? []).map((r) => r.question_id))];
+  if (hasQuestionnaireResponses(responses)) {
+    const optionIds = responses.flatMap((r) => r.answer_option_ids);
+    const questionIds = [...new Set(responses.map((r) => r.question_id))];
 
     const [optionsResult, questionsResult] = await Promise.all([
       optionIds.length > 0
@@ -1082,7 +1098,7 @@ export async function evaluateMedicineEligibility(
     ]);
 
     questionnaireResult = evaluateQuestionnaireResponses(
-      responses ?? [],
+      responses,
       optionsResult.data ?? [],
       questionsResult.data ?? [],
     );
@@ -1090,7 +1106,6 @@ export async function evaluateMedicineEligibility(
 
   const finalResult = combineEligibilityResults([categoryResult, questionnaireResult]);
 
-  // Replace prior eligibility for this session so hydration picks up the latest row.
   await supabaseAdmin
     .from("intake_session_eligibility_results")
     .delete()
@@ -1103,7 +1118,19 @@ export async function evaluateMedicineEligibility(
     reason: finalResult.reason,
   });
 
-  return { ok: true, data: finalResult };
+  return finalResult;
+}
+
+export async function evaluateMedicineEligibility(
+  medicineId: string | null = null,
+): Promise<IntakeActionResult<EligibilityResultDto>> {
+  const sessionResult = await requireIntakeSession();
+  if ("error" in sessionResult) {
+    return { ok: false, code: "session_error", message: sessionResult.error };
+  }
+
+  const data = await evaluateEligibilityForSession(sessionResult.session, medicineId);
+  return { ok: true, data };
 }
 
 export async function getPackagesForMedicine(

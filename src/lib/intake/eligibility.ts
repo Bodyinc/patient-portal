@@ -1,9 +1,16 @@
 import "server-only";
 
 import { calculateAgeFromDob, calculateBmiFromMetric } from "@/lib/intake/conversions";
+import {
+  booleanAnswerIsDisqualifying,
+  parseDisqualifyRules,
+  type QuestionDisqualifyRules,
+} from "@/lib/intake/questionnaire";
 import type { IntakeSessionRow } from "@/lib/intake/session";
 import type { EligibilityResultDto } from "@/lib/intake/types";
 import type { Json } from "@/lib/supabase/types";
+
+export type { QuestionDisqualifyRules };
 
 // `sex` and `bmi_bands` are the keys the admin category form writes; `allowed_sex`, `min_bmi` and
 // `max_bmi` are the portal's older names, kept as a fallback for rules set outside that form.
@@ -59,17 +66,6 @@ type QuestionRow = {
   question_type: string;
   disqualify_rules: Json;
 };
-
-export type QuestionDisqualifyRules = {
-  disqualify_when?: boolean | string | number;
-  disqualify_when_true?: boolean;
-  disqualify_when_false?: boolean;
-};
-
-function parseDisqualifyRules(value: Json): QuestionDisqualifyRules {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-  return value as QuestionDisqualifyRules;
-}
 
 export function evaluateCategoryRules(
   session: Pick<IntakeSessionRow, "state_code" | "sex" | "dob" | "height_cm" | "weight_kg">,
@@ -144,25 +140,6 @@ export function evaluateCategoryRules(
   return { result: "eligible", reason: null };
 }
 
-function isBooleanDisqualifying(
-  answer: boolean,
-  rules: QuestionDisqualifyRules,
-): { disqualified: boolean; reason: string | null } {
-  if (rules.disqualify_when_true === true && answer === true) {
-    return { disqualified: true, reason: "A disqualifying answer was provided." };
-  }
-  if (rules.disqualify_when_false === true && answer === false) {
-    return { disqualified: true, reason: "A disqualifying answer was provided." };
-  }
-  if (rules.disqualify_when === true && answer === true) {
-    return { disqualified: true, reason: "A disqualifying answer was provided." };
-  }
-  if (rules.disqualify_when === false && answer === false) {
-    return { disqualified: true, reason: "A disqualifying answer was provided." };
-  }
-  return { disqualified: false, reason: null };
-}
-
 export function evaluateQuestionnaireResponses(
   responses: QuestionnaireResponseRow[],
   options: QuestionOptionRow[],
@@ -185,8 +162,7 @@ export function evaluateQuestionnaireResponses(
     if (response.answer_boolean !== null && response.answer_boolean !== undefined) {
       const question = questionMap.get(response.question_id);
       const rules = parseDisqualifyRules(question?.disqualify_rules ?? {});
-      const booleanCheck = isBooleanDisqualifying(response.answer_boolean, rules);
-      if (booleanCheck.disqualified) {
+      if (booleanAnswerIsDisqualifying(response.answer_boolean, rules)) {
         const prompt = question?.prompt ?? "Question";
         return {
           result: "ineligible",

@@ -70,7 +70,7 @@ export default function MedicationCard({
         }
       }}
       className={cn(
-        "relative flex h-full w-full min-w-0 max-w-[386px] cursor-pointer flex-col rounded-[20px] border border-[#E8EEED] bg-white p-3 transition-all onboarding-font sm:p-4",
+        "relative flex h-full w-full min-w-0 max-w-[386px] cursor-pointer flex-col rounded-[20px] border border-[#E8EEED] bg-white p-3 onboarding-font sm:p-4",
         selected && "ring-2 ring-inset ring-[#6A9B9C]/40",
       )}
     >

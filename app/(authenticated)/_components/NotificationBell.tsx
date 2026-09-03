@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { Bell } from "lucide-react";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -47,34 +48,33 @@ export default function NotificationBell({
   iconClassName = "h-5 w-5 text-[#152A51]",
 }: NotificationBellProps) {
   const [open, setOpen] = useState(false);
-  const [items, setItems] = useState<PatientNotificationDto[]>([]);
-  const [loading, setLoading] = useState(true);
   /** Cutoff for the unread badge (updated when the panel opens). */
   const [badgeSeenAt, setBadgeSeenAt] = useState(0);
   /** Cutoff for unread styling inside the open panel (previous seen time). */
   const [listSeenAt, setListSeenAt] = useState(0);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const result = await getMyNotifications();
-    if (result.ok) setItems(result.data);
-    else setItems([]);
-    setLoading(false);
-  }, []);
+  const notificationsQuery = useQuery({
+    queryKey: ["patient-notifications"],
+    queryFn: async (): Promise<PatientNotificationDto[]> => {
+      const result = await getMyNotifications();
+      return result.ok ? result.data : [];
+    },
+  });
+  const items = notificationsQuery.data ?? [];
+  const loading = notificationsQuery.isLoading && items.length === 0;
 
   useEffect(() => {
     const seen = readSeenAt();
     setBadgeSeenAt(seen);
     setListSeenAt(seen);
-    void load();
-  }, [load]);
+  }, []);
 
   const unreadCount = items.filter((n) => new Date(n.createdAt).getTime() > badgeSeenAt).length;
 
   function handleOpenChange(next: boolean) {
     setOpen(next);
     if (next) {
-      void load();
+      void notificationsQuery.refetch();
       const prev = readSeenAt();
       setListSeenAt(prev);
       const now = Date.now();

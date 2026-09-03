@@ -32,6 +32,7 @@ export default function MedicationsPage() {
   function selectMedication(id: string, variantId: string | null) {
     setSelected(id);
     setSelectedVariantId(variantId);
+    void prefetchPackagesForMedicine(queryClient, id, variantId);
   }
 
   const {
@@ -58,16 +59,22 @@ export default function MedicationsPage() {
       return;
     }
 
-    setSaving(true);
-    const result = await saveIntakeMedicine(selected);
-    setSaving(false);
-
-    if (!result.ok) {
-      toast.error(result.message);
+    if (state.medicationId === selected) {
+      if (state.variantId !== selectedVariantId) {
+        updateState({ variantId: selectedVariantId });
+      }
+      const next = getNextStepPath("/onboarding/medications", {
+        ...state,
+        medicationId: selected,
+        variantId: selectedVariantId,
+      });
+      if (next) pushOnboardingRoute(router, next);
       return;
     }
 
-    // Preserve goal-level questionnaire answers and eligibility; only reset plan/checkout.
+    setSaving(true);
+    const savePromise = saveIntakeMedicine(selected);
+
     const patch = {
       medicationId: selected,
       variantId: selectedVariantId,
@@ -75,14 +82,15 @@ export default function MedicationsPage() {
       checkoutConfirmed: false,
     };
     updateState(patch);
-    await prefetchPackagesForMedicine(queryClient, selected, selectedVariantId);
     const next = getNextStepPath("/onboarding/medications", { ...state, ...patch });
-    if (next) await pushOnboardingRoute(router, next);
-  }
+    if (next) pushOnboardingRoute(router, next);
 
-  async function handleBack() {
-    const prev = getPrevStepPath("/onboarding/medications", state);
-    if (prev) await pushOnboardingRoute(router, prev);
+    const result = await savePromise;
+
+    if (!result.ok) {
+      toast.error(result.message);
+      pushOnboardingRoute(router, "/onboarding/medications");
+    }
   }
 
   return (
@@ -90,7 +98,7 @@ export default function MedicationsPage() {
       <OnboardingFrame
         footer={
           <OnboardingFooter
-            onBack={handleBack}
+            backHref={getPrevStepPath("/onboarding/medications", state)}
             onContinue={handleContinue}
             continueDisabled={!selected || saving || isLoading || !categoryEligible}
             variant="figma"

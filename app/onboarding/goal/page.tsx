@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { saveIntakeCategory } from "@/lib/actions/intake";
+import { intakeQueryKeys } from "@/lib/intake/query-keys";
 
 import GoalOptionCard from "../_components/GoalOptionCard";
 import OnboardingStepLayout from "../_components/OnboardingStepLayout";
@@ -54,36 +55,47 @@ export default function GoalPage() {
       return;
     }
 
-    setSaving(true);
-    try {
-      const result = await saveIntakeCategory(selected);
+    const category = categories.find((goal) => goal.slug === selected);
+    const questionnaireState = queryClient.getQueryState(intakeQueryKeys.questionnaire(selected));
+    const requiresQuestionnaire = questionnaireState?.dataUpdatedAt
+      ? Boolean(questionnaireState.data)
+      : true;
 
+    const patch = {
+      goalId: selected,
+      goalName: category?.name ?? state.goalName,
+      medicationId: null,
+      requiresQuestionnaire,
+      questionnaireAnswers: {},
+      questionnaireComplete: false,
+      selectedPackageId: null,
+      eligibilityResult: null,
+      checkoutConfirmed: false,
+    };
+
+    if (state.goalId === selected) {
+      const next = getNextStepPath("/onboarding/goal", { ...state, goalId: selected });
+      if (next) pushOnboardingRoute(router, next);
+      return;
+    }
+
+    setSaving(true);
+    const savePromise = saveIntakeCategory(selected);
+    updateState(patch);
+    const next = getNextStepPath("/onboarding/goal", { ...state, ...patch });
+    if (next) pushOnboardingRoute(router, next);
+
+    try {
+      const result = await savePromise;
       if (!result.ok) {
         toast.error(result.message);
+        pushOnboardingRoute(router, "/onboarding/goal");
         return;
       }
-
-      const patch = {
-        goalId: selected,
+      updateState({
         goalName: result.data.goalName,
-        medicationId: null,
         requiresQuestionnaire: result.data.requiresQuestionnaire,
-        questionnaireAnswers: {},
-        questionnaireComplete: false,
-        selectedPackageId: null,
-        eligibilityResult: null,
-        checkoutConfirmed: false,
-      };
-      updateState(patch);
-      // Start prefetch WHILE this page is still mounted. Prefetching after navigate abandons
-      // the server-action Promise (never settles), and React Query then hangs forever on
-      // fetchStatus:"fetching" when the questionnaire page mounts.
-      void prefetchMedicinesForCategory(queryClient, selected);
-      if (result.data.requiresQuestionnaire) {
-        void prefetchQuestionnaireForCategory(queryClient, selected);
-      }
-      const next = getNextStepPath("/onboarding/goal", { ...state, ...patch });
-      if (next) await pushOnboardingRoute(router, next);
+      });
     } catch (err) {
       const message =
         err instanceof Error
@@ -92,8 +104,7 @@ export default function GoalPage() {
             ? err
             : "Unable to save your goal. Please try again.";
       toast.error(message);
-    } finally {
-      setSaving(false);
+      pushOnboardingRoute(router, "/onboarding/goal");
     }
   }
 
@@ -131,7 +142,14 @@ export default function GoalPage() {
               goal={goal}
               selected={hasValidSelection && selected === goal.slug}
               dimmed={hasValidSelection && selected !== goal.slug}
-              onClick={() => setSelected(goal.slug)}
+              onClick={() => {
+                setSelected(goal.slug);
+                const slug = goal.slug;
+                requestAnimationFrame(() => {
+                  void prefetchMedicinesForCategory(queryClient, slug);
+                  void prefetchQuestionnaireForCategory(queryClient, slug);
+                });
+              }}
             />
           ))}
         </div>
