@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Toaster } from "@/components/ui/sonner";
+import FeedbackWidget from "@/components/feedback-widget";
 import { createClient } from "@/lib/supabase/client";
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -44,6 +45,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       {children}
+      <FeedbackWidget />
       <Toaster richColors position="top-center" />
     </QueryClientProvider>
   );

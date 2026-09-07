@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getPatientDisplayIdentity } from "@/lib/profile/identity";
 import { getOrCreateStripeCustomer } from "@/lib/stripe/customers";
 import {
   createSetupIntent,
@@ -22,10 +23,11 @@ async function requireCustomer() {
   if (!user)
     return { error: NextResponse.json({ error: "Authentication required." }, { status: 401 }) };
 
+  const identity = await getPatientDisplayIdentity(user.id);
   const customerId = await getOrCreateStripeCustomer({
     userId: user.id,
     email: user.email ?? null,
-    name: (user.user_metadata?.full_name as string | undefined) ?? null,
+    name: identity.stripeName,
   });
   return { user, customerId };
 }

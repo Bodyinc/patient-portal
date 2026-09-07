@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
@@ -11,10 +12,16 @@ import {
   type EditableProfileDto,
 } from "@/lib/actions/profile";
 import { ZipCodeInput } from "@/components/zip-code-input";
+import { PhoneField } from "@/components/phone-field";
 import { PROFILE_AVATAR_MAX_BYTES, PROFILE_AVATAR_MAX_LABEL } from "@/lib/profile/avatar";
 import { isExternalMedicineImage } from "@/lib/intake/medicine-image";
 import { fieldControlClass, fieldLabelClass } from "../../../onboarding/_lib/onboarding-theme";
-import { digitsOnlyZip } from "@/lib/validation";
+import {
+  DEFAULT_PHONE_COUNTRY_CODE,
+  digitsOnlyPhone,
+  digitsOnlyZip,
+  isValidNationalPhone,
+} from "@/lib/validation";
 
 function toPatientId(userId: string) {
   const compact = userId.replace(/-/g, "").toUpperCase();
@@ -25,7 +32,7 @@ type Field = {
   key: Exclude<keyof EditableProfileDto, "id" | "avatarUrl">;
   label: string;
   type?: "text" | "email" | "date";
-  kind?: "input" | "select-sex";
+  kind?: "input" | "select-sex" | "phone";
   readOnly?: boolean;
   hint?: string;
   autoFocus?: boolean;
@@ -74,6 +81,13 @@ function Section({
                 <option value="female">Female</option>
                 <option value="other">Other</option>
               </select>
+            ) : field.kind === "phone" ? (
+              <PhoneField
+                id="phone"
+                phone={form.phone}
+                phoneCountryCode={DEFAULT_PHONE_COUNTRY_CODE}
+                onPhoneChange={(phone) => onChange("phone", phone)}
+              />
             ) : field.key === "postalCode" ? (
               <ZipCodeInput
                 value={form.postalCode}
@@ -109,8 +123,10 @@ function initialsFromName(name: string) {
 }
 
 export default function ProfileEditor({ initialProfile }: { initialProfile: EditableProfileDto }) {
+  const router = useRouter();
   const [form, setForm] = useState<EditableProfileDto>(() => ({
     ...initialProfile,
+    phone: digitsOnlyPhone(initialProfile.phone, DEFAULT_PHONE_COUNTRY_CODE),
     postalCode: digitsOnlyZip(initialProfile.postalCode),
   }));
   const [avatarPreview, setAvatarPreview] = useState(initialProfile.avatarUrl);
@@ -122,7 +138,12 @@ export default function ProfileEditor({ initialProfile }: { initialProfile: Edit
   const external = avatarPreview ? isExternalMedicineImage(avatarPreview) : false;
 
   function updateField(key: Exclude<keyof EditableProfileDto, "id" | "avatarUrl">, value: string) {
-    const next = key === "postalCode" ? digitsOnlyZip(value) : value;
+    const next =
+      key === "postalCode"
+        ? digitsOnlyZip(value)
+        : key === "phone"
+          ? digitsOnlyPhone(value, DEFAULT_PHONE_COUNTRY_CODE)
+          : value;
     setForm((prev) => ({
       ...prev,
       [key]: key === "sex" ? ((next || null) as EditableProfileDto["sex"]) : next,
@@ -170,6 +191,11 @@ export default function ProfileEditor({ initialProfile }: { initialProfile: Edit
   }
 
   function onSave() {
+    if (!isValidNationalPhone(form.phone, DEFAULT_PHONE_COUNTRY_CODE)) {
+      toast.error("Enter a valid 10-digit phone number");
+      return;
+    }
+
     startSaveTransition(async () => {
       const result = await updateMyProfile({
         fullName: form.fullName,
@@ -193,6 +219,7 @@ export default function ProfileEditor({ initialProfile }: { initialProfile: Edit
       setForm(result.data);
       setAvatarPreview(result.data.avatarUrl);
       toast.success("Profile updated successfully");
+      router.refresh();
     });
   }
 
@@ -274,7 +301,7 @@ export default function ProfileEditor({ initialProfile }: { initialProfile: Edit
               readOnly: true,
               action: { label: "Change email", href: "/profile/change-email" },
             },
-            { key: "phone", label: "Phone Number" },
+            { key: "phone", label: "Phone Number", kind: "phone" },
           ]}
         />
 

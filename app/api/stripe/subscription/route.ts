@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getPatientDisplayIdentity } from "@/lib/profile/identity";
 import { getOrCreateStripeCustomer } from "@/lib/stripe/customers";
 import { formatSavedCardLabel, getDefaultPaymentMethod } from "@/lib/stripe/payment-methods";
 import { createSubscriptionForPrice } from "@/lib/stripe/subscriptions";
@@ -61,11 +62,13 @@ export async function POST(request: Request) {
         .eq("id", packageId)
         .maybeSingle(),
       computeShopOrderFees(user.id, medicineId),
-      getOrCreateStripeCustomer({
-        userId: user.id,
-        email: user.email ?? null,
-        name: (user.user_metadata?.full_name as string | undefined) ?? null,
-      }),
+      getPatientDisplayIdentity(user.id).then((identity) =>
+        getOrCreateStripeCustomer({
+          userId: user.id,
+          email: user.email ?? null,
+          name: identity.stripeName,
+        }),
+      ),
     ]);
 
     if (pkgError) {

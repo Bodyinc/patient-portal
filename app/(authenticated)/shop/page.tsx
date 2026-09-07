@@ -1,5 +1,6 @@
 import { requirePatientSession } from "@/lib/auth/require-patient";
 import { fetchActivePortalOffer } from "@/lib/offers/service-data";
+import { getPatientDisplayIdentity } from "@/lib/profile/identity";
 import { fetchShopCatalogData, fetchShopCategoriesData } from "@/lib/shop/service-data";
 import type { ShopSortOption } from "@/lib/shop/types";
 import ShopCatalogClient from "./_components/ShopCatalogClient";
@@ -30,7 +31,6 @@ export default async function ShopPage({
 }) {
   const { user } = await requirePatientSession();
   const patientId = toPatientId(user.id);
-  const fullName = user.user_metadata?.full_name ?? "Patient";
 
   const resolvedSearchParams = (await searchParams) ?? {};
   const category = resolvedSearchParams.category ?? null;
@@ -39,7 +39,7 @@ export default async function ShopPage({
   const searchQuery = (resolvedSearchParams.q ?? "").trim();
 
   try {
-    const [categories, list, offer] = await Promise.all([
+    const [categories, list, offer, identity] = await Promise.all([
       fetchShopCategoriesData(),
       fetchShopCatalogData({
         categorySlug: category,
@@ -52,6 +52,7 @@ export default async function ShopPage({
         console.error("[portal_offers] Shop load failed:", err);
         return null;
       }),
+      getPatientDisplayIdentity(user.id),
     ]);
 
     return (
@@ -61,9 +62,9 @@ export default async function ShopPage({
             categories={categories}
             initialList={list}
             pageSize={PAGE_SIZE}
-            fullName={fullName}
+            fullName={identity.fullName}
             patientId={patientId}
-            avatarUrl={(user.user_metadata?.avatar_url as string | null | undefined) ?? null}
+            avatarUrl={identity.avatarUrl}
             offer={offer}
           />
         </div>

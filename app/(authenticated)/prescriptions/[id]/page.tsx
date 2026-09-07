@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requirePatientSession } from "@/lib/auth/require-patient";
+import { getPatientDisplayIdentity } from "@/lib/profile/identity";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import PrescriptionDocument from "./_components/PrescriptionDocument";
 
@@ -36,18 +37,14 @@ export default async function PrescriptionPage({
     );
   }
 
-  let providerName: string | null = null;
-  if (rx.provider_id) {
-    const { data: prov } = await supabaseAdmin
-      .from("profiles")
-      .select("full_name")
-      .eq("id", rx.provider_id)
-      .maybeSingle();
-    providerName = prov?.full_name ?? null;
-  }
-
-  const patientName =
-    (user.user_metadata?.full_name as string | undefined) ?? user.email ?? "Patient";
+  const [providerResult, identity] = await Promise.all([
+    rx.provider_id
+      ? supabaseAdmin.from("profiles").select("full_name").eq("id", rx.provider_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    getPatientDisplayIdentity(user.id),
+  ]);
+  const providerName = providerResult.data?.full_name ?? null;
+  const patientName = identity.stripeName || user.email || identity.fullName;
 
   return (
     <main className="min-w-0 flex-1 bg-[#F3F6F6] p-3 sm:p-4 print:bg-white print:p-0">
