@@ -4,6 +4,7 @@ import { calculateBmiFromMetric } from "@/lib/intake/conversions";
 import { DEFAULT_MEDICINE_IMAGE, resolveMedicineImageSrc } from "@/lib/intake/medicine-image";
 import { healAndFetchPendingAdditionalPayments } from "@/lib/orders/additional-payment";
 import { fetchActiveMedications } from "@/lib/my-meds/service-data";
+import { getPatientDisplayIdentity } from "@/lib/profile/identity";
 import { maybeReconcileIncompleteSubscription } from "@/lib/stripe/reconcile";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -135,7 +136,7 @@ async function fetchClaimedIntakeExtras(userId: string): Promise<{
 }
 
 export async function fetchDashboardPageData(userId: string): Promise<DashboardPageDataDto> {
-  const [didReconcile, pendingPayments, profileResult, activeMeds, intake] = await Promise.all([
+  const [didReconcile, pendingPayments, identity, activeMeds, intake] = await Promise.all([
     maybeReconcileIncompleteSubscription(userId).catch((err) => {
       console.error("[stripe] dashboard incomplete reconcile failed:", err);
       return false;
@@ -144,7 +145,7 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
       console.error("[additional_payments] dashboard load failed:", err);
       return [] as Awaited<ReturnType<typeof healAndFetchPendingAdditionalPayments>>;
     }),
-    supabaseAdmin.from("profiles").select("full_name, avatar_url").eq("id", userId).maybeSingle(),
+    getPatientDisplayIdentity(userId),
     fetchActiveMedications(userId, { reconcile: false }).catch(() => []),
     fetchClaimedIntakeExtras(userId),
   ]);
@@ -153,8 +154,6 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
     didReconcile === true
       ? await fetchActiveMedications(userId, { reconcile: false }).catch(() => activeMeds)
       : activeMeds;
-  const profile = profileResult.data;
-
   const currentMed = meds[0] ?? null;
   const treatmentFromSub: DashboardTreatmentDto | null = currentMed
     ? {
@@ -173,9 +172,9 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
   const treatment = treatmentFromSub ?? intake.treatment;
 
   return {
-    fullName: profile?.full_name?.trim() || "Patient",
+    fullName: identity.fullName,
     patientId: toPatientId(userId),
-    avatarUrl: profile?.avatar_url?.trim() || null,
+    avatarUrl: identity.avatarUrl,
     bmi: intake.bmi,
     bmiCategory: getBmiCategory(intake.bmi),
     goals: intake.goals,

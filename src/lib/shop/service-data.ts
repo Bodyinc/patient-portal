@@ -299,7 +299,7 @@ export async function fetchShopCheckoutBootstrapData(options: {
     priceLabel: priceLabelFromDuration(Number(pkg.price), pkg.duration_months),
     amount: Number(pkg.price),
     durationMonths: pkg.duration_months,
-    badge: pkg.is_most_popular ? "Most Popular" : undefined,
+    badge: pkg.is_most_popular ? "Recommended" : undefined,
   }));
   const baseMonthly = fromPriceDollars(
     variant ? variant.from_price_cents : medicine.from_price_cents,

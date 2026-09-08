@@ -1,4 +1,5 @@
 import { requirePatientSession } from "@/lib/auth/require-patient";
+import { getPatientDisplayIdentity } from "@/lib/profile/identity";
 import { fetchShopCheckoutBootstrapData } from "@/lib/shop/service-data";
 import { getCustomerCreditCents, getOrCreateStripeCustomer } from "@/lib/stripe/customers";
 import { formatSavedCardLabel, getDefaultPaymentMethod } from "@/lib/stripe/payment-methods";
@@ -42,15 +43,17 @@ export default async function ShopCheckoutPage({
   }
 
   try {
-    const [bootstrap, walletCreditCents, savedCardLabel] = await Promise.all([
+    const [bootstrap, walletCreditCents, identity, savedCardLabel] = await Promise.all([
       fetchShopCheckoutBootstrapData({ medicineId, variantId }),
       getCustomerCreditCents(user.id),
+      getPatientDisplayIdentity(user.id),
       (async () => {
         try {
+          const identity = await getPatientDisplayIdentity(user.id);
           const customerId = await getOrCreateStripeCustomer({
             userId: user.id,
             email: user.email ?? null,
-            name: (user.user_metadata?.full_name as string | undefined) ?? null,
+            name: identity.stripeName,
           });
           const pm = await getDefaultPaymentMethod(customerId);
           return pm ? formatSavedCardLabel(pm) : null;
@@ -64,9 +67,9 @@ export default async function ShopCheckoutPage({
       <main className="mx-auto flex w-full max-w-[1440px] flex-1 flex-col overflow-x-hidden px-4 py-4 sm:px-6 lg:h-full lg:min-h-0 lg:overflow-hidden lg:px-1">
         <ShopCheckoutClient
           bootstrap={bootstrap}
-          fullName={user.user_metadata?.full_name ?? "Patient"}
+          fullName={identity.fullName}
           patientId={toPatientId(user.id)}
-          avatarUrl={(user.user_metadata?.avatar_url as string | null | undefined) ?? null}
+          avatarUrl={identity.avatarUrl}
           medicineId={medicineId}
           from={from}
           initialPackageId={packageId}

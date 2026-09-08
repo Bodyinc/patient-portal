@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requirePatientSession } from "@/lib/auth/require-patient";
 import { createAdditionalPaymentIntent } from "@/lib/orders/additional-payment";
+import { getPatientDisplayIdentity } from "@/lib/profile/identity";
 import AdditionalPaymentForm from "./_components/AdditionalPaymentForm";
 
 function money(cents: number) {
@@ -17,10 +18,11 @@ export default async function AdditionalPaymentPage({
   const { user } = await requirePatientSession();
   const { requestId } = await params;
 
+  const identity = await getPatientDisplayIdentity(user.id);
   const intent = await createAdditionalPaymentIntent({
     userId: user.id,
     email: user.email ?? null,
-    name: (user.user_metadata?.full_name as string | undefined) ?? null,
+    name: identity.stripeName,
     requestId,
   });
 

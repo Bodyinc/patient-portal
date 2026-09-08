@@ -1,14 +1,18 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { PROFILE_AVATAR_MAX_BYTES, PROFILE_AVATAR_MAX_LABEL } from "@/lib/profile/avatar";
+import { propagatePatientNameChange } from "@/lib/profile/identity";
 import {
   OPTIONAL_DOB_SCHEMA,
-  OPTIONAL_PHONE_SCHEMA,
   OPTIONAL_ZIP_CODE_SCHEMA,
+  PHONE_SCHEMA,
+  DEFAULT_PHONE_COUNTRY_CODE,
+  digitsOnlyPhone,
   digitsOnlyZip,
 } from "@/lib/validation";
 import type { Tables } from "@/lib/supabase/types";
@@ -18,7 +22,7 @@ import type { Tables } from "@/lib/supabase/types";
 // reconcileCheckoutEmail) may move it. Editing profiles.email directly would desync the two.
 const profileUpdateSchema = z.object({
   fullName: z.string().trim().min(1).max(120),
-  phone: OPTIONAL_PHONE_SCHEMA,
+  phone: PHONE_SCHEMA,
   dob: OPTIONAL_DOB_SCHEMA,
   sex: z.enum(["male", "female", "other"]).nullable(),
   stateCode: z.string().trim().max(2).optional().or(z.literal("")),
@@ -54,7 +58,7 @@ function mapProfile(profile: Tables<"profiles">): EditableProfileDto {
     id: profile.id,
     fullName: profile.full_name ?? "",
     email: profile.email ?? "",
-    phone: profile.phone ?? "",
+    phone: digitsOnlyPhone(profile.phone ?? "", DEFAULT_PHONE_COUNTRY_CODE),
     dob: profile.dob ?? "",
     sex: profile.sex ?? null,
     stateCode: profile.state_code ?? "",
@@ -145,7 +149,7 @@ export async function updateMyProfile(
 
   const updatePayload: Partial<Tables<"profiles">> = {
     full_name: data.fullName,
-    phone: data.phone || null,
+    phone: digitsOnlyPhone(data.phone, DEFAULT_PHONE_COUNTRY_CODE) || null,
     dob: data.dob || null,
     sex: data.sex,
     state_code: data.stateCode || null,
@@ -168,7 +172,21 @@ export async function updateMyProfile(
     return { ok: false, code: "save_error", message: error?.message ?? "Could not save profile." };
   }
 
-  return { ok: true, data: mapProfile(updated as Tables<"profiles">) };
+  const saved = updated as Tables<"profiles">;
+  await propagatePatientNameChange({
+    userId: auth.user.id,
+    fullName: saved.full_name,
+    avatarUrl: saved.avatar_url,
+    stripeCustomerId: saved.stripe_customer_id,
+  });
+
+  revalidatePath("/dashboard");
+  revalidatePath("/my-meds");
+  revalidatePath("/shop");
+  revalidatePath("/billing");
+  revalidatePath("/profile");
+
+  return { ok: true, data: mapProfile(saved) };
 }
 
 export async function uploadProfileAvatar(

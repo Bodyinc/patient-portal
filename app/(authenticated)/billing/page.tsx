@@ -1,5 +1,6 @@
 import { requirePatientSession } from "@/lib/auth/require-patient";
 import { fetchBillingPageData } from "@/lib/billing/service-data";
+import { getPatientDisplayIdentity } from "@/lib/profile/identity";
 import { getReferralSummary } from "@/lib/referrals";
 import { getWalletSummary } from "@/lib/wallet";
 import BillingPageClient from "./_components/BillingPageClient";
@@ -25,7 +26,7 @@ export default async function BillingPage({
   const query = (resolvedSearchParams.q ?? "").trim();
 
   try {
-    const [data, referral, wallet] = await Promise.all([
+    const [data, referral, wallet, identity] = await Promise.all([
       fetchBillingPageData(user.id, {
         page,
         pageSize: PAGE_SIZE,
@@ -33,15 +34,16 @@ export default async function BillingPage({
       }),
       getReferralSummary(user.id),
       getWalletSummary(user.id),
+      getPatientDisplayIdentity(user.id),
     ]);
 
     return (
       <main className="min-w-0 flex-1 bg-white p-3 sm:p-4">
         <BillingPageClient
           data={data}
-          fullName={user.user_metadata?.full_name ?? "Patient"}
+          fullName={identity.fullName}
           patientId={toPatientId(user.id)}
-          avatarUrl={(user.user_metadata?.avatar_url as string | null | undefined) ?? null}
+          avatarUrl={identity.avatarUrl}
           referral={referral}
           wallet={wallet}
         />

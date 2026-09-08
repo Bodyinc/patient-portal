@@ -22,6 +22,38 @@ export function adminNotifyEmail(): string | null {
   return email || null;
 }
 
+/** Ops inbox plus every user with the admin role (deduped). */
+export async function adminRecipientEmails(): Promise<string[]> {
+  const emails = new Set<string>();
+  const inbox = adminNotifyEmail();
+  if (inbox) emails.add(inbox.toLowerCase());
+
+  const { data: roles, error } = await supabaseAdmin
+    .from("user_roles")
+    .select("user_id")
+    .eq("role", "admin");
+  if (error) {
+    console.error("[email] admin roles lookup failed:", error);
+  }
+
+  const ids = [...new Set((roles ?? []).map((r) => r.user_id).filter(Boolean))];
+  if (ids.length > 0) {
+    const { data: profiles, error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .select("email")
+      .in("id", ids);
+    if (profileError) {
+      console.error("[email] admin profiles lookup failed:", profileError);
+    }
+    for (const p of profiles ?? []) {
+      const email = p.email?.trim();
+      if (email) emails.add(email.toLowerCase());
+    }
+  }
+
+  return [...emails];
+}
+
 type EmailRecipient = {
   email: string;
   fullName: string | null;

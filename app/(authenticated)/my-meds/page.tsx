@@ -2,6 +2,7 @@ import { requirePatientSession } from "@/lib/auth/require-patient";
 import { fulfillAdditionalPaymentByIntentId } from "@/lib/orders/additional-payment";
 import { fetchMyMedsPageData } from "@/lib/my-meds/service-data";
 import { fetchActivePortalOffer } from "@/lib/offers/service-data";
+import { getPatientDisplayIdentity } from "@/lib/profile/identity";
 import { buildReferralLink, getReferralSummary } from "@/lib/referrals";
 import MyMedsPageClient from "./_components/MyMedsPageClient";
 
@@ -36,7 +37,7 @@ export default async function MyMedsPage({
   }
 
   try {
-    const [data, referral, offer] = await Promise.all([
+    const [data, referral, offer, identity] = await Promise.all([
       fetchMyMedsPageData(user.id, {
         page,
         pageSize: PAGE_SIZE,
@@ -47,15 +48,16 @@ export default async function MyMedsPage({
         console.error("[portal_offers] My Meds load failed:", err);
         return null;
       }),
+      getPatientDisplayIdentity(user.id),
     ]);
 
     return (
       <main className="mx-auto w-full max-w-[1440px] flex-1 overflow-x-hidden px-4 py-4 sm:px-6 lg:px-2">
         <MyMedsPageClient
           data={data}
-          fullName={user.user_metadata?.full_name ?? "Patient"}
+          fullName={identity.fullName}
           patientId={toPatientId(user.id)}
-          avatarUrl={(user.user_metadata?.avatar_url as string | null | undefined) ?? null}
+          avatarUrl={identity.avatarUrl}
           referralCode={referral?.code ?? "BODYINC"}
           referralLink={referral?.link ?? buildReferralLink("BODYINC")}
           rewardCents={referral?.rewardCents ?? 0}

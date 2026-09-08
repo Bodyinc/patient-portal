@@ -1017,6 +1017,39 @@ export type Database = {
           },
         ];
       };
+      patient_feedback: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          email: string | null;
+          full_name: string | null;
+          category: string;
+          message: string;
+          page_path: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          email?: string | null;
+          full_name?: string | null;
+          category: string;
+          message: string;
+          page_path?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string | null;
+          email?: string | null;
+          full_name?: string | null;
+          category?: string;
+          message?: string;
+          page_path?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       promo_codes: {
         Row: {
           id: string;
