@@ -168,16 +168,10 @@ export async function fetchActiveMedications(
   return (subscriptions as SubscriptionRow[]).map(mapActiveMedication);
 }
 
-export async function fetchMedicationRequests(
-  userId: string,
-  options: { page?: number; pageSize?: number; query?: string } = {},
-): Promise<MyMedsMedicationRequestsListDto> {
-  const page = Math.max(1, options.page ?? 1);
-  const pageSize = Math.max(1, Math.min(50, options.pageSize ?? 10));
-  const query = (options.query ?? "").trim();
-
-  const orders = await fetchPatientOrders(userId);
-  const allItems: MyMedsMedicationRequestDto[] = orders.map((o) => ({
+function mapOrderToRequestDto(
+  o: Awaited<ReturnType<typeof fetchPatientOrders>>[number],
+): MyMedsMedicationRequestDto {
+  return {
     id: o.id,
     orderNumber: o.orderNumber,
     medicationName: o.medicineName,
@@ -197,22 +191,53 @@ export async function fetchMedicationRequests(
         }
       : null,
     timeline: o.timeline,
-  }));
+  };
+}
 
-  const filtered = query
-    ? allItems.filter((request) => matchesRequestQuery(request, query))
-    : allItems;
-  const total = filtered.length;
-  const totalPages = total === 0 ? 0 : Math.ceil(total / pageSize);
+export async function fetchMedicationRequests(
+  userId: string,
+  options: { page?: number; pageSize?: number; query?: string } = {},
+): Promise<MyMedsMedicationRequestsListDto> {
+  const page = Math.max(1, options.page ?? 1);
+  const pageSize = Math.max(1, Math.min(50, options.pageSize ?? 10));
+  const query = (options.query ?? "").trim();
   const start = (page - 1) * pageSize;
-  const items = filtered.slice(start, start + pageSize);
+
+  // Search spans medicine/plan names, so keep the wider fetch + in-memory filter.
+  // Default browse path paginates in SQL to avoid loading every request on each page.
+  if (!query) {
+    const [{ count, error: countError }, orders] = await Promise.all([
+      supabaseAdmin
+        .from("medication_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId),
+      fetchPatientOrders(userId, { limit: pageSize, offset: start }),
+    ]);
+    if (countError) throw new Error(countError.message);
+
+    const total = count ?? 0;
+    return {
+      items: orders.map(mapOrderToRequestDto),
+      total,
+      page,
+      pageSize,
+      totalPages: total === 0 ? 0 : Math.ceil(total / pageSize),
+      query,
+    };
+  }
+
+  const orders = await fetchPatientOrders(userId);
+  const filtered = orders
+    .map(mapOrderToRequestDto)
+    .filter((request) => matchesRequestQuery(request, query));
+  const total = filtered.length;
 
   return {
-    items,
+    items: filtered.slice(start, start + pageSize),
     total,
     page,
     pageSize,
-    totalPages,
+    totalPages: total === 0 ? 0 : Math.ceil(total / pageSize),
     query,
   };
 }

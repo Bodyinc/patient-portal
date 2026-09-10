@@ -9,9 +9,6 @@ import {
 } from "../_lib/onboarding-theme";
 import MedicineImage from "./MedicineImage";
 
-/** @deprecated Prefer MEDICATION_CARD_IMAGE_ASPECT */
-export const MEDICINE_PRODUCT_IMAGE_ASPECT = MEDICATION_CARD_IMAGE_ASPECT;
-
 /** Figma vial export frame */
 const VIAL_ASPECT = "133 / 200";
 

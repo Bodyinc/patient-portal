@@ -1,7 +1,27 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { stripe } from "./server";
+
+const getProfileStripeCustomerId = cache(async (userId: string): Promise<string | null> => {
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("stripe_customer_id")
+    .eq("id", userId)
+    .maybeSingle();
+  return profile?.stripe_customer_id ?? null;
+});
+
+function isMissingStripeObject(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: string }).code === "resource_missing"
+  );
+}
 
 export async function getOrCreateStripeCustomer(params: {
   userId: string;
@@ -10,13 +30,16 @@ export async function getOrCreateStripeCustomer(params: {
 }): Promise<string> {
   const { userId, email, name } = params;
 
-  const { data: profile } = await supabaseAdmin
-    .from("profiles")
-    .select("stripe_customer_id")
-    .eq("id", userId)
-    .maybeSingle();
-
-  if (profile?.stripe_customer_id) return profile.stripe_customer_id;
+  const existingId = await getProfileStripeCustomerId(userId);
+  if (existingId) {
+    try {
+      const existing = await stripe.customers.retrieve(existingId);
+      if (!existing.deleted) return existingId;
+    } catch (error) {
+      // Customer IDs from a previous Stripe account 404 here; create a new one below.
+      if (!isMissingStripeObject(error)) throw error;
+    }
+  }
 
   const customer = await stripe.customers.create({
     email: email ?? undefined,
@@ -46,13 +69,9 @@ export async function createGuestStripeCustomer(params: {
 // Stripe automatically deducts from the next invoice. Returned as positive cents.
 export async function getCustomerCreditCents(userId: string): Promise<number> {
   try {
-    const { data: profile } = await supabaseAdmin
-      .from("profiles")
-      .select("stripe_customer_id")
-      .eq("id", userId)
-      .maybeSingle();
-    if (!profile?.stripe_customer_id) return 0;
-    const customer = await stripe.customers.retrieve(profile.stripe_customer_id);
+    const stripeCustomerId = await getProfileStripeCustomerId(userId);
+    if (!stripeCustomerId) return 0;
+    const customer = await stripe.customers.retrieve(stripeCustomerId);
     if (customer.deleted) return 0;
     const balance = customer.balance ?? 0;
     return balance < 0 ? -balance : 0;

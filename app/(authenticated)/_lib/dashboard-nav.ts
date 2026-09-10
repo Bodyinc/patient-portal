@@ -10,6 +10,7 @@ export const DASHBOARD_NAV: DashboardNavItem[] = [
   // { label: "Document Center", href: "/document-center" },
   { label: "Billing", href: "/billing" },
   { label: "Shop", href: "/shop" },
+  { label: "My inquiries", href: "/inquiries" },
   { label: "Profile", href: "/profile" },
 ];
 

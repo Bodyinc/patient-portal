@@ -963,31 +963,6 @@ export async function getCategoryRequiresQuestionnaire(
   return { ok: true, data: await categoryHasActiveQuestionnaire(category.id) };
 }
 
-/** @deprecated Prefer getQuestionnaireForCategory — questionnaires are linked to categories. */
-export async function getQuestionnaireForMedicine(
-  medicineId: string,
-): Promise<IntakeActionResult<QuestionnaireDto | null>> {
-  const { data: categoryLink, error: categoryLinkError } = await supabaseAdmin
-    .from("medication_category_medicines")
-    .select("category_id, medication_categories(slug)")
-    .eq("medicine_id", medicineId)
-    .limit(1)
-    .maybeSingle();
-
-  if (categoryLinkError) {
-    return { ok: false, code: "fetch_error", message: categoryLinkError.message };
-  }
-
-  const slug = (categoryLink as { medication_categories?: { slug: string } | null } | null)
-    ?.medication_categories?.slug;
-
-  if (!slug) {
-    return { ok: true, data: null };
-  }
-
-  return getQuestionnaireForCategory(slug);
-}
-
 /**
  * Persist questionnaire answers for the current intake session.
  * Pass `medicineId: null` when the patient has not chosen a medicine yet
@@ -1142,7 +1117,9 @@ export async function getPackagesForMedicine(
   // only discovers it after completing the whole intake.
   let query = supabaseAdmin
     .from("packages")
-    .select("*")
+    .select(
+      "id, name, duration_months, original_price, price, is_most_popular, features, clinical_note",
+    )
     .eq("medicine_id", medicineId)
     .eq("is_active", true)
     .not("stripe_price_id", "is", null)
@@ -1217,54 +1194,6 @@ export async function saveSelectedPlan(
   return { ok: true, data: { sessionId: sessionResult.session.id } };
 }
 
-export async function confirmCheckoutStub(): Promise<IntakeActionResult<{ sessionId: string }>> {
-  const sessionResult = await requireIntakeSession();
-  if ("error" in sessionResult) {
-    return { ok: false, code: "session_error", message: sessionResult.error };
-  }
-
-  const summary = await buildIntakeSummary(sessionResult.session.id, sessionResult.session);
-  if (!summary) {
-    return { ok: false, code: "session_error", message: "Session not found" };
-  }
-
-  if (!summary.selectedPackageId) {
-    return { ok: false, code: "no_plan", message: "Select a treatment plan first" };
-  }
-
-  if (!summary.medicineId) {
-    return { ok: false, code: "no_medicine", message: "Select a medication first" };
-  }
-
-  const { data: pkg } = await supabaseAdmin
-    .from("packages")
-    .select("medicine_id, is_active, stripe_price_id")
-    .eq("id", summary.selectedPackageId)
-    .maybeSingle();
-
-  if (!pkg?.is_active || pkg.medicine_id !== summary.medicineId) {
-    return { ok: false, code: "invalid_plan", message: "Selected plan is not valid" };
-  }
-
-  if (!pkg.stripe_price_id) {
-    return {
-      ok: false,
-      code: "invalid_plan",
-      message: "This plan is not available for purchase yet.",
-    };
-  }
-
-  if (summary.requiresQuestionnaire && summary.eligibilityResult === "ineligible") {
-    return {
-      ok: false,
-      code: "ineligible",
-      message: "You are not eligible for this treatment based on your responses.",
-    };
-  }
-
-  return { ok: true, data: { sessionId: summary.sessionId } };
-}
-
 export async function getIntakeSummary(): Promise<IntakeActionResult<IntakeSummaryDto | null>> {
   const sessionResult = await requireIntakeSession();
   if ("error" in sessionResult) {
@@ -1284,179 +1213,8 @@ export async function hydrateIntakeState(): Promise<IntakeActionResult<IntakeSum
   return getIntakeSummary();
 }
 
-export async function completeIntakeSession(): Promise<IntakeActionResult<{ sessionId: string }>> {
-  const sessionResult = await requireIntakeSession();
-  if ("error" in sessionResult) {
-    return { ok: false, code: "session_error", message: sessionResult.error };
-  }
-
-  if (sessionResult.session.status === "completed") {
-    return { ok: true, data: { sessionId: sessionResult.session.id } };
-  }
-
-  const { error } = await supabaseAdmin
-    .from("intake_sessions")
-    .update({ status: "completed" })
-    .eq("id", sessionResult.session.id);
-
-  if (error) {
-    return { ok: false, code: "save_error", message: error.message };
-  }
-
-  return { ok: true, data: { sessionId: sessionResult.session.id } };
-}
-
-/** Backstop for onboarding confirmation — same self-heal as authenticated /order-confirmation. */
-export async function reconcileOnboardingSubscription(): Promise<IntakeActionResult<null>> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return { ok: false, code: "auth_error", message: "Authentication required." };
-  }
-
-  try {
-    await reconcileLatestSubscriptionForUser(user.id);
-    return { ok: true, data: null };
-  } catch (error) {
-    console.error("[stripe] reconcile onboarding confirmation failed:", error);
-    return {
-      ok: false,
-      code: "reconcile_error",
-      message: error instanceof Error ? error.message : "Unable to reconcile subscription.",
-    };
-  }
-}
-
 function formatOrderDate(iso: string): string {
   return formatPortalDate(iso);
-}
-
-/**
- * Order number + date chips on the onboarding confirmation page.
- * Prefers the session payment id, then medication_request id, then session id.
- * Allows completed sessions because confirmation marks the session complete on mount.
- */
-export async function getOnboardingOrderMeta(): Promise<
-  IntakeActionResult<{ orderNumber: string; orderDate: string }>
-> {
-  const token = await getSessionTokenFromCookie();
-  if (!token) {
-    return { ok: false, code: "session_error", message: "No intake session" };
-  }
-
-  const { session, error } = await resolveIntakeSession(token, { allowCompleted: true });
-  if (!session || error) {
-    return { ok: false, code: "session_error", message: error ?? "Invalid session" };
-  }
-
-  const [paymentResult, requestResult] = await Promise.all([
-    supabaseAdmin
-      .from("payments")
-      .select("id, created_at")
-      .eq("session_id", session.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    supabaseAdmin
-      .from("medication_requests")
-      .select("id, created_at")
-      .eq("session_id", session.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-  ]);
-
-  const payment = paymentResult.data;
-  if (payment) {
-    return {
-      ok: true,
-      data: {
-        orderNumber: formatOrderId(payment.id),
-        orderDate: formatOrderDate(payment.created_at),
-      },
-    };
-  }
-
-  const request = requestResult.data;
-  if (request) {
-    return {
-      ok: true,
-      data: {
-        orderNumber: formatOrderId(request.id),
-        orderDate: formatOrderDate(request.created_at),
-      },
-    };
-  }
-
-  return {
-    ok: true,
-    data: {
-      orderNumber: formatOrderId(session.id),
-      orderDate: formatOrderDate(session.updated_at ?? session.created_at),
-    },
-  };
-}
-
-/**
- * Order summary card on onboarding confirmation. Must allow completed sessions because
- * the page marks the session complete on mount (getIntakeSummary would then return null).
- */
-export async function getOnboardingOrderSummary(): Promise<
-  IntakeActionResult<{
-    medicineName: string | null;
-    variantName: string | null;
-    packageName: string | null;
-    packagePrice: number | null;
-    totalPaid: number | null;
-    email: string | null;
-  }>
-> {
-  const token = await getSessionTokenFromCookie();
-  if (!token) {
-    return { ok: false, code: "session_error", message: "No intake session" };
-  }
-
-  const { session, error } = await resolveIntakeSession(token, { allowCompleted: true });
-  if (!session || error) {
-    return { ok: false, code: "session_error", message: error ?? "Invalid session" };
-  }
-
-  const [summary, paymentResult] = await Promise.all([
-    buildIntakeSummary(session.id, session),
-    supabaseAdmin
-      .from("payments")
-      .select("amount_cents")
-      .eq("session_id", session.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-  ]);
-
-  if (!summary) {
-    return { ok: false, code: "not_found", message: "Order summary unavailable" };
-  }
-
-  const paidCents = paymentResult.data?.amount_cents;
-  const totalPaid =
-    paidCents != null
-      ? Number(paidCents) / 100
-      : summary.packagePrice != null
-        ? Number(summary.packagePrice)
-        : null;
-
-  return {
-    ok: true,
-    data: {
-      medicineName: summary.medicineName,
-      variantName: summary.variantName,
-      packageName: summary.packageName,
-      packagePrice: summary.packagePrice,
-      totalPaid,
-      email: summary.email?.trim() || null,
-    },
-  };
 }
 
 /**
@@ -1605,6 +1363,12 @@ export async function claimIntakeSession(userId: string): Promise<void> {
     .from("medication_requests")
     .update({ user_id: userId })
     .eq("session_id", session.id)
+    .is("user_id", null);
+
+  await supabaseAdmin
+    .from("patient_feedback")
+    .update({ user_id: userId })
+    .eq("intake_session_id", session.id)
     .is("user_id", null);
 
   // Always attribute session-scoped Stripe rows to this account.
