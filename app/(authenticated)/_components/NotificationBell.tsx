@@ -59,6 +59,7 @@ export default function NotificationBell({
       const result = await getMyNotifications();
       return result.ok ? result.data : [];
     },
+    staleTime: 60_000,
   });
   const items = notificationsQuery.data ?? [];
   const loading = notificationsQuery.isLoading && items.length === 0;

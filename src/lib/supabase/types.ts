@@ -1026,7 +1026,11 @@ export type Database = {
           category: string;
           message: string;
           page_path: string | null;
+          status: string;
+          updated_at: string;
+          resolved_at: string | null;
           created_at: string;
+          intake_session_id: string | null;
         };
         Insert: {
           id?: string;
@@ -1036,7 +1040,11 @@ export type Database = {
           category: string;
           message: string;
           page_path?: string | null;
+          status?: string;
+          updated_at?: string;
+          resolved_at?: string | null;
           created_at?: string;
+          intake_session_id?: string | null;
         };
         Update: {
           id?: string;
@@ -1046,6 +1054,45 @@ export type Database = {
           category?: string;
           message?: string;
           page_path?: string | null;
+          status?: string;
+          updated_at?: string;
+          resolved_at?: string | null;
+          created_at?: string;
+          intake_session_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "patient_feedback_intake_session_id_fkey";
+            columns: ["intake_session_id"];
+            isOneToOne: false;
+            referencedRelation: "intake_sessions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      patient_feedback_replies: {
+        Row: {
+          id: string;
+          feedback_id: string;
+          author_role: string;
+          author_user_id: string | null;
+          body: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          feedback_id: string;
+          author_role: string;
+          author_user_id?: string | null;
+          body: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          feedback_id?: string;
+          author_role?: string;
+          author_user_id?: string | null;
+          body?: string;
           created_at?: string;
         };
         Relationships: [];

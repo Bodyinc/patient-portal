@@ -1,5 +1,6 @@
 "use server";
 
+import { cache } from "react";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -34,6 +35,27 @@ const profileUpdateSchema = z.object({
   avatarUrl: z.string().trim().url().optional().or(z.literal("")),
 });
 
+const PROFILE_EDITABLE_SELECT =
+  "id, full_name, email, phone, dob, sex, state_code, street_address, apartment, city, postal_code, country, avatar_url, stripe_customer_id";
+
+type ProfileEditableRow = Pick<
+  Tables<"profiles">,
+  | "id"
+  | "full_name"
+  | "email"
+  | "phone"
+  | "dob"
+  | "sex"
+  | "state_code"
+  | "street_address"
+  | "apartment"
+  | "city"
+  | "postal_code"
+  | "country"
+  | "avatar_url"
+  | "stripe_customer_id"
+>;
+
 export type ProfileActionResult<T> =
   { ok: true; data: T } | { ok: false; code: string; message: string };
 
@@ -53,7 +75,7 @@ export type EditableProfileDto = {
   avatarUrl: string;
 };
 
-function mapProfile(profile: Tables<"profiles">): EditableProfileDto {
+function mapProfile(profile: ProfileEditableRow): EditableProfileDto {
   return {
     id: profile.id,
     fullName: profile.full_name ?? "",
@@ -71,7 +93,7 @@ function mapProfile(profile: Tables<"profiles">): EditableProfileDto {
   };
 }
 
-async function requireAuthedUser() {
+const requireAuthedUser = cache(async () => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -79,7 +101,7 @@ async function requireAuthedUser() {
 
   if (!user) return null;
   return { supabase, user };
-}
+});
 
 // An abandoned email change can leave the auth LOGIN email pointing at an unverified new address
 // while profiles.email still holds the verified one. profiles.email is only ever written after a
@@ -117,7 +139,7 @@ export async function getMyProfile(): Promise<ProfileActionResult<EditableProfil
 
   const { data: profile, error } = await auth.supabase
     .from("profiles")
-    .select("*")
+    .select(PROFILE_EDITABLE_SELECT)
     .eq("id", auth.user.id)
     .maybeSingle();
 
@@ -125,7 +147,7 @@ export async function getMyProfile(): Promise<ProfileActionResult<EditableProfil
     return { ok: false, code: "not_found", message: error?.message ?? "Profile not found." };
   }
 
-  return { ok: true, data: mapProfile(profile as Tables<"profiles">) };
+  return { ok: true, data: mapProfile(profile as ProfileEditableRow) };
 }
 
 export async function updateMyProfile(
@@ -165,14 +187,14 @@ export async function updateMyProfile(
     .from("profiles")
     .update(updatePayload)
     .eq("id", auth.user.id)
-    .select("*")
+    .select(PROFILE_EDITABLE_SELECT)
     .single();
 
   if (error || !updated) {
     return { ok: false, code: "save_error", message: error?.message ?? "Could not save profile." };
   }
 
-  const saved = updated as Tables<"profiles">;
+  const saved = updated as ProfileEditableRow;
   await propagatePatientNameChange({
     userId: auth.user.id,
     fullName: saved.full_name,

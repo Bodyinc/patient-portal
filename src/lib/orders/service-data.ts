@@ -28,7 +28,13 @@ export type PatientOrderDto = {
 };
 
 // One query per related table (batched by request ids), never N+1.
-export async function fetchPatientOrders(userId: string): Promise<PatientOrderDto[]> {
+export async function fetchPatientOrders(
+  userId: string,
+  options: { limit?: number; offset?: number } = {},
+): Promise<PatientOrderDto[]> {
+  const limit = Math.max(1, Math.min(100, options.limit ?? 100));
+  const offset = Math.max(0, options.offset ?? 0);
+
   const { data: requests, error } = await supabaseAdmin
     .from("medication_requests")
     .select(
@@ -36,7 +42,7 @@ export async function fetchPatientOrders(userId: string): Promise<PatientOrderDt
     )
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
-    .limit(100);
+    .range(offset, offset + limit - 1);
   if (error) throw new Error(error.message);
   const rows = requests ?? [];
   if (rows.length === 0) return [];
