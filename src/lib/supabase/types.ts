@@ -1097,6 +1097,50 @@ export type Database = {
         };
         Relationships: [];
       };
+      patient_consultations: {
+        Row: {
+          id: string;
+          user_id: string;
+          subscription_id: string;
+          qb_user_id: number;
+          qb_appointment_id: string;
+          qb_dialog_id: string | null;
+          started_at: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          subscription_id: string;
+          qb_user_id: number;
+          qb_appointment_id: string;
+          qb_dialog_id?: string | null;
+          started_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          subscription_id?: string;
+          qb_user_id?: number;
+          qb_appointment_id?: string;
+          qb_dialog_id?: string | null;
+          started_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "patient_consultations_subscription_id_fkey";
+            columns: ["subscription_id"];
+            isOneToOne: true;
+            referencedRelation: "subscriptions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       promo_codes: {
         Row: {
           id: string;
