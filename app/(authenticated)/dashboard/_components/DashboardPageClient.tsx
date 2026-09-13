@@ -134,12 +134,15 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
                 Ready to begin your treatment journey?
               </h3>
               <p className="mt-3 max-w-xl text-sm leading-relaxed text-[#152A51]/80 sm:text-[15px] sm:leading-7">
-                Your clinician review is scheduled once your intake is complete. Please answer all
-                questions to the best of your ability.
+                Complete your intake form to start your consultation with a licensed clinician.
+                Please answer all questions to the best of your ability.
               </p>
               <div className="mt-auto pt-5">
-                <Button className="h-[46px] w-full rounded-full bg-[#E3E084] px-6 text-sm font-medium text-[#152A51] hover:bg-[#D9D674] sm:w-fit">
-                  Complete intake form
+                <Button
+                  asChild
+                  className="h-[46px] w-full rounded-full bg-[#E3E084] px-6 text-sm font-medium text-[#152A51] hover:bg-[#D9D674] sm:w-fit"
+                >
+                  <Link href="/consultations">Complete intake form</Link>
                 </Button>
               </div>
             </>

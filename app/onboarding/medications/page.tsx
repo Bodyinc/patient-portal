@@ -107,7 +107,7 @@ export default function MedicationsPage() {
       >
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden scrollbar-hide">
           <div className="mx-auto mb-4 w-full min-w-0 max-w-[1220px] shrink-0 px-4 text-center onboarding-font sm:mb-6 sm:px-6">
-            <h1 className="text-[28px] font-medium leading-none tracking-[-0.5px] text-[#152A51] sm:text-[32px]">
+            <h1 className="pt-6 text-[28px] font-medium leading-none tracking-[-0.5px] text-[#152A51] sm:pt-8 sm:text-[32px]">
               Choose your medication
             </h1>
             <p className="mx-auto mt-3.5 max-w-2xl text-[14px] font-normal leading-snug text-[#152A51]/80">

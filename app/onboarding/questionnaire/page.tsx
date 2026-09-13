@@ -257,6 +257,7 @@ export default function QuestionnairePage() {
       variant="bare"
       align="center"
       layout="fill"
+      titleClassName="pt-10 sm:pt-10"
     >
       <div className="space-y-6 pb-6 text-left sm:space-y-7">
         {questionnaire.questions.map((question, index) => (

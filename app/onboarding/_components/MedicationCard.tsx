@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { Check } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import MedicineProductImage from "./MedicineProductImage";
@@ -108,25 +108,31 @@ export default function MedicationCard({
             <label className="mb-1.5 block text-[12px] font-normal text-[#152A51]/70">
               Select option
             </label>
-            <select
-              value={selectedVariantId ?? ""}
-              onChange={(e) => {
-                const nextVariantId = e.target.value;
-                setSelectedVariantId(nextVariantId);
-                chooseMedication(nextVariantId);
-              }}
-              className={cn(
-                "min-w-0 w-full max-w-full text-[13px] sm:text-[14px]",
-                fieldControlClass,
-              )}
-            >
-              {medication.variants.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.name}
-                  {v.fromPriceCents == null ? " — coming soon" : ""}
-                </option>
-              ))}
-            </select>
+            <div className="relative min-w-0 w-full">
+              <select
+                value={selectedVariantId ?? ""}
+                onChange={(e) => {
+                  const nextVariantId = e.target.value;
+                  setSelectedVariantId(nextVariantId);
+                  chooseMedication(nextVariantId);
+                }}
+                className={cn(
+                  "min-w-0 w-full max-w-full appearance-none pr-11 text-[13px] sm:text-[14px]",
+                  fieldControlClass,
+                )}
+              >
+                {medication.variants.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                    {v.fromPriceCents == null ? " — coming soon" : ""}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#152A51]/55"
+                aria-hidden
+              />
+            </div>
           </div>
         ) : null}
 

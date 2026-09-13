@@ -4,7 +4,7 @@ Next.js App Router patient portal with Supabase auth (cookie-based SSR), shadcn/
 
 ## Stack
 
-- **Framework:** Next.js 15 (App Router)
+- **Framework:** Next.js 16 (App Router)
 - **Auth/Data:** Supabase (`@supabase/ssr`)
 - **UI:** shadcn/ui + Tailwind v4
 - **State:** TanStack React Query (client-side data fetching)

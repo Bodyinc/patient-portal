@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { ChevronDown } from "lucide-react";
 
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
@@ -62,18 +63,24 @@ export default function MedicationDetailsDialog({
   const variantSelect = hasVariants ? (
     <div className="space-y-2.5">
       <label className="text-[14px] font-normal text-[#152A51]">Select option</label>
-      <select
-        value={variantId ?? ""}
-        onChange={(e) => setVariantId(e.target.value)}
-        className={cn("w-full text-[14px]", fieldControlClass)}
-      >
-        {variants.map((v) => (
-          <option key={v.id} value={v.id}>
-            {v.name}
-            {v.fromPriceCents == null ? " — coming soon" : ""}
-          </option>
-        ))}
-      </select>
+      <div className="relative">
+        <select
+          value={variantId ?? ""}
+          onChange={(e) => setVariantId(e.target.value)}
+          className={cn("w-full appearance-none pr-11 text-[14px]", fieldControlClass)}
+        >
+          {variants.map((v) => (
+            <option key={v.id} value={v.id}>
+              {v.name}
+              {v.fromPriceCents == null ? " — coming soon" : ""}
+            </option>
+          ))}
+        </select>
+        <ChevronDown
+          className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#152A51]/55"
+          aria-hidden
+        />
+      </div>
     </div>
   ) : null;
 

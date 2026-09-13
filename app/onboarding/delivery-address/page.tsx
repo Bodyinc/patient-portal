@@ -201,6 +201,7 @@ export default function DeliveryAddressPage() {
       variant="bare"
       align="center"
       layout="fill"
+      titleClassName="pt-10 sm:pt-10"
     >
       <div className="space-y-6 text-left">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-3">
