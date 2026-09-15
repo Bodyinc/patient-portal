@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { ArrowRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ import { cn } from "@/lib/utils";
 
 import MedicineProductImage from "../../../onboarding/_components/MedicineProductImage";
 import DashboardHeader from "../../_components/DashboardHeader";
+import { openConsultationInNewTab } from "@/lib/consultations/open-visit";
 
 /** Figma treatment row — hug height ~102px; bottle well fills card vertically */
 const TREATMENT_ROW_HEIGHT = 102;
@@ -204,7 +206,12 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
 
               <div className="hidden min-w-[64px] flex-1 lg:block" aria-hidden />
 
-              <div className="flex shrink-0 items-center sm:ml-auto lg:ml-0">
+              <div className="flex shrink-0 flex-col items-stretch gap-2 sm:ml-auto sm:flex-row sm:items-center lg:ml-0">
+                {data.treatment.canStartConsultation && data.treatment.subscriptionId ? (
+                  <DashboardStartConsultationButton
+                    subscriptionId={data.treatment.subscriptionId}
+                  />
+                ) : null}
                 <button
                   type="button"
                   onClick={handleRefillRequest}
@@ -232,5 +239,29 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
         </section>
       ) : null}
     </main>
+  );
+}
+
+function DashboardStartConsultationButton({ subscriptionId }: { subscriptionId: string }) {
+  const router = useRouter();
+  const [started, setStarted] = useState(false);
+
+  if (started) return null;
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void (async () => {
+          const opened = await openConsultationInNewTab(subscriptionId);
+          if (!opened) return;
+          setStarted(true);
+          router.refresh();
+        })();
+      }}
+      className="inline-flex h-[46px] w-full items-center justify-center rounded-full bg-[#152A51] px-5 text-sm font-medium text-white hover:bg-[#152A51]/90 sm:w-fit"
+    >
+      Start consultation
+    </button>
   );
 }

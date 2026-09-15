@@ -170,3 +170,62 @@ export function additionalPaymentReceivedEmail(params: {
     html: emailLayout("Payment received", body),
   };
 }
+
+export function consultationStartedEmail(params: {
+  fullName: string | null;
+  medicineName: string;
+  consultationsUrl: string;
+}): { subject: string; html: string } {
+  const med = params.medicineName.trim() || "your plan";
+  const body = [
+    `<p>Hi ${firstName(params.fullName)},</p>`,
+    `<p>You started your included consultation for <strong>${med}</strong>.</p>`,
+    `<p>Each subscription includes <strong>one consultation</strong>. You can reopen this same visit anytime from Consultations. Starting another visit for this plan is not included.</p>`,
+    emailButton("Open Consultations", params.consultationsUrl),
+  ].join("");
+  return {
+    subject: `You used your 1 consultation for ${med}`,
+    html: emailLayout("Consultation started", body),
+  };
+}
+
+export function consultationStartedAdminEmail(params: {
+  patientName: string | null;
+  patientEmail: string;
+  medicineName: string;
+  consultationsUrl: string;
+}): { subject: string; html: string } {
+  const med = params.medicineName.trim() || "a plan";
+  const patient = params.patientName?.trim() || params.patientEmail;
+  const body = [
+    `<p>A patient started their included consultation.</p>`,
+    `<p><strong>Patient:</strong> ${patient}</p>`,
+    `<p><strong>Email:</strong> ${params.patientEmail}</p>`,
+    `<p><strong>Medication:</strong> ${med}</p>`,
+    emailButton("Open consultations", params.consultationsUrl),
+  ].join("");
+  return {
+    subject: `[Body Inc] Consultation started — ${med}`,
+    html: emailLayout("Consultation started", body),
+  };
+}
+
+export function consultationStartedProviderEmail(params: {
+  providerName: string | null;
+  patientName: string | null;
+  medicineName: string;
+  consultationsUrl: string;
+}): { subject: string; html: string } {
+  const med = params.medicineName.trim() || "a plan";
+  const patient = params.patientName?.trim() || "a patient";
+  const body = [
+    `<p>Hi ${firstName(params.providerName)},</p>`,
+    `<p>${patient} started their included consultation for <strong>${med}</strong>.</p>`,
+    `<p>Join the visit from Consultations in your practitioner portal.</p>`,
+    emailButton("Join consultation", params.consultationsUrl),
+  ].join("");
+  return {
+    subject: `[Body Inc] ${patient} started a consultation — ${med}`,
+    html: emailLayout("Patient consultation started", body),
+  };
+}

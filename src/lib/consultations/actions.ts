@@ -4,24 +4,75 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 import { isEligibleSubscriptionStatus, isQuickbloxConfigured } from "./config";
+import type { StartConsultationResult } from "./types";
 import {
   buildConsultationEmbedUrl,
+  claimStoredAppointment,
   createQuickbloxAppointment,
   ensureQuickbloxClient,
-  loginQuickbloxClient,
+  getCachedClientSession,
+  resumeStoredAppointment,
 } from "./quickblox";
-import type { StartConsultationResult } from "./types";
+import { readQbClientSession, saveQbClientSession } from "./session-cookie";
+import { sendTransactionalEmail } from "@/lib/email/send";
+import {
+  consultationStartedAdminEmail,
+  consultationStartedEmail,
+  consultationStartedProviderEmail,
+} from "@/lib/email/lifecycle-emails";
+import { markEmailSent, wasEmailSent } from "@/lib/email/idempotency";
+import {
+  adminAppUrl,
+  adminRecipientEmails,
+  appUrl,
+  assignedProvidersForPatient,
+} from "@/lib/email/recipients";
 
 function friendlyQbError(error: unknown) {
   const message = error instanceof Error ? error.message : "";
+  if (/blocked|login policy|try in \d+ minutes/i.test(message)) {
+    const mins = message.match(/try in (\d+) minutes/i)?.[1];
+    if (mins) {
+      return `The consultation service is temporarily blocked by QuickBlox. Wait ${mins} minutes and do not click Start during that time — extra attempts keep it locked.`;
+    }
+    return message.includes("Wait")
+      ? message
+      : "The consultation service is temporarily blocked by QuickBlox. Wait 30 minutes and do not click Start during that time — extra attempts keep it locked.";
+  }
   if (/active appointment/i.test(message)) {
-    return "You already have an open visit with your provider. Open that consultation, or finish it before starting another plan.";
+    return "Unable to start this consultation because another visit is still open. Please try again.";
   }
-  if (/unauthorized/i.test(message)) {
-    return "Could not start this plan’s consultation. Open your current visit first, then try this plan again.";
+  if (/forbidden/i.test(message.trim())) {
+    return "The consultation service is temporarily blocked by QuickBlox. Wait 30 minutes and do not click Start during that time — extra attempts keep it locked.";
   }
-  if (message) return message;
-  return "Unable to start your consultation right now. Please try again.";
+  if (message && !/^(unauthorized|forbidden)$/i.test(message.trim())) return message;
+  return "QuickBlox could not sign in this consultation. Wait a minute, then try Start once.";
+}
+
+async function clientSessionForUser(params: {
+  userId: string;
+  subscriptionId: string;
+  fullName: string;
+  dob: string;
+  sex: string | null;
+}) {
+  const cached =
+    getCachedClientSession(params.userId, params.subscriptionId) ??
+    (await readQbClientSession(params.userId, params.subscriptionId));
+  if (cached) {
+    await saveQbClientSession(params.userId, params.subscriptionId, cached);
+    return cached;
+  }
+
+  const session = await ensureQuickbloxClient({
+    userId: params.userId,
+    subscriptionId: params.subscriptionId,
+    fullName: params.fullName,
+    dob: params.dob,
+    sex: params.sex,
+  });
+  await saveQbClientSession(params.userId, params.subscriptionId, session);
+  return session;
 }
 
 export async function startConsultation(subscriptionId: string): Promise<StartConsultationResult> {
@@ -52,7 +103,7 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
 
   const { data: existing } = await supabaseAdmin
     .from("patient_consultations")
-    .select("qb_appointment_id, qb_user_id")
+    .select("id, qb_appointment_id, qb_user_id")
     .eq("subscription_id", subscription.id)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -87,42 +138,53 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
 
   const fullName = profile?.full_name?.trim() || intake?.full_name?.trim() || "Patient";
   const sex = profile?.sex ?? intake?.sex ?? null;
-  const phone = profile?.phone ?? intake?.phone ?? null;
   const medicineName =
     (subscription as { medicines?: { name?: string } | null }).medicines?.name ?? "treatment";
 
   try {
+    const client = await clientSessionForUser({
+      userId: user.id,
+      subscriptionId: subscription.id,
+      fullName,
+      dob,
+      sex,
+    });
+
     if (existing?.qb_appointment_id) {
-      const session = await loginQuickbloxClient(email, user.id);
+      const appointmentId =
+        existing.qb_user_id === client.userId
+          ? await resumeStoredAppointment({
+              appointmentId: existing.qb_appointment_id,
+              clientToken: client.token,
+              clientId: client.userId,
+            })
+          : await claimStoredAppointment({
+              appointmentId: existing.qb_appointment_id,
+              clientId: client.userId,
+              clientToken: client.token,
+            });
+
+      if (existing.qb_user_id !== client.userId) {
+        await supabaseAdmin
+          .from("patient_consultations")
+          .update({ qb_user_id: client.userId, updated_at: new Date().toISOString() })
+          .eq("id", existing.id);
+      }
+
       return {
         ok: true,
         alreadyStarted: true,
         embedUrl: buildConsultationEmbedUrl({
-          token: session.token,
-          appointmentId: existing.qb_appointment_id,
+          token: client.token,
+          appointmentId,
         }),
       };
     }
-
-    const client = await ensureQuickbloxClient({
-      userId: user.id,
-      email,
-      fullName,
-      dob,
-      sex,
-      phone,
-    });
-
-    const { data: priorVisits } = await supabaseAdmin
-      .from("patient_consultations")
-      .select("qb_appointment_id")
-      .eq("user_id", user.id);
 
     const appointment = await createQuickbloxAppointment({
       clientId: client.userId,
       clientToken: client.token,
       description: `${medicineName} consultation`,
-      previousAppointmentIds: (priorVisits ?? []).map((row) => row.qb_appointment_id),
     });
 
     const { error: insertError } = await supabaseAdmin.from("patient_consultations").insert({
@@ -154,6 +216,15 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
       return { ok: false, message: insertError.message };
     }
 
+    void sendConsultationStartedEmail({
+      userId: user.id,
+      email,
+      fullName,
+      subscriptionId: subscription.id,
+      medicineId: subscription.medicine_id,
+      medicineName,
+    });
+
     return {
       ok: true,
       alreadyStarted: false,
@@ -165,5 +236,85 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
   } catch (error) {
     console.error("[consultations] start failed:", error);
     return { ok: false, message: friendlyQbError(error) };
+  }
+}
+
+async function sendConsultationStartedEmail(params: {
+  userId: string;
+  email: string;
+  fullName: string;
+  subscriptionId: string;
+  medicineId: string | null;
+  medicineName: string;
+}) {
+  try {
+    if (await wasEmailSent("consultation_started", params.subscriptionId)) return;
+
+    const { subject, html } = consultationStartedEmail({
+      fullName: params.fullName,
+      medicineName: params.medicineName,
+      consultationsUrl: `${appUrl()}/consultations`,
+    });
+    const sent = await sendTransactionalEmail({ to: params.email, subject, html });
+    if (sent) await markEmailSent("consultation_started", params.subscriptionId);
+
+    const hubUrl = adminAppUrl();
+    const providers = await assignedProvidersForPatient({
+      userId: params.userId,
+      medicineId: params.medicineId,
+    });
+    const emailed = new Set<string>([params.email.toLowerCase()]);
+
+    if (providers.length > 0) {
+      const providerConsultationsUrl = hubUrl
+        ? `${hubUrl}/provider/consultations`
+        : "/provider/consultations";
+      await Promise.all(
+        providers.map(async (provider) => {
+          const providerMail = consultationStartedProviderEmail({
+            providerName: provider.fullName,
+            patientName: params.fullName,
+            medicineName: params.medicineName,
+            consultationsUrl: providerConsultationsUrl,
+          });
+          await sendTransactionalEmail({
+            to: provider.email,
+            subject: providerMail.subject,
+            html: providerMail.html,
+          });
+          emailed.add(provider.email.toLowerCase());
+          const { error } = await supabaseAdmin.from("notifications").insert({
+            user_id: provider.id,
+            type: "consultation_started",
+            title: "Patient started a consultation",
+            body: `${params.fullName} started a consultation for ${params.medicineName}.`,
+            link: "/provider/consultations",
+            entity_id: params.subscriptionId,
+          });
+          if (error) {
+            console.error("[consultations] provider notification insert failed:", error);
+          }
+        }),
+      );
+    }
+
+    const adminEmails = (await adminRecipientEmails()).filter(
+      (to) => !emailed.has(to.toLowerCase()),
+    );
+    if (adminEmails.length > 0) {
+      const adminMail = consultationStartedAdminEmail({
+        patientName: params.fullName,
+        patientEmail: params.email,
+        medicineName: params.medicineName,
+        consultationsUrl: `${hubUrl ?? appUrl()}/admin/consultations`,
+      });
+      await Promise.all(
+        adminEmails.map((to) =>
+          sendTransactionalEmail({ to, subject: adminMail.subject, html: adminMail.html }),
+        ),
+      );
+    }
+  } catch (error) {
+    console.error("[consultations] start email failed:", error);
   }
 }

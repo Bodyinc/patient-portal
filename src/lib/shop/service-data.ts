@@ -327,8 +327,7 @@ export async function fetchShopCheckoutBootstrapData(options: {
     },
     plans,
     paymentMethods: [
-      { id: "card", title: "Visa •••• 4242", subtitle: "Expires 12/26" },
-      { id: "alt", title: "Alternative Payment", subtitle: "Apple Pay / PayPal" },
+      { id: "card", title: "Card on file", subtitle: "Use your saved card" },
       { id: "new", title: "Add Payment Method", subtitle: "" },
     ],
     referralHint,

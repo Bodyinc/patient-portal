@@ -200,10 +200,7 @@ export default function BillingCheckoutPage() {
   const paymentReady = Boolean(clientSecret) && !paymentLoading && !paymentError;
   const showSkeleton = consentAccepted && !paymentError && !paymentReady;
   const showCollapsedCard = !consentAccepted && !paymentError;
-  const skeletonHint =
-    paymentLoading || !packageId
-      ? "Loading secure payment form…"
-      : "Updating payment for your promo…";
+  const skeletonHint = paymentLoading || !packageId ? "Loading payment form…" : "Updating payment…";
 
   const returnUrl = `${
     typeof window !== "undefined" ? window.location.origin : ""

@@ -71,7 +71,7 @@ export default function SelectPlanPage() {
     }
 
     setSaving(true);
-    const result = await saveSelectedPlan(selectedPackageId);
+    const result = await saveSelectedPlan(selectedPackageId, state.medicationId, state.goalId);
 
     if (!result.ok) {
       setSaving(false);

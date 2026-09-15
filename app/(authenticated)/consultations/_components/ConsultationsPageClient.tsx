@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { startConsultation } from "@/lib/consultations/actions";
+import { openConsultationInNewTab } from "@/lib/consultations/open-visit";
 import type { ConsultationsPageData } from "@/lib/consultations/types";
 import { formatPortalDate } from "@/lib/date-format";
 import { getDbMedicineImageSrc } from "@/lib/intake/medicine-image";
@@ -20,22 +20,14 @@ type ConsultationsPageClientProps = {
 };
 
 export default function ConsultationsPageClient({ data }: ConsultationsPageClientProps) {
+  const router = useRouter();
   const [pendingId, setPendingId] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
 
-  function openPlan(subscriptionId: string) {
+  async function openPlan(subscriptionId: string) {
     setPendingId(subscriptionId);
-    startTransition(async () => {
-      const result = await startConsultation(subscriptionId);
-      setPendingId(null);
-      if (!result.ok) {
-        toast.error(result.message);
-        return;
-      }
-      // QuickBlox sets X-Frame-Options: SAMEORIGIN, so it cannot load inside our portal.
-      // Stay in this tab (no window.open) as requested.
-      window.location.assign(result.embedUrl);
-    });
+    const opened = await openConsultationInNewTab(subscriptionId);
+    setPendingId(null);
+    if (opened) router.refresh();
   }
 
   return (
@@ -64,7 +56,7 @@ export default function ConsultationsPageClient({ data }: ConsultationsPageClien
           <ul className="space-y-3">
             {data.plans.map((plan) => {
               const used = Boolean(plan.startedAt);
-              const busy = pending && pendingId === plan.subscriptionId;
+              const busy = pendingId === plan.subscriptionId;
               const imageSrc = getDbMedicineImageSrc(plan.imageSrc);
               const fields = [
                 { label: "Medication Name", value: plan.medicineName },

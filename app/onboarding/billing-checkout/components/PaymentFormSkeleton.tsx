@@ -6,11 +6,7 @@ function Bone({ className }: { className?: string }) {
   return <div className={cn("animate-pulse rounded-md bg-[#E8EEED]", className)} />;
 }
 
-export default function PaymentFormSkeleton({
-  hint = "Preparing secure payment…",
-}: {
-  hint?: string;
-}) {
+export default function PaymentFormSkeleton({ hint = "Loading payment form…" }: { hint?: string }) {
   return (
     <div
       className="rounded-[14px] border border-[#E8E8E8] bg-white p-4 onboarding-font"
