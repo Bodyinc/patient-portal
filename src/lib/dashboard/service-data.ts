@@ -9,6 +9,7 @@ import { maybeReconcileIncompleteSubscription } from "@/lib/stripe/reconcile";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 import { isQuickbloxConfigured } from "@/lib/consultations/config";
+import { fetchAppointmentStatuses } from "@/lib/consultations/quickblox";
 
 import type { DashboardGoalDto, DashboardPageDataDto, DashboardTreatmentDto } from "./types";
 
@@ -132,7 +133,7 @@ async function fetchClaimedIntakeExtras(userId: string): Promise<{
         variantDose: "—",
         nextRefillDate: null,
         imageSrc: toDbImageSrc(medicine.image_url),
-        canStartConsultation: false,
+        consultationStatus: "none",
       }
     : null;
 
@@ -159,15 +160,41 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
       ? await fetchActiveMedications(userId, { reconcile: false }).catch(() => activeMeds)
       : activeMeds;
   const currentMed = meds[0] ?? null;
-  let consultationStarted = false;
+  let consultationStatus: DashboardTreatmentDto["consultationStatus"] = "none";
   if (currentMed?.subscriptionId) {
-    const { data: visit } = await supabaseAdmin
+    let visit: {
+      qb_appointment_id: string;
+      ended_at?: string | null;
+    } | null = null;
+    const first = await supabaseAdmin
       .from("patient_consultations")
-      .select("id")
+      .select("qb_appointment_id, ended_at")
       .eq("user_id", userId)
       .eq("subscription_id", currentMed.subscriptionId)
       .maybeSingle();
-    consultationStarted = Boolean(visit?.id);
+    if (first.error && /ended_at/i.test(first.error.message)) {
+      const retried = await supabaseAdmin
+        .from("patient_consultations")
+        .select("qb_appointment_id")
+        .eq("user_id", userId)
+        .eq("subscription_id", currentMed.subscriptionId)
+        .maybeSingle();
+      visit = retried.data;
+    } else if (first.error && !/patient_consultations/i.test(first.error.message)) {
+      throw new Error(first.error.message);
+    } else {
+      visit = first.data;
+    }
+
+    if (visit?.qb_appointment_id) {
+      consultationStatus = visit.ended_at ? "closed" : "open";
+      if (isQuickbloxConfigured()) {
+        const live = (await fetchAppointmentStatuses([visit.qb_appointment_id])).get(
+          visit.qb_appointment_id,
+        );
+        if (live) consultationStatus = live.open ? "open" : "closed";
+      }
+    }
   }
 
   const treatmentFromSub: DashboardTreatmentDto | null = currentMed
@@ -181,8 +208,7 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
         variantDose: currentMed.variantName || currentMed.dosage || "—",
         nextRefillDate: currentMed.nextRefillDate,
         imageSrc: toDbImageSrc(currentMed.imageSrc),
-        canStartConsultation:
-          isQuickbloxConfigured() && Boolean(currentMed.subscriptionId) && !consultationStarted,
+        consultationStatus,
       }
     : null;
 
@@ -199,5 +225,6 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
     treatment,
     activeTreatmentCount: meds.length,
     pendingPayments,
+    consultationsEnabled: isQuickbloxConfigured(),
   };
 }

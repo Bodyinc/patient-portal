@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { sendMissedOrderConfirmationEmails } from "@/lib/email/order-confirmation";
+import { sendMissedAdminNewRequestEmails } from "@/lib/email/admin-request-email";
 import {
   sendIncompleteOrderReminders,
   sendOrderStatusEmails,
@@ -27,12 +28,14 @@ export async function GET(request: Request) {
     const refills = await sendRefillReminders();
     const orderStatuses = await sendOrderStatusEmails();
     const orderConfirmations = await sendMissedOrderConfirmationEmails();
+    const adminNewRequests = await sendMissedAdminNewRequestEmails();
     return NextResponse.json({
       ok: true,
       incompleteOrders,
       refills,
       orderStatuses,
       orderConfirmations,
+      adminNewRequests,
     });
   } catch (error) {
     return NextResponse.json(

@@ -3,6 +3,7 @@ import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureMedicationOrderForPayment } from "@/lib/orders/ensure-medication-order";
 import { sendOrderConfirmationEmail } from "@/lib/email/order-confirmation";
+import { sendAdminNewRequestEmail } from "@/lib/email/admin-request-email";
 import { sendUnsentOrderStatusEmailsForPayment } from "@/lib/email/reminders";
 import type { Database } from "@/lib/supabase/types";
 
@@ -16,6 +17,11 @@ async function settleOrder(paymentId: string): Promise<void> {
     await sendOrderConfirmationEmail(paymentId);
   } catch (error) {
     console.error("[email] order confirmation failed:", error);
+  }
+  try {
+    await sendAdminNewRequestEmail(paymentId);
+  } catch (error) {
+    console.error("[email] admin new-request failed:", error);
   }
   try {
     await sendUnsentOrderStatusEmailsForPayment(paymentId);

@@ -7,10 +7,10 @@ import { isEligibleSubscriptionStatus, isQuickbloxConfigured } from "./config";
 import type { StartConsultationResult } from "./types";
 import {
   buildConsultationEmbedUrl,
-  claimStoredAppointment,
   createQuickbloxAppointment,
   ensureQuickbloxClient,
   getCachedClientSession,
+  pickReusableAppointmentId,
   resumeStoredAppointment,
 } from "./quickblox";
 import { readQbClientSession, saveQbClientSession } from "./session-cookie";
@@ -101,12 +101,18 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
     return { ok: false, message: "Consultations are only available on an active plan." };
   }
 
-  const { data: existing } = await supabaseAdmin
+  const allRowsResult = await supabaseAdmin
     .from("patient_consultations")
-    .select("id, qb_appointment_id, qb_user_id")
-    .eq("subscription_id", subscription.id)
+    .select("id, subscription_id, qb_appointment_id, qb_user_id, started_at")
     .eq("user_id", user.id)
-    .maybeSingle();
+    .order("started_at", { ascending: true });
+  if (allRowsResult.error && !/patient_consultations/i.test(allRowsResult.error.message)) {
+    return { ok: false, message: allRowsResult.error.message };
+  }
+  const allRows = allRowsResult.data ?? [];
+  const forThisSub = allRows.find((row) => row.subscription_id === subscription.id);
+  const identityRow = allRows.find((row) => row.qb_appointment_id) ?? forThisSub;
+  const storedIds = allRows.map((row) => row.qb_appointment_id).filter(Boolean);
 
   const [{ data: profile }, { data: intake }] = await Promise.all([
     supabaseAdmin
@@ -144,31 +150,49 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
   try {
     const client = await clientSessionForUser({
       userId: user.id,
-      subscriptionId: subscription.id,
+      subscriptionId: identityRow?.subscription_id ?? subscription.id,
       fullName,
       dob,
       sex,
     });
 
-    if (existing?.qb_appointment_id) {
-      const appointmentId =
-        existing.qb_user_id === client.userId
-          ? await resumeStoredAppointment({
-              appointmentId: existing.qb_appointment_id,
-              clientToken: client.token,
-              clientId: client.userId,
-            })
-          : await claimStoredAppointment({
-              appointmentId: existing.qb_appointment_id,
-              clientId: client.userId,
-              clientToken: client.token,
-            });
+    const reusableId = await pickReusableAppointmentId({
+      storedIds,
+      clientToken: client.token,
+      clientId: client.userId,
+    });
 
-      if (existing.qb_user_id !== client.userId) {
-        await supabaseAdmin
-          .from("patient_consultations")
-          .update({ qb_user_id: client.userId, updated_at: new Date().toISOString() })
-          .eq("id", existing.id);
+    if (reusableId) {
+      const appointmentId = await resumeStoredAppointment({
+        appointmentId: reusableId,
+        clientToken: client.token,
+        clientId: client.userId,
+      });
+      const now = new Date().toISOString();
+      if (forThisSub?.id) {
+        if (
+          forThisSub.qb_appointment_id !== appointmentId ||
+          forThisSub.qb_user_id !== client.userId
+        ) {
+          await supabaseAdmin
+            .from("patient_consultations")
+            .update({
+              qb_appointment_id: appointmentId,
+              qb_user_id: client.userId,
+              updated_at: now,
+            })
+            .eq("id", forThisSub.id);
+        }
+      } else {
+        const { error: insertError } = await supabaseAdmin.from("patient_consultations").insert({
+          user_id: user.id,
+          subscription_id: subscription.id,
+          qb_user_id: client.userId,
+          qb_appointment_id: appointmentId,
+        });
+        if (insertError && insertError.code !== "23505") {
+          return { ok: false, message: insertError.message };
+        }
       }
 
       return {
@@ -185,6 +209,7 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
       clientId: client.userId,
       clientToken: client.token,
       description: `${medicineName} consultation`,
+      keepAppointmentId: storedIds[0] ?? null,
     });
 
     const { error: insertError } = await supabaseAdmin.from("patient_consultations").insert({
