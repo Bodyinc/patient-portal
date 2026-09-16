@@ -8,6 +8,8 @@ import { getPatientDisplayIdentity } from "@/lib/profile/identity";
 import { maybeReconcileIncompleteSubscription } from "@/lib/stripe/reconcile";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
+import { isQuickbloxConfigured } from "@/lib/consultations/config";
+
 import type { DashboardGoalDto, DashboardPageDataDto, DashboardTreatmentDto } from "./types";
 
 function toPatientId(userId: string) {
@@ -124,11 +126,13 @@ async function fetchClaimedIntakeExtras(userId: string): Promise<{
         medicineId: medicine.id,
         packageId: null,
         variantId: null,
+        subscriptionId: null,
         name: medicine.name,
         currentPlan: "—",
         variantDose: "—",
         nextRefillDate: null,
         imageSrc: toDbImageSrc(medicine.image_url),
+        canStartConsultation: false,
       }
     : null;
 
@@ -155,16 +159,30 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
       ? await fetchActiveMedications(userId, { reconcile: false }).catch(() => activeMeds)
       : activeMeds;
   const currentMed = meds[0] ?? null;
+  let consultationStarted = false;
+  if (currentMed?.subscriptionId) {
+    const { data: visit } = await supabaseAdmin
+      .from("patient_consultations")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("subscription_id", currentMed.subscriptionId)
+      .maybeSingle();
+    consultationStarted = Boolean(visit?.id);
+  }
+
   const treatmentFromSub: DashboardTreatmentDto | null = currentMed
     ? {
         medicineId: currentMed.medicineId,
         packageId: currentMed.packageId,
         variantId: currentMed.variantId,
+        subscriptionId: currentMed.subscriptionId,
         name: currentMed.medicationName,
         currentPlan: currentMed.currentPlan,
         variantDose: currentMed.variantName || currentMed.dosage || "—",
         nextRefillDate: currentMed.nextRefillDate,
         imageSrc: toDbImageSrc(currentMed.imageSrc),
+        canStartConsultation:
+          isQuickbloxConfigured() && Boolean(currentMed.subscriptionId) && !consultationStarted,
       }
     : null;
 

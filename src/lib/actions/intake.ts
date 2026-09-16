@@ -36,6 +36,7 @@ import type {
   QuestionnaireDto,
   QuestionnaireResponseInput,
 } from "@/lib/intake/types";
+import { fetchActiveCategories } from "@/lib/intake/categories";
 import { normalizeQuestionType, parseDisqualifyRules } from "@/lib/intake/questionnaire";
 import { resolveMedicineImageSrc } from "@/lib/intake/medicine-image";
 import { formatPortalDate } from "@/lib/date-format";
@@ -66,6 +67,19 @@ function parseFeatures(value: Json): string[] {
 function parseEligibilityRules(value: Json): CategoryEligibilityRules {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   return value as CategoryEligibilityRules;
+}
+
+function categoryHasEligibilityRules(rules: CategoryEligibilityRules): boolean {
+  return Boolean(
+    rules.blocked_state_codes?.length ||
+    rules.sex?.length ||
+    rules.allowed_sex?.length ||
+    rules.bmi_bands?.length ||
+    rules.min_age != null ||
+    rules.max_age != null ||
+    rules.min_bmi != null ||
+    rules.max_bmi != null,
+  );
 }
 
 function isMedicineCatalogVisible(medicine: { is_active: boolean; status: string }) {
@@ -335,124 +349,49 @@ export async function ensureIntakeSession(): Promise<IntakeActionResult<{ sessio
   return { ok: true, data: { sessionId: created.session.id } };
 }
 
-function resolveCategoryImageSrc(
-  categoryImageUrl: string | null | undefined,
-  icon: string | null | undefined,
-  medicineImageUrl: string | null | undefined,
-): string | null {
-  const categoryImageTrimmed = categoryImageUrl?.trim();
-  if (categoryImageTrimmed) {
-    return categoryImageTrimmed;
-  }
-
-  const iconTrimmed = icon?.trim();
-  if (
-    iconTrimmed &&
-    (iconTrimmed.startsWith("http://") ||
-      iconTrimmed.startsWith("https://") ||
-      iconTrimmed.startsWith("/"))
-  ) {
-    return iconTrimmed;
-  }
-
-  const medicineTrimmed = medicineImageUrl?.trim();
-  return medicineTrimmed || null;
-}
-
 export async function getActiveCategories(): Promise<IntakeActionResult<CategoryDto[]>> {
-  const { data, error } = await supabaseAdmin
-    .from("medication_categories")
-    .select("id, slug, name, tagline, description, icon, image_url")
-    .eq("is_active", true)
-    .order("sort_order", { ascending: true });
-
-  if (error) {
-    return { ok: false, code: "fetch_error", message: error.message };
-  }
-
-  const categories = data ?? [];
-  const categoryIds = categories.map((c) => c.id);
-
-  const firstMedicineImageByCategory = new Map<string, string | null>();
-
-  if (categoryIds.length > 0) {
-    const { data: links } = await supabaseAdmin
-      .from("medication_category_medicines")
-      .select("category_id, medicine_id, sort_order")
-      .in("category_id", categoryIds)
-      .order("sort_order", { ascending: true });
-
-    const medicineIds = [...new Set((links ?? []).map((l) => l.medicine_id))];
-    const imageByMedicineId = new Map<string, string | null>();
-
-    if (medicineIds.length > 0) {
-      const { data: medicines } = await supabaseAdmin
-        .from("medicines")
-        .select("id, image_url")
-        .in("id", medicineIds);
-
-      for (const med of medicines ?? []) {
-        imageByMedicineId.set(med.id, med.image_url);
-      }
-    }
-
-    for (const link of links ?? []) {
-      if (firstMedicineImageByCategory.has(link.category_id)) continue;
-      firstMedicineImageByCategory.set(
-        link.category_id,
-        imageByMedicineId.get(link.medicine_id) ?? null,
-      );
-    }
-  }
-
-  return {
-    ok: true,
-    data: categories.map((row) => ({
-      id: row.id,
-      slug: row.slug,
-      name: row.name,
-      tagline: row.tagline,
-      description: row.description,
-      icon: row.icon,
-      imageSrc: resolveCategoryImageSrc(
-        row.image_url,
-        row.icon,
-        firstMedicineImageByCategory.get(row.id),
-      ),
-    })),
-  };
+  return fetchActiveCategories();
 }
 
 export async function getMedicinesForCategory(
   categorySlug: string,
 ): Promise<IntakeActionResult<MedicinesForCategoryDto>> {
-  const { data: category, error: categoryError } = await supabaseAdmin
+  // Category lookup starts immediately; session is only needed when this goal has eligibility rules.
+  const categoryPromise = supabaseAdmin
     .from("medication_categories")
     .select("id, name, eligibility_rules")
     .eq("slug", categorySlug)
     .eq("is_active", true)
     .maybeSingle();
 
+  const { data: category, error: categoryError } = await categoryPromise;
+
   if (categoryError || !category) {
     return { ok: false, code: "not_found", message: "Category not found" };
   }
 
-  const sessionResult = await requireIntakeSession();
-  const session = "session" in sessionResult ? sessionResult.session : null;
+  const rules = parseEligibilityRules(category.eligibility_rules);
+  const needsSession = categoryHasEligibilityRules(rules);
 
-  const { data: links, error } = await supabaseAdmin
-    .from("medication_category_medicines")
-    .select("sort_order, medicine_id")
-    .eq("category_id", category.id)
-    .order("sort_order", { ascending: true });
+  // Links + optional session in parallel (session was previously sequential and slowed the page).
+  const [linksResult, sessionResult] = await Promise.all([
+    supabaseAdmin
+      .from("medication_category_medicines")
+      .select("sort_order, medicine_id")
+      .eq("category_id", category.id)
+      .order("sort_order", { ascending: true }),
+    needsSession ? requireIntakeSession() : Promise.resolve(null),
+  ]);
 
-  if (error) {
-    return { ok: false, code: "fetch_error", message: error.message };
+  if (linksResult.error) {
+    return { ok: false, code: "fetch_error", message: linksResult.error.message };
   }
 
-  const rules = parseEligibilityRules(category.eligibility_rules);
+  const links = linksResult.data ?? [];
+  const session = sessionResult && "session" in sessionResult ? sessionResult.session : null;
+
   const categoryEligibility =
-    session !== null
+    needsSession && session !== null
       ? evaluateCategoryRules(session, rules)
       : { result: "eligible" as const, reason: null };
 
@@ -467,7 +406,7 @@ export async function getMedicinesForCategory(
     };
   }
 
-  const medicineIds = (links ?? []).map((l) => l.medicine_id);
+  const medicineIds = links.map((l) => l.medicine_id);
   if (medicineIds.length === 0) {
     return {
       ok: true,
@@ -475,23 +414,25 @@ export async function getMedicinesForCategory(
     };
   }
 
-  const { data: meds, error: medsError } = await supabaseAdmin
-    .from("medicines")
-    .select(
-      "id, name, short_description, long_description, image_url, from_price_cents, important_info, notice_text, is_active, status, sort_order",
-    )
-    .in("id", medicineIds);
+  const [{ data: meds, error: medsError }, { data: variantRows }] = await Promise.all([
+    supabaseAdmin
+      .from("medicines")
+      .select(
+        "id, name, short_description, long_description, image_url, from_price_cents, important_info, notice_text, is_active, status, sort_order",
+      )
+      .in("id", medicineIds),
+    supabaseAdmin
+      .from("medicine_variants")
+      .select("id, medicine_id, name, from_price_cents")
+      .in("medicine_id", medicineIds)
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true }),
+  ]);
 
   if (medsError) {
     return { ok: false, code: "fetch_error", message: medsError.message };
   }
 
-  const { data: variantRows } = await supabaseAdmin
-    .from("medicine_variants")
-    .select("id, medicine_id, name, from_price_cents")
-    .in("medicine_id", medicineIds)
-    .eq("is_active", true)
-    .order("sort_order", { ascending: true });
   const variantsByMedicineId = new Map<string, IntakeVariantOption[]>();
   for (const v of variantRows ?? []) {
     const list = variantsByMedicineId.get(v.medicine_id) ?? [];
@@ -506,7 +447,7 @@ export async function getMedicinesForCategory(
   const medMap = new Map((meds ?? []).map((m) => [m.id, m]));
   const medicines: MedicineDto[] = [];
 
-  for (const link of links ?? []) {
+  for (const link of links) {
     const med = medMap.get(link.medicine_id);
     if (!med || !isMedicineCatalogVisible(med)) continue;
 
@@ -680,13 +621,21 @@ export async function saveIntakeBmi(
 
 export async function saveIntakeMedicine(
   medicineId: string,
+  categorySlug?: string | null,
 ): Promise<IntakeActionResult<{ medicineId: string }>> {
   const sessionResult = await requireIntakeSession();
   if ("error" in sessionResult) {
     return { ok: false, code: "session_error", message: sessionResult.error };
   }
 
-  const categoryLink = await getSessionCategory(sessionResult.session.id);
+  // Goal page also navigates before saveIntakeCategory finishes. Recover from that race when
+  // the client still knows which goal was selected.
+  let categoryLink = await getSessionCategory(sessionResult.session.id);
+  if (!categoryLink?.category_id && categorySlug) {
+    const ensured = await saveIntakeCategory(categorySlug);
+    if (!ensured.ok) return ensured;
+    categoryLink = await getSessionCategory(sessionResult.session.id);
+  }
   if (!categoryLink?.category_id) {
     return { ok: false, code: "no_category", message: "Select a goal first" };
   }
@@ -1149,13 +1098,22 @@ export async function getPackagesForMedicine(
 
 export async function saveSelectedPlan(
   packageId: string,
+  medicineId?: string | null,
+  categorySlug?: string | null,
 ): Promise<IntakeActionResult<{ sessionId: string }>> {
   const sessionResult = await requireIntakeSession();
   if ("error" in sessionResult) {
     return { ok: false, code: "session_error", message: sessionResult.error };
   }
 
-  const medicineLink = await getSessionMedicineLink(sessionResult.session.id);
+  // Goal/medications pages navigate before their saves finish. If the patient continues
+  // quickly on the plan page, ensure goal + medicine links exist before validating.
+  let medicineLink = await getSessionMedicineLink(sessionResult.session.id);
+  if (!medicineLink?.medicine_id && medicineId) {
+    const ensured = await saveIntakeMedicine(medicineId, categorySlug);
+    if (!ensured.ok) return ensured;
+    medicineLink = await getSessionMedicineLink(sessionResult.session.id);
+  }
   if (!medicineLink?.medicine_id) {
     return { ok: false, code: "no_medicine", message: "Select a medication first" };
   }

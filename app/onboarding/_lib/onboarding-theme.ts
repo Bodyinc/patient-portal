@@ -30,6 +30,7 @@ export const medicineImageFitClass = "object-contain object-bottom mix-blend-nor
 
 /** Shared label / control classes for Figma-styled form fields. */
 export const fieldLabelClass = "text-[14px] font-normal leading-none text-[#152A51]";
+export const fieldRequiredMarkClass = "text-red-500";
 
 export const fieldControlClass =
   "h-[45px] rounded-[14px] border-0 bg-[#E8EEED] px-4 text-[14px] font-normal leading-none text-[#152A51] shadow-none " +

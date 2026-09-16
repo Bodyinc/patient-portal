@@ -46,7 +46,10 @@ export default function OtpLoginPage() {
       // email goes into onboarding; a provider/admin email is rejected.
       const check = await checkPatientEmail(parsed.data.email);
       if (check.status === "new") {
-        router.push(`/onboarding/goal?email=${encodeURIComponent(parsed.data.email)}`);
+        toast.error("No account exists with this email.", {
+          description: "Get started below to create your account.",
+          duration: 8000,
+        });
         return;
       }
       if (check.status === "wrong_portal") {

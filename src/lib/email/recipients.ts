@@ -136,3 +136,67 @@ export async function providerEmailByUserId(providerId: string | null | undefine
 } | null> {
   return patientEmailByUserId(providerId);
 }
+
+/** Practitioners currently assigned to this patient's medication request(s). */
+export async function assignedProvidersForPatient(params: {
+  userId: string;
+  medicineId?: string | null;
+}): Promise<{ id: string; email: string; fullName: string | null }[]> {
+  let query = supabaseAdmin
+    .from("medication_requests")
+    .select("provider_id")
+    .eq("user_id", params.userId)
+    .not("provider_id", "is", null);
+
+  if (params.medicineId) query = query.eq("medicine_id", params.medicineId);
+
+  const { data, error } = await query;
+  if (error) {
+    console.error("[email] assigned providers lookup failed:", error);
+    return [];
+  }
+
+  let ids = [
+    ...new Set(
+      (data ?? []).map((row) => row.provider_id).filter((id): id is string => Boolean(id)),
+    ),
+  ];
+
+  if (ids.length === 0 && params.medicineId) {
+    const fallback = await supabaseAdmin
+      .from("medication_requests")
+      .select("provider_id")
+      .eq("user_id", params.userId)
+      .not("provider_id", "is", null);
+    if (fallback.error) {
+      console.error("[email] assigned providers fallback failed:", fallback.error);
+      return [];
+    }
+    ids = [
+      ...new Set(
+        (fallback.data ?? [])
+          .map((row) => row.provider_id)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+  }
+
+  if (ids.length === 0) return [];
+
+  const { data: profiles, error: profileError } = await supabaseAdmin
+    .from("profiles")
+    .select("id, email, full_name")
+    .in("id", ids);
+  if (profileError) {
+    console.error("[email] assigned provider profiles failed:", profileError);
+    return [];
+  }
+
+  const result: { id: string; email: string; fullName: string | null }[] = [];
+  for (const row of profiles ?? []) {
+    const email = row.email?.trim();
+    if (!email) continue;
+    result.push({ id: row.id, email, fullName: row.full_name ?? null });
+  }
+  return result;
+}

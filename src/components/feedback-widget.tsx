@@ -28,6 +28,7 @@ export default function FeedbackWidget() {
   const [email, setEmail] = useState("");
   const [pending, startTransition] = useTransition();
 
+  const onOpenConsultation = pathname.startsWith("/consultations/open");
   const onOnboarding = pathname.startsWith("/onboarding");
   const collectContact = context.collectContact;
   const showLabel = hovered && !open;
@@ -69,6 +70,8 @@ export default function FeedbackWidget() {
       );
     });
   }
+
+  if (onOpenConsultation) return null;
 
   return (
     <div

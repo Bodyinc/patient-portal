@@ -8,11 +8,13 @@ export type DashboardTreatmentDto = {
   medicineId: string | null;
   packageId: string | null;
   variantId: string | null;
+  subscriptionId: string | null;
   name: string;
   currentPlan: string;
   variantDose: string;
   nextRefillDate: string | null;
   imageSrc: string | null;
+  canStartConsultation: boolean;
 };
 
 export type DashboardPendingPaymentDto = {

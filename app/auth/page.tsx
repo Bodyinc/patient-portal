@@ -59,13 +59,9 @@ function AuthPageContent() {
 
         <p className="text-center text-sm text-[#152A51]/80">
           New to Body Inc?{" "}
-          <button
-            type="button"
-            onClick={() => router.push("/onboarding/goal")}
-            className="font-medium text-[#152A51] hover:underline"
-          >
+          <Link href="/onboarding/goal" className="font-medium text-[#152A51] hover:underline">
             Get started
-          </button>
+          </Link>
         </p>
       </div>
     </AuthPageShell>
@@ -102,11 +98,14 @@ function LoginForm() {
       });
       if (error) {
         // Supabase returns the same generic error for a wrong password and a
-        // non-existent email. Classify the email so we can send brand-new visitors
-        // into onboarding instead of showing them a login error.
+        // non-existent email. Classify the email so new visitors get a clear path
+        // to create an account instead of a vague login failure.
         const check = await checkPatientEmail(parsed.data.email);
         if (check.status === "new") {
-          router.push(`/onboarding/goal?email=${encodeURIComponent(parsed.data.email)}`);
+          toast.error("No account exists with this email.", {
+            description: "Get started below to create your account.",
+            duration: 8000,
+          });
           return;
         }
         if (check.status === "wrong_portal") {

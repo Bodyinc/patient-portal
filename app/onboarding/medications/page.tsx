@@ -73,7 +73,7 @@ export default function MedicationsPage() {
     }
 
     setSaving(true);
-    const savePromise = saveIntakeMedicine(selected);
+    const savePromise = saveIntakeMedicine(selected, state.goalId);
 
     const patch = {
       medicationId: selected,

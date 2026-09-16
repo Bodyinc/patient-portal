@@ -36,7 +36,11 @@ import {
   pushOnboardingRoute,
 } from "../_lib/onboarding-navigation";
 import { useOnboarding } from "../_lib/onboarding-store";
-import { fieldControlClass, fieldLabelClass } from "../_lib/onboarding-theme";
+import {
+  fieldControlClass,
+  fieldLabelClass,
+  fieldRequiredMarkClass,
+} from "../_lib/onboarding-theme";
 
 const addressSchema = z
   .object({
@@ -207,7 +211,7 @@ export default function DeliveryAddressPage() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-3">
           <div className="space-y-4 sm:col-span-2">
             <Label htmlFor="streetAddress" className={fieldLabelClass}>
-              Address <span className="text-[#152A51]/50">*</span>
+              Address <span className={fieldRequiredMarkClass}>*</span>
             </Label>
             <Input
               id="streetAddress"
@@ -221,7 +225,7 @@ export default function DeliveryAddressPage() {
           </div>
           <div className="space-y-4">
             <Label htmlFor="apartment" className={fieldLabelClass}>
-              Apartment number <span className="text-[#152A51]/50">*</span>
+              Apartment number <span className={fieldRequiredMarkClass}>*</span>
             </Label>
             <Input
               id="apartment"
@@ -237,7 +241,7 @@ export default function DeliveryAddressPage() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-3">
           <div className="space-y-4">
             <Label htmlFor="postalCode" className={fieldLabelClass}>
-              Zip code <span className="text-[#152A51]/50">*</span>
+              Zip code <span className={fieldRequiredMarkClass}>*</span>
             </Label>
             <ZipCodeInput
               id="postalCode"
@@ -249,7 +253,7 @@ export default function DeliveryAddressPage() {
           </div>
           <div className="space-y-4 sm:col-span-2">
             <Label htmlFor="city" className={fieldLabelClass}>
-              City <span className="text-[#152A51]/50">*</span>
+              City <span className={fieldRequiredMarkClass}>*</span>
             </Label>
             <Input
               id="city"
@@ -277,7 +281,7 @@ export default function DeliveryAddressPage() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-3">
               <div className="space-y-4 sm:col-span-2">
                 <Label htmlFor="billingStreetAddress" className={fieldLabelClass}>
-                  Address <span className="text-[#152A51]/50">*</span>
+                  Address <span className={fieldRequiredMarkClass}>*</span>
                 </Label>
                 <Input
                   id="billingStreetAddress"
@@ -303,7 +307,7 @@ export default function DeliveryAddressPage() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-3">
               <div className="space-y-4">
                 <Label htmlFor="billingPostalCode" className={fieldLabelClass}>
-                  Zip code <span className="text-[#152A51]/50">*</span>
+                  Zip code <span className={fieldRequiredMarkClass}>*</span>
                 </Label>
                 <ZipCodeInput
                   id="billingPostalCode"
@@ -315,7 +319,7 @@ export default function DeliveryAddressPage() {
               </div>
               <div className="space-y-4">
                 <Label htmlFor="billingCity" className={fieldLabelClass}>
-                  City <span className="text-[#152A51]/50">*</span>
+                  City <span className={fieldRequiredMarkClass}>*</span>
                 </Label>
                 <Input
                   id="billingCity"
@@ -327,7 +331,7 @@ export default function DeliveryAddressPage() {
               </div>
               <div className="space-y-4">
                 <Label htmlFor="billingStateCode" className={fieldLabelClass}>
-                  State <span className="text-[#152A51]/50">*</span>
+                  State <span className={fieldRequiredMarkClass}>*</span>
                 </Label>
                 <Select
                   value={form.billingStateCode || undefined}
@@ -354,7 +358,7 @@ export default function DeliveryAddressPage() {
 
         <div className="space-y-4">
           <Label htmlFor="phone" className={fieldLabelClass}>
-            Phone number <span className="text-[#152A51]/50">*</span>
+            Phone number <span className={fieldRequiredMarkClass}>*</span>
           </Label>
           <PhoneField
             id="phone"
@@ -383,7 +387,7 @@ export default function DeliveryAddressPage() {
               information (PHI), and I accept this risk and consent to receiving communications
               through these methods. I understand that message and data rates may apply and that I
               can opt out of receiving SMS messages at any time by replying STOP.
-              <span className="font-semibold text-red-600"> *</span>
+              <span className={cn("font-semibold", fieldRequiredMarkClass)}> *</span>
             </span>
           </label>
 

@@ -10,8 +10,9 @@ import {
   getQuestionnaireForCategory,
 } from "@/lib/actions/intake";
 import { CATALOG_STALE_MS, intakeQueryKeys, SUMMARY_STALE_MS } from "@/lib/intake/query-keys";
+import type { CategoryDto } from "@/lib/intake/types";
 
-export function useIntakeCategories() {
+export function useIntakeCategories(initialData?: CategoryDto[]) {
   return useQuery({
     queryKey: intakeQueryKeys.categories,
     queryFn: async () => {
@@ -20,6 +21,7 @@ export function useIntakeCategories() {
       return result.data;
     },
     staleTime: CATALOG_STALE_MS,
+    ...(initialData ? { initialData } : {}),
   });
 }
 
