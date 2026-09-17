@@ -63,7 +63,11 @@ export default function ConsultationsPageClient({ data }: ConsultationsPageClien
                 { label: "Current Plan", value: plan.planLabel ?? "Active plan" },
                 {
                   label: "Consultation",
-                  value: used ? `Started ${formatPortalDate(plan.startedAt)}` : "1 included",
+                  value: !plan.startedAt
+                    ? "1 included"
+                    : plan.visitStatus === "closed"
+                      ? `Closed ${formatPortalDate(plan.endedAt ?? plan.startedAt)}`
+                      : `Started ${formatPortalDate(plan.startedAt)}`,
                 },
               ];
 
@@ -115,7 +119,13 @@ export default function ConsultationsPageClient({ data }: ConsultationsPageClien
                           onClick={() => openPlan(plan.subscriptionId)}
                           className="h-[46px] w-full rounded-full bg-[#152A51] px-6 text-sm font-medium text-white hover:bg-[#152A51]/90 sm:w-fit"
                         >
-                          {busy ? "Opening…" : used ? "Open consultation" : "Start consultation"}
+                          {busy
+                            ? "Opening…"
+                            : !used
+                              ? "Start consultation"
+                              : plan.visitStatus === "closed"
+                                ? "Closed consultation"
+                                : "Open consultation"}
                         </Button>
                       </div>
                     </div>

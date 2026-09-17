@@ -17,9 +17,6 @@ import MedicineProductImage from "../../../onboarding/_components/MedicineProduc
 import DashboardHeader from "../../_components/DashboardHeader";
 import { openConsultationInNewTab } from "@/lib/consultations/open-visit";
 
-/** Figma treatment row — hug height ~102px; bottle well fills card vertically */
-const TREATMENT_ROW_HEIGHT = 102;
-
 type DashboardPageClientProps = {
   data: DashboardPageDataDto;
 };
@@ -63,7 +60,10 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
         duePayment.amountCents / 100,
       )
     : null;
-  const canRefill = Boolean(data.treatment?.medicineId);
+  const canRefill =
+    data.treatment?.consultationStatus === "closed" && Boolean(data.treatment.medicineId);
+  const consultationStatus = data.treatment?.consultationStatus ?? "none";
+  const showConsultationCta = data.consultationsEnabled && Boolean(data.treatment?.subscriptionId);
 
   const treatmentFields = data.treatment
     ? [
@@ -140,12 +140,22 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
                 Please answer all questions to the best of your ability.
               </p>
               <div className="mt-auto pt-5">
-                <Button
-                  asChild
-                  className="h-[46px] w-full rounded-full bg-[#E3E084] px-6 text-sm font-medium text-[#152A51] hover:bg-[#D9D674] sm:w-fit"
-                >
-                  <Link href="/consultations">Complete intake form</Link>
-                </Button>
+                {consultationStatus === "closed" ? (
+                  <Button
+                    type="button"
+                    disabled
+                    className="h-[46px] w-full rounded-full bg-[#E3E084] px-6 text-sm font-medium text-[#152A51] disabled:opacity-100 sm:w-fit"
+                  >
+                    Intake form closed
+                  </Button>
+                ) : (
+                  <Button
+                    asChild
+                    className="h-[46px] w-full rounded-full bg-[#E3E084] px-6 text-sm font-medium text-[#152A51] hover:bg-[#D9D674] sm:w-fit"
+                  >
+                    <Link href="/consultations">Complete intake form</Link>
+                  </Button>
+                )}
               </div>
             </>
           )}
@@ -170,12 +180,9 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
 
       {data.treatment ? (
         /* Figma treatment row: radius 10, pr 20, gap 32, bottle flush to card height */
-        <section className="mt-4 overflow-hidden rounded-[10px] border border-[#E8EEED] bg-white">
-          <div
-            className="flex flex-col sm:flex-row sm:items-stretch sm:gap-8 sm:pr-5"
-            style={{ minHeight: TREATMENT_ROW_HEIGHT }}
-          >
-            <div className="relative mx-auto h-[102px] w-[102px] shrink-0 overflow-hidden rounded-[10px] bg-[#E8EEED] sm:mx-0 sm:h-auto sm:w-[102px] sm:self-stretch">
+        <section className="mt-4 rounded-[10px] border border-[#E8EEED] bg-white">
+          <div className="flex min-h-[102px] flex-col sm:flex-row sm:items-center sm:gap-6 sm:pr-5">
+            <div className="relative mx-auto h-[102px] w-[102px] shrink-0 overflow-hidden rounded-[10px] bg-[#E8EEED] sm:mx-0 sm:h-[102px] sm:w-[102px] sm:self-center">
               <MedicineProductImage
                 src={data.treatment.imageSrc}
                 alt={data.treatment.name}
@@ -184,16 +191,15 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
               />
             </div>
 
-            <div className="flex min-w-0 flex-1 flex-col gap-4 p-4 sm:flex-row sm:items-center sm:gap-8 sm:p-0 sm:py-3">
-              {/* Fields hug content; spacer creates Figma gap before refill CTA */}
-              <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:flex lg:shrink-0 lg:items-center lg:gap-0">
+            <div className="flex min-w-0 flex-1 flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-0 sm:py-3">
+              <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:flex xl:min-w-0 xl:flex-1 xl:items-center xl:gap-0">
                 {treatmentFields.map((field, index) => (
                   <div
                     key={field.label}
                     className={cn(
-                      "min-w-0 lg:max-w-[200px] lg:px-4",
-                      index > 0 && "lg:border-l lg:border-[#E8EEED]",
-                      index === 0 && "lg:pl-0",
+                      "min-w-0 xl:max-w-[180px] xl:px-3",
+                      index > 0 && "xl:border-l xl:border-[#E8EEED]",
+                      index === 0 && "xl:pl-0",
                     )}
                   >
                     <p className="text-xs text-[#152A51]/60 sm:text-[13px]">{field.label}</p>
@@ -204,23 +210,36 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
                 ))}
               </div>
 
-              <div className="hidden min-w-[64px] flex-1 lg:block" aria-hidden />
-
-              <div className="flex shrink-0 flex-col items-stretch gap-2 sm:ml-auto sm:flex-row sm:items-center lg:ml-0">
-                {data.treatment.canStartConsultation && data.treatment.subscriptionId ? (
-                  <DashboardStartConsultationButton
-                    subscriptionId={data.treatment.subscriptionId}
+              <div className="flex shrink-0 flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+                {showConsultationCta && consultationStatus === "none" ? (
+                  <DashboardConsultationButton
+                    subscriptionId={data.treatment.subscriptionId!}
+                    label="Start consultation"
                   />
                 ) : null}
-                <button
-                  type="button"
-                  onClick={handleRefillRequest}
-                  disabled={!canRefill}
-                  className="inline-flex h-[46px] w-full items-center justify-center gap-2 rounded-full border border-[#152A51]/20 bg-white px-5 text-sm font-medium text-[#152A51] hover:bg-[#F3F6F6] disabled:cursor-not-allowed disabled:opacity-50 sm:w-fit"
-                >
-                  New Refill Request
-                  <ArrowRight className="h-4 w-4" />
-                </button>
+                {showConsultationCta && consultationStatus === "open" ? (
+                  <DashboardConsultationButton
+                    subscriptionId={data.treatment.subscriptionId!}
+                    label="Open consultation"
+                  />
+                ) : null}
+                {showConsultationCta && consultationStatus === "closed" ? (
+                  <DashboardConsultationButton
+                    subscriptionId={data.treatment.subscriptionId!}
+                    label="Closed consultation"
+                    variant="secondary"
+                  />
+                ) : null}
+                {canRefill ? (
+                  <button
+                    type="button"
+                    onClick={handleRefillRequest}
+                    className="inline-flex h-[46px] shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-[#152A51]/20 bg-white px-5 text-sm font-medium text-[#152A51] hover:bg-[#F3F6F6]"
+                  >
+                    New Refill Request
+                    <ArrowRight className="h-4 w-4 shrink-0" />
+                  </button>
+                ) : null}
               </div>
             </div>
           </div>
@@ -242,26 +261,38 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
   );
 }
 
-function DashboardStartConsultationButton({ subscriptionId }: { subscriptionId: string }) {
+function DashboardConsultationButton({
+  subscriptionId,
+  label,
+  variant = "primary",
+}: {
+  subscriptionId: string;
+  label: string;
+  variant?: "primary" | "secondary";
+}) {
   const router = useRouter();
-  const [started, setStarted] = useState(false);
-
-  if (started) return null;
+  const [busy, setBusy] = useState(false);
 
   return (
     <button
       type="button"
+      disabled={busy}
       onClick={() => {
         void (async () => {
+          setBusy(true);
           const opened = await openConsultationInNewTab(subscriptionId);
+          setBusy(false);
           if (!opened) return;
-          setStarted(true);
           router.refresh();
         })();
       }}
-      className="inline-flex h-[46px] w-full items-center justify-center rounded-full bg-[#152A51] px-5 text-sm font-medium text-white hover:bg-[#152A51]/90 sm:w-fit"
+      className={
+        variant === "secondary"
+          ? "inline-flex h-[46px] shrink-0 items-center justify-center whitespace-nowrap rounded-full border border-[#152A51]/20 bg-white px-5 text-sm font-medium text-[#152A51] hover:bg-[#F3F6F6] disabled:opacity-60"
+          : "inline-flex h-[46px] shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-[#152A51] px-5 text-sm font-medium text-white hover:bg-[#152A51]/90 disabled:opacity-60"
+      }
     >
-      Start consultation
+      {busy ? "Opening…" : label}
     </button>
   );
 }

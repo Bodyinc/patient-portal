@@ -373,58 +373,130 @@ function isAppointmentOpen(appointment: QbAppointment) {
   return appointment.date_end == null || appointment.date_end === "";
 }
 
-async function listClientOpenAppointmentIds(clientToken: string, clientId: number) {
+export type AppointmentCloseState = {
+  open: boolean;
+  dateEnd: string | null;
+};
+
+async function appointmentAuth() {
+  const { apiKey } = getQuickbloxConfig();
+  if (apiKey) return { apiKey };
+  const provider = await getProviderAuth();
+  return { token: provider.token };
+}
+
+/** Live QuickBlox close state (`date_end`) for stored appointment ids. */
+export async function fetchAppointmentStatuses(ids: string[]) {
+  const unique = [...new Set(ids.filter(Boolean))];
+  const wanted = new Set(unique);
+  const map = new Map<string, AppointmentCloseState>();
+  if (unique.length === 0) return map;
+
+  let auth: { token?: string; apiKey?: string };
+  try {
+    auth = await appointmentAuth();
+  } catch (error) {
+    console.warn("[consultations] appointment status auth failed:", error);
+    return map;
+  }
+
+  const fill = (items: QbAppointment[]) => {
+    for (const item of items) {
+      if (!item._id || !wanted.has(item._id)) continue;
+      map.set(item._id, {
+        open: isAppointmentOpen(item),
+        dateEnd: item.date_end ?? null,
+      });
+    }
+  };
+
+  try {
+    const listed = await qbFetch<{ items?: QbAppointment[] }>(
+      "/appointments?limit=1000&sort_desc=updated_at",
+      auth,
+    );
+    fill(listed.items ?? []);
+  } catch (error) {
+    console.warn("[consultations] list appointments for status failed:", error);
+  }
+
+  const missing = unique.filter((id) => !map.has(id));
+  for (let i = 0; i < missing.length; i += 8) {
+    const chunk = missing.slice(i, i + 8);
+    await Promise.all(
+      chunk.map(async (id) => {
+        try {
+          const item = await qbFetch<QbAppointment>(`/appointments/${id}`, auth);
+          fill([item]);
+        } catch (error) {
+          console.warn("[consultations] get appointment status failed:", id, error);
+        }
+      }),
+    );
+  }
+
+  return map;
+}
+
+async function inspectAppointment(appointmentId: string, token?: string) {
+  if (token) {
+    try {
+      return await qbFetch<QbAppointment>(`/appointments/${appointmentId}`, { token });
+    } catch {
+      // Fall through to provider/api key.
+    }
+  }
+  try {
+    const auth = await appointmentAuth();
+    return await qbFetch<QbAppointment>(`/appointments/${appointmentId}`, auth);
+  } catch {
+    return null;
+  }
+}
+
+/** Prefer an already-started open visit (waiting room) over a brand-new intake stub. */
+export async function pickReusableAppointmentId(params: {
+  storedIds: string[];
+  clientToken: string;
+  clientId: number;
+}): Promise<string | null> {
+  const ids = [...new Set(params.storedIds.filter(Boolean))];
+  const inspected: QbAppointment[] = [];
+
+  for (const id of ids) {
+    const item = await inspectAppointment(id, params.clientToken);
+    if (item?._id && !inspected.some((row) => row._id === item._id)) inspected.push(item);
+  }
+
+  for (const item of await findClientOpenAppointments(params.clientToken, params.clientId)) {
+    if (item._id && !inspected.some((row) => row._id === item._id)) inspected.push(item);
+  }
+
+  const open = inspected.filter((item) => isAppointmentOpen(item));
+  const withDialog = open.find((item) => Boolean(item.dialog_id));
+  if (withDialog?._id) return withDialog._id;
+  if (open[0]?._id) return open[0]._id;
+  return ids[0] ?? null;
+}
+
+async function findClientOpenAppointments(clientToken: string, clientId: number) {
   try {
     const listed = await qbFetch<{ items?: QbAppointment[] }>("/appointments/my?limit=20", {
       token: clientToken,
     });
-    return (listed.items ?? [])
-      .filter(
-        (appointment) =>
-          Boolean(appointment._id) &&
-          isAppointmentOpen(appointment) &&
-          (appointment.client_id == null || appointment.client_id === clientId),
-      )
-      .map((appointment) => appointment._id)
-      .slice(0, 5);
+    return (listed.items ?? []).filter(
+      (appointment) =>
+        Boolean(appointment._id) &&
+        isAppointmentOpen(appointment) &&
+        (appointment.client_id == null || appointment.client_id === clientId),
+    );
   } catch (error) {
     console.warn("[consultations] list my appointments failed:", error);
-    return [];
+    return [] as QbAppointment[];
   }
 }
 
-async function endAppointment(appointmentId: string, token: string) {
-  await qbFetch(`/appointments/${appointmentId}`, {
-    method: "PATCH",
-    token,
-    body: JSON.stringify({ date_end: new Date().toISOString() }),
-  });
-}
-
-async function closeThisClientOpenVisits(params: {
-  clientId: number;
-  clientToken: string;
-  extraIds?: string[];
-  keepId?: string | null;
-}) {
-  const ids = new Set(
-    (await listClientOpenAppointmentIds(params.clientToken, params.clientId)).concat(
-      (params.extraIds ?? []).filter(Boolean),
-    ),
-  );
-  if (params.keepId) ids.delete(params.keepId);
-
-  for (const id of [...ids].slice(0, 5)) {
-    try {
-      await endAppointment(id, params.clientToken);
-    } catch (error) {
-      if (isLoginLockedError(error)) throw error;
-      console.warn("[consultations] close appointment failed:", id, error);
-    }
-  }
-}
-
-/** Reopen the stored visit. Never create a new QuickBlox appointment for this plan. */
+/** Open the stored visit. Never create a new QuickBlox appointment for this plan. */
 export async function resumeStoredAppointment(params: {
   appointmentId: string;
   clientToken: string;
@@ -432,16 +504,8 @@ export async function resumeStoredAppointment(params: {
 }) {
   const { appointmentId, clientToken } = params;
   try {
-    const current = await qbFetch<QbAppointment>(`/appointments/${appointmentId}`, {
+    await qbFetch<QbAppointment>(`/appointments/${appointmentId}`, {
       token: clientToken,
-    });
-    if (isAppointmentOpen(current)) return appointmentId;
-    await qbFetch(`/appointments/${appointmentId}`, {
-      method: "PATCH",
-      token: clientToken,
-      body: JSON.stringify({ date_end: null }),
-    }).catch((error) => {
-      console.warn("[consultations] reactivate appointment failed:", appointmentId, error);
     });
   } catch (error) {
     console.warn("[consultations] load stored appointment failed:", appointmentId, error);
@@ -461,7 +525,6 @@ export async function claimStoredAppointment(params: {
       token: params.clientToken,
       body: JSON.stringify({
         client_id: params.clientId,
-        date_end: null,
       }),
     });
   } catch {
@@ -472,7 +535,6 @@ export async function claimStoredAppointment(params: {
         token: provider.token,
         body: JSON.stringify({
           client_id: params.clientId,
-          date_end: null,
         }),
       });
     } catch (error) {
@@ -512,6 +574,18 @@ export async function createQuickbloxAppointment(params: {
 }) {
   const providerId = configuredProviderId() ?? (await getProviderAuth()).userId;
 
+  const reuseOpen = async () => {
+    const open = await findClientOpenAppointments(params.clientToken, params.clientId);
+    if (params.keepAppointmentId) {
+      const kept = open.find((item) => item._id === params.keepAppointmentId);
+      if (kept) return kept;
+    }
+    return open[0] ?? null;
+  };
+
+  const alreadyOpen = await reuseOpen();
+  if (alreadyOpen) return alreadyOpen;
+
   const tryPost = async (token: string) => {
     try {
       return await postAppointment({
@@ -523,18 +597,9 @@ export async function createQuickbloxAppointment(params: {
     } catch (error) {
       if (isLoginLockedError(error)) throw error;
       if (!isActiveAppointmentError(error)) throw error;
-      await closeThisClientOpenVisits({
-        clientId: params.clientId,
-        clientToken: params.clientToken,
-        extraIds: params.previousAppointmentIds,
-        keepId: params.keepAppointmentId,
-      });
-      return postAppointment({
-        token,
-        clientId: params.clientId,
-        providerId,
-        description: params.description,
-      });
+      const existingOpen = await reuseOpen();
+      if (existingOpen) return existingOpen;
+      throw error;
     }
   };
 

@@ -4,6 +4,8 @@ export type ConsultationPlanState = {
   planLabel: string | null;
   imageSrc: string | null;
   startedAt: string | null;
+  endedAt: string | null;
+  visitStatus: "open" | "closed" | null;
 };
 
 export type ConsultationsPageData = {

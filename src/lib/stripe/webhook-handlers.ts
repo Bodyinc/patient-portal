@@ -447,11 +447,15 @@ async function handleChargeRefunded(charge: Stripe.Charge): Promise<void> {
 
   // Match by payment_intent first; fall back to the invoice id so a refund issued from the
   // Stripe dashboard reconciles even when the payment row never captured a payment_intent.
-  let payment: { id: string } | null = null;
+  let payment: {
+    id: string;
+    user_id: string | null;
+    stripe_subscription_id: string | null;
+  } | null = null;
   if (piId) {
     const { data } = await supabaseAdmin
       .from("payments")
-      .select("id")
+      .select("id, user_id, stripe_subscription_id")
       .eq("stripe_payment_intent_id", piId)
       .maybeSingle();
     payment = data ?? null;
@@ -459,7 +463,7 @@ async function handleChargeRefunded(charge: Stripe.Charge): Promise<void> {
   if (!payment && invoiceId) {
     const { data } = await supabaseAdmin
       .from("payments")
-      .select("id")
+      .select("id, user_id, stripe_subscription_id")
       .eq("stripe_invoice_id", invoiceId)
       .maybeSingle();
     payment = data ?? null;
@@ -471,16 +475,68 @@ async function handleChargeRefunded(charge: Stripe.Charge): Promise<void> {
   const refundId =
     (charge as unknown as { refunds?: { data?: Array<{ id?: string }> } }).refunds?.data?.[0]?.id ??
     null;
+  const latestRefundCents =
+    (charge as unknown as { refunds?: { data?: Array<{ amount?: number }> } }).refunds?.data?.[0]
+      ?.amount ??
+    charge.amount_refunded ??
+    0;
 
-  await supabaseAdmin
+  const { data: pending } = await supabaseAdmin
     .from("refund_requests")
-    .update({
-      status: "approved",
-      stripe_refund_id: refundId,
-      reviewed_at: new Date().toISOString(),
-    })
+    .select("id")
     .eq("payment_id", payment.id)
-    .eq("status", "pending");
+    .eq("status", "pending")
+    .maybeSingle();
+
+  if (pending) {
+    await supabaseAdmin
+      .from("refund_requests")
+      .update({
+        status: "approved",
+        stripe_refund_id: refundId,
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq("id", pending.id);
+    return;
+  }
+
+  // Reject-and-refund already writes stripe_refund_id on the request; don't duplicate history.
+  const { data: alreadyOnRequest } = await supabaseAdmin
+    .from("medication_requests")
+    .select("id")
+    .eq("payment_id", payment.id)
+    .not("stripe_refund_id", "is", null)
+    .maybeSingle();
+  if (alreadyOnRequest) return;
+
+  const { data: alreadyLogged } = await supabaseAdmin
+    .from("refund_requests")
+    .select("id")
+    .eq("payment_id", payment.id)
+    .eq("status", "approved")
+    .maybeSingle();
+  if (alreadyLogged) return;
+
+  let subscriptionId: string | null = null;
+  if (payment.stripe_subscription_id) {
+    const { data: sub } = await supabaseAdmin
+      .from("subscriptions")
+      .select("id")
+      .eq("stripe_subscription_id", payment.stripe_subscription_id)
+      .maybeSingle();
+    subscriptionId = sub?.id ?? null;
+  }
+
+  await supabaseAdmin.from("refund_requests").insert({
+    user_id: payment.user_id,
+    payment_id: payment.id,
+    subscription_id: subscriptionId,
+    amount_cents: latestRefundCents,
+    reason: "Refund processed in Stripe",
+    status: "approved",
+    stripe_refund_id: refundId,
+    reviewed_at: new Date().toISOString(),
+  });
 }
 
 export async function handleStripeEvent(event: Stripe.Event): Promise<void> {

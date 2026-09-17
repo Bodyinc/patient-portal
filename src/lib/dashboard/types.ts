@@ -14,7 +14,7 @@ export type DashboardTreatmentDto = {
   variantDose: string;
   nextRefillDate: string | null;
   imageSrc: string | null;
-  canStartConsultation: boolean;
+  consultationStatus: "none" | "open" | "closed";
 };
 
 export type DashboardPendingPaymentDto = {
@@ -36,4 +36,5 @@ export type DashboardPageDataDto = {
   /** Number of active/trialing/past_due subscriptions for “view all” hint. */
   activeTreatmentCount: number;
   pendingPayments: DashboardPendingPaymentDto[];
+  consultationsEnabled: boolean;
 };
