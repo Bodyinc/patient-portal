@@ -2,12 +2,26 @@ import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** email_reminders.target_id is uuid. Stripe invoice ids (in_…) must never be claimed. */
+export function isEmailTargetId(targetId: string): boolean {
+  return UUID_RE.test(targetId);
+}
+
+function rejectNonUuid(reminderType: string, targetId: string): boolean {
+  if (isEmailTargetId(targetId)) return false;
+  console.error(`[email] refused non-uuid claim ${reminderType}/${targetId}`);
+  return true;
+}
+
 /** Returns true if this reminder was already recorded (duplicate send should be skipped). */
 export async function wasEmailSent(
   reminderType: string,
   targetId: string,
   periodKey = "",
 ): Promise<boolean> {
+  if (rejectNonUuid(reminderType, targetId)) return false;
   const { data } = await supabaseAdmin
     .from("email_reminders")
     .select("target_id")
@@ -23,6 +37,7 @@ export async function markEmailSent(
   targetId: string,
   periodKey = "",
 ): Promise<void> {
+  if (rejectNonUuid(reminderType, targetId)) return;
   const { error } = await supabaseAdmin.from("email_reminders").insert({
     reminder_type: reminderType,
     target_id: targetId,
@@ -42,6 +57,7 @@ export async function claimEmailSend(
   targetId: string,
   periodKey = "",
 ): Promise<boolean> {
+  if (rejectNonUuid(reminderType, targetId)) return false;
   const { error } = await supabaseAdmin.from("email_reminders").insert({
     reminder_type: reminderType,
     target_id: targetId,
@@ -91,12 +107,13 @@ export async function alreadySentKeys(
   reminderType: string,
   targetIds: string[],
 ): Promise<Set<string>> {
-  if (!targetIds.length) return new Set();
+  const ids = targetIds.filter(isEmailTargetId);
+  if (!ids.length) return new Set();
   const { data, error } = await supabaseAdmin
     .from("email_reminders")
     .select("target_id, period_key")
     .eq("reminder_type", reminderType)
-    .in("target_id", targetIds);
+    .in("target_id", ids);
   if (error) throw new Error(error.message);
   return new Set((data ?? []).map((r) => `${r.target_id}|${r.period_key}`));
 }

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { patientStatusLabel } from "@/lib/orders/status";
-import { emailButton, emailChip, emailLayout, emailSoftPanel } from "./layout";
+import { emailButton, emailChip, emailLayout, emailSoftPanel, formatAmount } from "./layout";
 
 function firstName(fullName: string | null | undefined): string {
   const first = (fullName ?? "").trim().split(/\s+/)[0];
@@ -50,6 +50,8 @@ export function orderStatusEmail(params: {
   orderNumber: string;
   ctaUrl: string;
   trackingNumber?: string | null;
+  amountCents?: number | null;
+  currency?: string | null;
 }): { subject: string; html: string } | null {
   const bodyFn = STATUS_BODY[params.status];
   if (!bodyFn) return null;
@@ -71,9 +73,19 @@ export function orderStatusEmail(params: {
       ? dispatchedDetailsBlock(params.orderNumber, params.trackingNumber)
       : emailChip(`Order ${params.orderNumber}`);
 
+  let statusBody = bodyFn(params.medicineName);
+  if (
+    params.status === "awaiting_additional_payment" &&
+    params.amountCents != null &&
+    params.amountCents > 0
+  ) {
+    const amount = formatAmount(params.amountCents, params.currency ?? "usd");
+    statusBody = `Your clinician updated your <strong>${params.medicineName}</strong> treatment. An additional payment of <strong>${amount}</strong> is required before your prescription can continue. Please complete payment to avoid delays.`;
+  }
+
   const body = [
     `<p>Hi ${firstName(params.fullName)},</p>`,
-    `<p>${bodyFn(params.medicineName)}</p>`,
+    `<p>${statusBody}</p>`,
     orderDetails,
     emailButton(ctaLabel, params.ctaUrl),
   ].join("");

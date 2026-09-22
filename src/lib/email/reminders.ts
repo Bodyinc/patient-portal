@@ -36,12 +36,10 @@ const ORDER_STATUS_EMAIL_STATUS_LIST = [
 /** Must match admin-hub `notifyPatientRequestEvent` so both apps share one claim. */
 const PATIENT_STATUS_REMINDER = "order_status";
 
-function shouldEmailPatientForEvent(status: string): boolean {
-  // Admin hub already emails these the moment the clinician acts:
-  // combined "Practitioner assigned — prescription under review", and additional payment.
-  // Sending them again from this app is the duplicate Gmail pair.
-  if (status === "provider_assigned") return false;
-  if (status === "awaiting_additional_payment") return false;
+function shouldEmailPatientForEvent(status: string, actorRole: string | null): boolean {
+  // DB trigger writes provider_assigned at pay time. Patient mail waits until an
+  // admin/provider actually assigns — one combined assigned + under-review email.
+  if (status === "provider_assigned" && actorRole === "system") return false;
   return true;
 }
 
@@ -240,6 +238,28 @@ export async function sendUnsentOrderStatusEmails(opts?: {
   ]);
   const medicineById = new Map((medicines ?? []).map((m) => [m.id, m.name]));
 
+  const extraPayRequestIds = [
+    ...new Set(
+      candidates.filter((e) => e.status === "awaiting_additional_payment").map((e) => e.request_id),
+    ),
+  ];
+  const extraPayByRequest = new Map<string, { amount_cents: number; currency: string }>();
+  if (extraPayRequestIds.length > 0) {
+    const { data: extras } = await supabaseAdmin
+      .from("additional_payments")
+      .select("request_id, amount_cents, currency")
+      .in("request_id", extraPayRequestIds)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
+    for (const row of extras ?? []) {
+      if (extraPayByRequest.has(row.request_id)) continue;
+      extraPayByRequest.set(row.request_id, {
+        amount_cents: row.amount_cents,
+        currency: row.currency ?? "usd",
+      });
+    }
+  }
+
   let sent = 0;
   for (const event of candidates) {
     const request = requestById.get(event.request_id);
@@ -253,12 +273,13 @@ export async function sendUnsentOrderStatusEmails(opts?: {
       : null;
 
     if (!sentKeys.has(`${event.id}|`)) {
-      if (!shouldEmailPatientForEvent(event.status)) {
+      if (!shouldEmailPatientForEvent(event.status, event.actor_role)) {
         await markEmailSent(PATIENT_STATUS_REMINDER, event.id, "");
         sentKeys.add(`${event.id}|`);
       } else if (!patient) {
         console.warn("[email] order status skipped: no recipient yet", event.id);
       } else {
+        const extraPay = extraPayByRequest.get(event.request_id);
         const ctaUrl =
           event.status === "awaiting_additional_payment" && request
             ? `${appUrl()}/orders/${request.id}/pay`
@@ -273,6 +294,8 @@ export async function sendUnsentOrderStatusEmails(opts?: {
           orderNumber,
           ctaUrl,
           trackingNumber: request?.tracking_number,
+          amountCents: extraPay?.amount_cents,
+          currency: extraPay?.currency,
         });
 
         const claim = patientStatusClaimTarget(event.status, event.id, request?.id);

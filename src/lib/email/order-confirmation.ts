@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { formatOrderId } from "@/lib/orders/order-id";
+import { ensureMedicationOrderForPayment } from "@/lib/orders/ensure-medication-order";
 import { sendOnce, wasEmailSent, markEmailSent } from "./idempotency";
 import { orderConfirmedEmail } from "./order-confirmation-emails";
 import { appUrl, patientEmailByUserId } from "./recipients";
@@ -34,6 +35,7 @@ function invoiceUrlFromRawEvent(rawEvent: unknown): string | null {
 async function findOrderForPayment(payment: {
   id: string;
   stripe_invoice_id: string | null;
+  stripe_subscription_id?: string | null;
 }): Promise<OrderRow | null> {
   const { data: byPayment } = await supabaseAdmin
     .from("medication_requests")
@@ -44,15 +46,46 @@ async function findOrderForPayment(payment: {
     .maybeSingle();
   if (byPayment) return byPayment as OrderRow;
 
-  if (!payment.stripe_invoice_id) return null;
-  const { data: byInvoice } = await supabaseAdmin
+  if (payment.stripe_invoice_id) {
+    const { data: byInvoice } = await supabaseAdmin
+      .from("medication_requests")
+      .select(ORDER_COLUMNS)
+      .eq("stripe_invoice_id", payment.stripe_invoice_id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (byInvoice) return byInvoice as OrderRow;
+  }
+
+  if (!payment.stripe_subscription_id) return null;
+  const { data: sub } = await supabaseAdmin
+    .from("subscriptions")
+    .select("id")
+    .eq("stripe_subscription_id", payment.stripe_subscription_id)
+    .maybeSingle();
+  if (!sub?.id) return null;
+  const { data: bySub } = await supabaseAdmin
     .from("medication_requests")
     .select(ORDER_COLUMNS)
-    .eq("stripe_invoice_id", payment.stripe_invoice_id)
+    .eq("subscription_id", sub.id)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  return (byInvoice as OrderRow | null) ?? null;
+  return (bySub as OrderRow | null) ?? null;
+}
+
+async function waitForOrder(payment: {
+  id: string;
+  stripe_invoice_id: string | null;
+  stripe_subscription_id?: string | null;
+}): Promise<OrderRow | null> {
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 300));
+    await ensureMedicationOrderForPayment({ paymentId: payment.id });
+    const order = await findOrderForPayment(payment);
+    if (order) return order;
+  }
+  return null;
 }
 
 // During onboarding the account may not be claimed yet, so fall back to the intake session.
@@ -110,7 +143,9 @@ async function loadOrderLabels(order: OrderRow): Promise<{
 export async function sendOrderConfirmationEmail(paymentId: string): Promise<boolean> {
   const { data: payment } = await supabaseAdmin
     .from("payments")
-    .select("id, status, amount_cents, currency, stripe_invoice_id, raw_event")
+    .select(
+      "id, status, amount_cents, currency, stripe_invoice_id, stripe_subscription_id, stripe_payment_intent_id, raw_event",
+    )
     .eq("id", paymentId)
     .maybeSingle();
   if (!payment || payment.status !== "succeeded") {
@@ -118,7 +153,16 @@ export async function sendOrderConfirmationEmail(paymentId: string): Promise<boo
     return false;
   }
 
-  const order = await findOrderForPayment(payment);
+  if (payment.stripe_payment_intent_id) {
+    const { data: extraPay } = await supabaseAdmin
+      .from("additional_payments")
+      .select("id")
+      .eq("stripe_payment_intent_id", payment.stripe_payment_intent_id)
+      .maybeSingle();
+    if (extraPay) return false;
+  }
+
+  const order = await waitForOrder(payment);
   if (!order) {
     console.warn("[email] order confirmation skipped: no order row yet for payment", paymentId);
     return false;
@@ -145,14 +189,13 @@ export async function sendOrderConfirmationEmail(paymentId: string): Promise<boo
     invoiceUrl: invoiceUrlFromRawEvent(payment.raw_event),
   });
 
-  // Key on the invoice (fallback: payment row) so invoice.paid + invoice.payment_succeeded +
-  // reconcile cannot send twice even if two order rows exist for the same checkout.
-  const claimId = payment.stripe_invoice_id?.trim() || payment.id;
-  if (claimId !== order.id && (await wasEmailSent(REMINDER_TYPE, order.id))) {
-    await markEmailSent(REMINDER_TYPE, claimId);
+  // email_reminders.target_id is uuid. Claim the payment row (shared by invoice.paid +
+  // payment_succeeded). Also honor an older claim keyed on the order id.
+  if (await wasEmailSent(REMINDER_TYPE, order.id)) {
+    await markEmailSent(REMINDER_TYPE, payment.id);
     return false;
   }
-  return sendOnce(REMINDER_TYPE, claimId, () =>
+  return sendOnce(REMINDER_TYPE, payment.id, () =>
     sendTransactionalEmail({ to: recipient.email, subject, html }),
   );
 }

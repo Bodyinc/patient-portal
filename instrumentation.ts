@@ -10,6 +10,7 @@ export async function register() {
   // (or anything that pulls it in) here — Edge cannot resolve `stream`.
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   if (process.env.VERCEL === "1") return;
+  if (process.env.NEXT_PHASE === "phase-production-build") return;
 
   const secret = process.env.CRON_SECRET?.trim();
   if (!secret) {

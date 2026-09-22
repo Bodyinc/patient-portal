@@ -2,7 +2,6 @@ import "server-only";
 
 import { cache } from "react";
 import { redirect } from "next/navigation";
-import { ensurePatientRole } from "@/lib/actions/patient-auth";
 import { PORTAL_ROLE } from "@/lib/auth/constants";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -34,7 +33,14 @@ export const requirePatientSession = cache(async () => {
         .catch(() => {});
     }
     if (!error && !rpcRole) {
-      await ensurePatientRole();
+      const { data: existing } = await supabaseAdmin
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (!existing?.role) {
+        await supabaseAdmin.from("user_roles").insert({ user_id: user.id, role: PORTAL_ROLE });
+      }
       role = PORTAL_ROLE;
     }
   }

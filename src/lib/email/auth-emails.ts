@@ -4,6 +4,11 @@ import { EMAIL_THEME, emailButton, emailLayout, emailSoftPanel } from "./layout"
 
 export type VerificationEmailPurpose = "login" | "change_email";
 
+export const AUTH_MAGICLINK_CLAIM = "auth_magiclink";
+export const AUTH_RECOVERY_CLAIM = "auth_recovery";
+/** Checkout generateLink must stay silent. The Send Email hook skips when this is present. */
+export const AUTH_EMAIL_SKIP_QUERY = "email_skip=1";
+
 export function verificationCodeEmail(params: {
   code: string;
   fullName?: string | null;
