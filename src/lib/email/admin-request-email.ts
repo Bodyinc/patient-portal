@@ -2,7 +2,7 @@ import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { formatOrderId } from "@/lib/orders/order-id";
-import { markEmailSent, wasEmailSent } from "./idempotency";
+import { sendOnce } from "./idempotency";
 import { adminAppUrl, adminRecipientEmails, patientEmailByUserId } from "./recipients";
 import { sendTransactionalEmail } from "./send";
 import { emailButton, emailLayout } from "./layout";
@@ -132,8 +132,6 @@ export async function sendAdminNewRequestEmail(paymentId: string): Promise<boole
     return false;
   }
 
-  if (await wasEmailSent(REMINDER_TYPE, order.id)) return false;
-
   const recipients = await adminRecipientEmails();
   if (recipients.length === 0) {
     console.warn("[email] admin new-request skipped: no admin emails configured");
@@ -170,18 +168,15 @@ export async function sendAdminNewRequestEmail(paymentId: string): Promise<boole
     reviewUrl,
   });
 
-  let sentAny = false;
-  for (const to of recipients) {
-    const ok = await sendTransactionalEmail({ to, subject, html });
-    if (ok) sentAny = true;
-    else console.error(`[email] admin new-request failed for ${to}`);
-  }
-
-  if (sentAny) {
-    await markEmailSent(REMINDER_TYPE, order.id);
-    return true;
-  }
-  return false;
+  return sendOnce(REMINDER_TYPE, order.id, async () => {
+    let sentAny = false;
+    for (const to of recipients) {
+      const ok = await sendTransactionalEmail({ to, subject, html });
+      if (ok) sentAny = true;
+      else console.error(`[email] admin new-request failed for ${to}`);
+    }
+    return sentAny;
+  });
 }
 
 /** Retry admin new-request mail that was skipped because the order row was not ready yet. */

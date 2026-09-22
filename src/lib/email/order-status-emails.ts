@@ -10,11 +10,9 @@ function firstName(fullName: string | null | undefined): string {
 
 const STATUS_BODY: Record<string, (medicineName: string) => string> = {
   provider_assigned: (m) =>
-    `A licensed practitioner has been assigned to review your <strong>${m}</strong> request.`,
-  pending_review: (m) =>
-    `Your <strong>${m}</strong> prescription is currently under review by your care team.`,
+    `A licensed practitioner has been assigned to your <strong>${m}</strong> request and is ready to consult. Your prescription is now under review.`,
   awaiting_additional_payment: (m) =>
-    `An additional payment is required to continue your <strong>${m}</strong> prescription. Please complete payment to avoid delays.`,
+    `Your clinician updated your <strong>${m}</strong> treatment. An additional payment is required before your prescription can continue. Please complete payment to avoid delays.`,
   approved: (m) => `Your <strong>${m}</strong> prescription has been approved.`,
   prescribed: (m) =>
     `Your <strong>${m}</strong> prescription is ready and moving toward fulfillment.`,
@@ -53,12 +51,20 @@ export function orderStatusEmail(params: {
   ctaUrl: string;
   trackingNumber?: string | null;
 }): { subject: string; html: string } | null {
-  const label = patientStatusLabel(params.status);
   const bodyFn = STATUS_BODY[params.status];
   if (!bodyFn) return null;
 
+  const label =
+    params.status === "provider_assigned"
+      ? "Practitioner assigned — prescription under review"
+      : patientStatusLabel(params.status);
+
   const ctaLabel =
-    params.status === "awaiting_additional_payment" ? "Complete payment" : "View my meds";
+    params.status === "awaiting_additional_payment"
+      ? "Complete payment"
+      : params.status === "provider_assigned"
+        ? "Open consultations"
+        : "View my meds";
 
   const orderDetails =
     params.status === "dispatched"

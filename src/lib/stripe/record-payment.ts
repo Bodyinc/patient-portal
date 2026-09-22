@@ -4,36 +4,33 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureMedicationOrderForPayment } from "@/lib/orders/ensure-medication-order";
 import { sendOrderConfirmationEmail } from "@/lib/email/order-confirmation";
 import { sendAdminNewRequestEmail } from "@/lib/email/admin-request-email";
-import { sendUnsentOrderStatusEmailsForPayment } from "@/lib/email/reminders";
 import type { Database } from "@/lib/supabase/types";
 
 type PaymentInsert = Database["public"]["Tables"]["payments"]["Insert"];
 
 // Runs after the order row exists (trigger- or app-created). Never let a mail failure fail the
 // payment write — Stripe would retry the whole webhook event.
-async function settleOrder(paymentId: string): Promise<void> {
+// Patient mail at checkout is only the combined payment + order confirmation.
+async function settleOrder(paymentId: string, opts?: { sendPatientMail?: boolean }): Promise<void> {
   await ensureMedicationOrderForPayment({ paymentId });
-  try {
-    await sendOrderConfirmationEmail(paymentId);
-  } catch (error) {
-    console.error("[email] order confirmation failed:", error);
+  if (opts?.sendPatientMail !== false) {
+    try {
+      await sendOrderConfirmationEmail(paymentId);
+    } catch (error) {
+      console.error("[email] order confirmation failed:", error);
+    }
   }
   try {
     await sendAdminNewRequestEmail(paymentId);
   } catch (error) {
     console.error("[email] admin new-request failed:", error);
   }
-  try {
-    await sendUnsentOrderStatusEmailsForPayment(paymentId);
-  } catch (error) {
-    console.error("[email] order status flush failed:", error);
-  }
 }
 
-// Idempotent payment write keyed on the Stripe invoice, without depending on a DB unique
-// index (an ON CONFLICT upsert throws if that index is missing). Safe to call from the
-// webhook and the reconcile path for the same invoice.
-export async function recordPayment(payment: PaymentInsert): Promise<string | null> {
+export async function recordPayment(
+  payment: PaymentInsert,
+  opts?: { sendPatientMail?: boolean },
+): Promise<string | null> {
   if (payment.stripe_invoice_id) {
     const { data: existing } = await supabaseAdmin
       .from("payments")
@@ -43,7 +40,7 @@ export async function recordPayment(payment: PaymentInsert): Promise<string | nu
     if (existing) {
       await supabaseAdmin.from("payments").update(payment).eq("id", existing.id);
       if (payment.status === "succeeded") {
-        await settleOrder(existing.id);
+        await settleOrder(existing.id, opts);
       }
       return existing.id;
     }
@@ -62,7 +59,7 @@ export async function recordPayment(payment: PaymentInsert): Promise<string | nu
 
   const paymentId = inserted?.id ?? null;
   if (paymentId && payment.status === "succeeded") {
-    await settleOrder(paymentId);
+    await settleOrder(paymentId, opts);
   }
   return paymentId;
 }

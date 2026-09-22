@@ -6,7 +6,7 @@ import { fulfillAdditionalPayment } from "@/lib/orders/additional-payment";
 import { recordPayment } from "./record-payment";
 import { stripe } from "./server";
 import { sendTransactionalEmail } from "@/lib/email/send";
-import { paymentReceiptEmail, refundNotificationEmail } from "@/lib/email/payment-emails";
+import { refundNotificationEmail } from "@/lib/email/payment-emails";
 import {
   cancellationScheduledEmail,
   paymentFailedAdminEmail,
@@ -205,26 +205,6 @@ async function customerEmailById(custId: string | null): Promise<string | null> 
   return null;
 }
 
-async function sendPaymentReceipt(invoice: Stripe.Invoice): Promise<void> {
-  const to = invoice.customer_email ?? (await customerEmailById(customerId(invoice)));
-  if (!to) return;
-
-  const amountCents = invoice.amount_paid ?? invoice.amount_due ?? 0;
-  if (amountCents <= 0) return;
-
-  const description =
-    invoice.lines?.data?.map((l) => l.description).find(Boolean) ?? "Body Inc subscription";
-
-  const { subject, html } = paymentReceiptEmail({
-    amountCents,
-    currency: invoice.currency ?? "usd",
-    description,
-    invoiceNumber: invoice.number,
-    invoiceUrl: invoice.hosted_invoice_url,
-  });
-  await sendTransactionalEmail({ to, subject, html });
-}
-
 async function redeemPromoFromSubscription(subscriptionId: string): Promise<void> {
   try {
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
@@ -244,8 +224,6 @@ async function handleInvoicePaid(
   invoice: Stripe.Invoice,
   options?: { notifyCustomer?: boolean },
 ): Promise<void> {
-  if (options?.notifyCustomer) await sendPaymentReceipt(invoice);
-
   const subId = invoiceSubscriptionId(invoice);
   if (!subId) return;
 
@@ -257,19 +235,22 @@ async function handleInvoicePaid(
 
   const piId = invoicePaymentIntentId(invoice);
 
-  await recordPayment({
-    user_id: subRow?.user_id ?? null,
-    session_id: subRow?.session_id ?? null,
-    plan_id: subRow?.package_id ?? null,
-    stripe_subscription_id: subId,
-    stripe_invoice_id: invoice.id,
-    stripe_payment_intent_id: piId,
-    stripe_customer_id: customerId(invoice),
-    amount_cents: invoice.amount_paid ?? invoice.amount_due ?? 0,
-    currency: invoice.currency ?? "usd",
-    status: "succeeded",
-    raw_event: invoice as unknown as Json,
-  });
+  await recordPayment(
+    {
+      user_id: subRow?.user_id ?? null,
+      session_id: subRow?.session_id ?? null,
+      plan_id: subRow?.package_id ?? null,
+      stripe_subscription_id: subId,
+      stripe_invoice_id: invoice.id,
+      stripe_payment_intent_id: piId,
+      stripe_customer_id: customerId(invoice),
+      amount_cents: invoice.amount_paid ?? invoice.amount_due ?? 0,
+      currency: invoice.currency ?? "usd",
+      status: "succeeded",
+      raw_event: invoice as unknown as Json,
+    },
+    { sendPatientMail: Boolean(options?.notifyCustomer) },
+  );
 
   // First invoice only — renewals must not re-consume the onboarding promo.
   // Run on invoice.paid (notifyCustomer) so invoice.payment_succeeded doesn't double-count.
@@ -546,8 +527,8 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
     case "customer.subscription.deleted":
       await upsertSubscription(event.data.object as Stripe.Subscription);
       break;
-    // Both events fire for the same paid invoice; email only on invoice.paid so the
-    // customer gets a single receipt.
+    // Both events fire for the same paid invoice. Payment + order confirmation is one
+    // email from settleOrder (claim-before-send). invoice.paid still uniquely redeems promos.
     case "invoice.paid":
       await handleInvoicePaid(event.data.object as Stripe.Invoice, { notifyCustomer: true });
       break;

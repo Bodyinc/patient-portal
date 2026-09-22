@@ -2,7 +2,7 @@ import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { formatOrderId } from "@/lib/orders/order-id";
-import { markEmailSent, wasEmailSent } from "./idempotency";
+import { sendOnce, wasEmailSent, markEmailSent } from "./idempotency";
 import { orderConfirmedEmail } from "./order-confirmation-emails";
 import { appUrl, patientEmailByUserId } from "./recipients";
 import { sendTransactionalEmail } from "./send";
@@ -22,6 +22,12 @@ type OrderRow = {
 
 const ORDER_COLUMNS =
   "id, user_id, session_id, medicine_id, variant_id, package_id, kind, requires_consultation";
+
+function invoiceUrlFromRawEvent(rawEvent: unknown): string | null {
+  if (!rawEvent || typeof rawEvent !== "object" || Array.isArray(rawEvent)) return null;
+  const url = (rawEvent as { hosted_invoice_url?: unknown }).hosted_invoice_url;
+  return typeof url === "string" && url.trim() ? url.trim() : null;
+}
 
 // The order row can be written either by the DB trigger (on payment insert) or by
 // ensureMedicationOrderForPayment, so look it up by payment first and fall back to the invoice.
@@ -97,14 +103,14 @@ async function loadOrderLabels(order: OrderRow): Promise<{
 }
 
 /**
- * Sends the "order confirmed" email once per order. Called from the payment write path so it
- * fires for both the Stripe webhook and the on-demand reconcile (which is what completes the
- * order when webhooks are delayed or not reachable). Stripe sends the invoice separately.
+ * Sends one combined payment + order confirmation email. Called from the payment write path
+ * so it fires for both the Stripe webhook and the on-demand reconcile. Claimed before send so
+ * invoice.paid, invoice.payment_succeeded, and reconcile cannot deliver it twice.
  */
 export async function sendOrderConfirmationEmail(paymentId: string): Promise<boolean> {
   const { data: payment } = await supabaseAdmin
     .from("payments")
-    .select("id, status, amount_cents, currency, stripe_invoice_id")
+    .select("id, status, amount_cents, currency, stripe_invoice_id, raw_event")
     .eq("id", paymentId)
     .maybeSingle();
   if (!payment || payment.status !== "succeeded") {
@@ -117,9 +123,6 @@ export async function sendOrderConfirmationEmail(paymentId: string): Promise<boo
     console.warn("[email] order confirmation skipped: no order row yet for payment", paymentId);
     return false;
   }
-
-  // Keyed on the order, so a replayed webhook or a repeat reconcile never re-sends.
-  if (await wasEmailSent(REMINDER_TYPE, order.id)) return false;
 
   const recipient = await resolveRecipient(order);
   if (!recipient) {
@@ -139,14 +142,19 @@ export async function sendOrderConfirmationEmail(paymentId: string): Promise<boo
     requiresConsultation: order.requires_consultation,
     isRefill: order.kind !== "initial",
     myMedsUrl: `${appUrl()}/my-meds`,
+    invoiceUrl: invoiceUrlFromRawEvent(payment.raw_event),
   });
 
-  if (await sendTransactionalEmail({ to: recipient.email, subject, html })) {
-    await markEmailSent(REMINDER_TYPE, order.id);
-    return true;
+  // Key on the invoice (fallback: payment row) so invoice.paid + invoice.payment_succeeded +
+  // reconcile cannot send twice even if two order rows exist for the same checkout.
+  const claimId = payment.stripe_invoice_id?.trim() || payment.id;
+  if (claimId !== order.id && (await wasEmailSent(REMINDER_TYPE, order.id))) {
+    await markEmailSent(REMINDER_TYPE, claimId);
+    return false;
   }
-  console.error("[email] order confirmation send failed for order", order.id);
-  return false;
+  return sendOnce(REMINDER_TYPE, claimId, () =>
+    sendTransactionalEmail({ to: recipient.email, subject, html }),
+  );
 }
 
 /** Retry confirmations that were skipped because the order row was not ready yet. */

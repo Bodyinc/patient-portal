@@ -3,6 +3,7 @@ import "server-only";
 import type Stripe from "stripe";
 
 import { additionalPaymentReceivedEmail } from "@/lib/email/lifecycle-emails";
+import { sendOnce } from "@/lib/email/idempotency";
 import { sendUnsentOrderStatusEmails } from "@/lib/email/reminders";
 import { appUrl, patientEmailByUserId } from "@/lib/email/recipients";
 import { sendTransactionalEmail } from "@/lib/email/send";
@@ -229,7 +230,9 @@ async function notifyAdditionalPaymentReceived(row: AddPayRow): Promise<void> {
       currency: row.currency ?? "usd",
       myMedsUrl: `${appUrl()}/my-meds`,
     });
-    await sendTransactionalEmail({ to: patient.email, subject, html });
+    await sendOnce("additional_payment_received", row.id, () =>
+      sendTransactionalEmail({ to: patient.email, subject, html }),
+    );
   } catch (error) {
     console.error("[email] additional payment notify failed:", error);
   }
