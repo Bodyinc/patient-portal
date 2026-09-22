@@ -37,4 +37,6 @@ export type DashboardPageDataDto = {
   activeTreatmentCount: number;
   pendingPayments: DashboardPendingPaymentDto[];
   consultationsEnabled: boolean;
+  /** Latest medication request was rejected or cancelled — hide intake CTA and that treatment. */
+  latestOrderClosed: boolean;
 };

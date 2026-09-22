@@ -22,9 +22,9 @@ export async function register() {
   const g = globalThis as GlobalPoll;
   if (g.__bodyincEmailPoll) return;
 
-  const origin =
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
-    `http://localhost:${process.env.PORT || "3000"}`;
+  // Always hit this local server. NEXT_PUBLIC_APP_URL is production, and polling that
+  // would dispatch live patient emails from `npm run dev`.
+  const origin = `http://127.0.0.1:${process.env.PORT || "3000"}`;
 
   const tick = async () => {
     if (g.__bodyincEmailPollRunning) return;

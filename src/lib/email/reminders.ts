@@ -5,7 +5,7 @@ import { formatOrderId } from "@/lib/orders/order-id";
 import { sendTransactionalEmail } from "./send";
 import { incompleteOrderEmail, refillReminderEmail } from "./reminder-emails";
 import { orderStatusEmail, providerCaseAssignedEmail } from "./order-status-emails";
-import { alreadySentKeys, markEmailSent } from "./idempotency";
+import { alreadySentKeys, markEmailSent, sendOnce } from "./idempotency";
 import {
   adminAppUrl,
   adminNotifyEmail,
@@ -23,7 +23,6 @@ const ACTIVE_INTAKE_STATUSES = ["in_progress", "payment_pending"] as const;
 
 const ORDER_STATUS_EMAIL_STATUS_LIST = [
   "provider_assigned",
-  "pending_review",
   "awaiting_additional_payment",
   "approved",
   "prescribed",
@@ -33,6 +32,28 @@ const ORDER_STATUS_EMAIL_STATUS_LIST = [
   "rejected",
   "cancelled",
 ] as const;
+
+/** Must match admin-hub `notifyPatientRequestEvent` so both apps share one claim. */
+const PATIENT_STATUS_REMINDER = "order_status";
+
+function shouldEmailPatientForEvent(status: string): boolean {
+  // Admin hub already emails these the moment the clinician acts:
+  // combined "Practitioner assigned — prescription under review", and additional payment.
+  // Sending them again from this app is the duplicate Gmail pair.
+  if (status === "provider_assigned") return false;
+  if (status === "awaiting_additional_payment") return false;
+  return true;
+}
+
+function patientStatusClaimTarget(
+  status: string,
+  eventId: string,
+  requestId: string | undefined,
+): { targetId: string; periodKey: string } {
+  // One patient email per request+status, shared with admin-hub notifyPatientRequestEvent.
+  if (requestId) return { targetId: requestId, periodKey: status };
+  return { targetId: eventId, periodKey: "" };
+}
 
 export type ReminderRunResult = { candidates: number; sent: number };
 
@@ -159,7 +180,7 @@ export async function sendUnsentOrderStatusEmails(opts?: {
 }): Promise<ReminderRunResult> {
   let query = supabaseAdmin
     .from("medication_request_events")
-    .select("id, request_id, status, created_at")
+    .select("id, request_id, status, actor_role, created_at")
     .in("status", [...ORDER_STATUS_EMAIL_STATUS_LIST])
     .order("created_at", { ascending: true });
 
@@ -180,10 +201,7 @@ export async function sendUnsentOrderStatusEmails(opts?: {
     .map((e) => e.id);
 
   const [sentKeys, providerSentKeys, adminSentKeys, requestsResult] = await Promise.all([
-    alreadySentKeys(
-      "order_status",
-      candidates.map((e) => e.id),
-    ),
+    alreadySentKeys(PATIENT_STATUS_REMINDER, [...candidates.map((e) => e.id), ...requestIds]),
     alreadySentKeys("provider_assigned", providerEventIds),
     alreadySentKeys("admin_case_assigned", providerEventIds),
     requestIds.length
@@ -235,13 +253,18 @@ export async function sendUnsentOrderStatusEmails(opts?: {
       : null;
 
     if (!sentKeys.has(`${event.id}|`)) {
-      if (!patient) {
+      if (!shouldEmailPatientForEvent(event.status)) {
+        await markEmailSent(PATIENT_STATUS_REMINDER, event.id, "");
+        sentKeys.add(`${event.id}|`);
+      } else if (!patient) {
         console.warn("[email] order status skipped: no recipient yet", event.id);
       } else {
         const ctaUrl =
           event.status === "awaiting_additional_payment" && request
             ? `${appUrl()}/orders/${request.id}/pay`
-            : `${appUrl()}/my-meds`;
+            : event.status === "provider_assigned"
+              ? `${appUrl()}/consultations`
+              : `${appUrl()}/my-meds`;
 
         const mail = orderStatusEmail({
           fullName: patient.fullName,
@@ -252,17 +275,32 @@ export async function sendUnsentOrderStatusEmails(opts?: {
           trackingNumber: request?.tracking_number,
         });
 
+        const claim = patientStatusClaimTarget(event.status, event.id, request?.id);
+        const claimKey = `${claim.targetId}|${claim.periodKey}`;
+
         if (!mail) {
-          await markEmailSent("order_status", event.id, "");
+          await markEmailSent(PATIENT_STATUS_REMINDER, event.id, "");
+          sentKeys.add(`${event.id}|`);
+        } else if (sentKeys.has(claimKey)) {
+          await markEmailSent(PATIENT_STATUS_REMINDER, event.id, "");
           sentKeys.add(`${event.id}|`);
         } else if (
-          await sendTransactionalEmail({
-            to: patient.email,
-            subject: mail.subject,
-            html: mail.html,
-          })
+          await sendOnce(
+            PATIENT_STATUS_REMINDER,
+            claim.targetId,
+            () =>
+              sendTransactionalEmail({
+                to: patient.email,
+                subject: mail.subject,
+                html: mail.html,
+              }),
+            claim.periodKey,
+          )
         ) {
-          await markEmailSent("order_status", event.id, "");
+          sentKeys.add(claimKey);
+          if (claim.targetId !== event.id) {
+            await markEmailSent(PATIENT_STATUS_REMINDER, event.id, "");
+          }
           sentKeys.add(`${event.id}|`);
           sent += 1;
         }
@@ -286,13 +324,14 @@ export async function sendUnsentOrderStatusEmails(opts?: {
           caseUrl,
         });
         if (
-          await sendTransactionalEmail({
-            to: provider.email,
-            subject: providerMail.subject,
-            html: providerMail.html,
-          })
+          await sendOnce("provider_assigned", event.id, () =>
+            sendTransactionalEmail({
+              to: provider.email,
+              subject: providerMail.subject,
+              html: providerMail.html,
+            }),
+          )
         ) {
-          await markEmailSent("provider_assigned", event.id, "");
           providerSentKeys.add(`${event.id}|`);
           sent += 1;
         }
@@ -312,13 +351,14 @@ export async function sendUnsentOrderStatusEmails(opts?: {
           caseUrl,
         });
         if (
-          await sendTransactionalEmail({
-            to: adminTo,
-            subject: `[Body Inc] New case — ${orderNumber}`,
-            html: adminMail.html,
-          })
+          await sendOnce("admin_case_assigned", event.id, () =>
+            sendTransactionalEmail({
+              to: adminTo,
+              subject: `[Body Inc] New case — ${orderNumber}`,
+              html: adminMail.html,
+            }),
+          )
         ) {
-          await markEmailSent("admin_case_assigned", event.id, "");
           adminSentKeys.add(`${event.id}|`);
           sent += 1;
         }
@@ -327,40 +367,6 @@ export async function sendUnsentOrderStatusEmails(opts?: {
   }
 
   return { candidates: candidates.length, sent };
-}
-
-export async function sendUnsentOrderStatusEmailsForPayment(
-  paymentId: string,
-): Promise<ReminderRunResult> {
-  const { data: payment } = await supabaseAdmin
-    .from("payments")
-    .select("id, stripe_invoice_id")
-    .eq("id", paymentId)
-    .maybeSingle();
-  if (!payment) return { candidates: 0, sent: 0 };
-
-  const { data: byPayment } = await supabaseAdmin
-    .from("medication_requests")
-    .select("id")
-    .eq("payment_id", payment.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  let requestId = byPayment?.id ?? null;
-  if (!requestId && payment.stripe_invoice_id) {
-    const { data: byInvoice } = await supabaseAdmin
-      .from("medication_requests")
-      .select("id")
-      .eq("stripe_invoice_id", payment.stripe_invoice_id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    requestId = byInvoice?.id ?? null;
-  }
-  if (!requestId) return { candidates: 0, sent: 0 };
-
-  return sendUnsentOrderStatusEmails({ requestId });
 }
 
 export async function sendOrderStatusEmails(now = new Date()): Promise<ReminderRunResult> {

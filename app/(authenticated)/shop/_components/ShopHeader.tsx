@@ -1,13 +1,12 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 
-import { isExternalMedicineImage } from "@/lib/intake/medicine-image";
 import type { PortalOfferDto } from "@/lib/offers/types";
 import type { ShopSortOption } from "@/lib/shop/types";
 
 import NotificationBell from "../../_components/NotificationBell";
+import PatientAvatarLink from "../../_components/PatientAvatarLink";
 
 type ShopHeaderProps = {
   fullName: string;
@@ -24,13 +23,6 @@ type ShopHeaderProps = {
   subtitle?: string;
 };
 
-function initialsFromName(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "P";
-  if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
-  return `${parts[0].slice(0, 1)}${parts[parts.length - 1].slice(0, 1)}`.toUpperCase();
-}
-
 function offerTrailingCopy(offer: PortalOfferDto): string | null {
   if (offer.couponCode) return `Use code ${offer.couponCode}`;
   if (offer.badgeText) return offer.badgeText;
@@ -45,7 +37,6 @@ export default function ShopHeader({
   title = "Shop",
   subtitle = "Browse medications and healthcare products available for your treatment journey.",
 }: ShopHeaderProps) {
-  const external = avatarUrl ? isExternalMedicineImage(avatarUrl) : false;
   const trailing = offer ? offerTrailingCopy(offer) : null;
 
   return (
@@ -61,22 +52,7 @@ export default function ShopHeader({
           <div className="flex items-center justify-between gap-3 sm:justify-end sm:gap-4">
             <NotificationBell />
             <div className="flex min-w-0 items-center gap-3">
-              {avatarUrl ? (
-                <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full sm:h-[42px] sm:w-[42px]">
-                  <Image
-                    src={avatarUrl}
-                    alt={fullName}
-                    fill
-                    sizes="42px"
-                    unoptimized={external}
-                    className="object-cover"
-                  />
-                </div>
-              ) : (
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#E8EEED] text-xs font-medium text-[#152A51] sm:h-[42px] sm:w-[42px] sm:text-sm">
-                  {initialsFromName(fullName)}
-                </div>
-              )}
+              <PatientAvatarLink fullName={fullName} avatarUrl={avatarUrl} />
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium text-[#152A51] sm:text-base">
                   {fullName}

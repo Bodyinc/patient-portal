@@ -140,26 +140,62 @@ async function fetchClaimedIntakeExtras(userId: string): Promise<{
   return { bmi, goals, treatment };
 }
 
+function isClosedOrderStatus(status: string | null | undefined): boolean {
+  return status === "rejected" || status === "cancelled";
+}
+
 export async function fetchDashboardPageData(userId: string): Promise<DashboardPageDataDto> {
-  const [didReconcile, pendingPayments, identity, activeMeds, intake] = await Promise.all([
-    maybeReconcileIncompleteSubscription(userId).catch((err) => {
-      console.error("[stripe] dashboard incomplete reconcile failed:", err);
-      return false;
-    }),
-    healAndFetchPendingAdditionalPayments(userId).catch((err) => {
-      console.error("[additional_payments] dashboard load failed:", err);
-      return [] as Awaited<ReturnType<typeof healAndFetchPendingAdditionalPayments>>;
-    }),
-    getPatientDisplayIdentity(userId),
-    fetchActiveMedications(userId, { reconcile: false }).catch(() => []),
-    fetchClaimedIntakeExtras(userId),
-  ]);
+  const [didReconcile, pendingPayments, identity, activeMeds, intake, requestRows] =
+    await Promise.all([
+      maybeReconcileIncompleteSubscription(userId).catch((err) => {
+        console.error("[stripe] dashboard incomplete reconcile failed:", err);
+        return false;
+      }),
+      healAndFetchPendingAdditionalPayments(userId).catch((err) => {
+        console.error("[additional_payments] dashboard load failed:", err);
+        return [] as Awaited<ReturnType<typeof healAndFetchPendingAdditionalPayments>>;
+      }),
+      getPatientDisplayIdentity(userId),
+      fetchActiveMedications(userId, { reconcile: false }).catch(() => []),
+      fetchClaimedIntakeExtras(userId),
+      supabaseAdmin
+        .from("medication_requests")
+        .select("subscription_id, medicine_id, status, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false }),
+    ]);
+
+  const requests = requestRows.data ?? [];
+  if (requestRows.error) {
+    console.error("[dashboard] medication requests load failed:", requestRows.error.message);
+  }
+
+  const latestOverall = requests[0] ?? null;
+  const latestOrderClosed = isClosedOrderStatus(latestOverall?.status);
+  const latestBySubscription = new Map<string, (typeof requests)[number]>();
+  const latestByMedicine = new Map<string, (typeof requests)[number]>();
+  for (const row of requests) {
+    if (row.subscription_id && !latestBySubscription.has(row.subscription_id)) {
+      latestBySubscription.set(row.subscription_id, row);
+    }
+    if (row.medicine_id && !latestByMedicine.has(row.medicine_id)) {
+      latestByMedicine.set(row.medicine_id, row);
+    }
+  }
 
   const meds =
     didReconcile === true
       ? await fetchActiveMedications(userId, { reconcile: false }).catch(() => activeMeds)
       : activeMeds;
-  const currentMed = meds[0] ?? null;
+
+  const visibleMeds = meds.filter((med) => {
+    const latest =
+      (med.subscriptionId ? latestBySubscription.get(med.subscriptionId) : undefined) ??
+      (med.medicineId ? latestByMedicine.get(med.medicineId) : undefined);
+    return !isClosedOrderStatus(latest?.status);
+  });
+
+  const currentMed = visibleMeds[0] ?? null;
   let consultationStatus: DashboardTreatmentDto["consultationStatus"] = "none";
   if (currentMed?.subscriptionId) {
     let visit: {
@@ -212,8 +248,14 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
       }
     : null;
 
-  // Prefer active subscription medicine; fall back to claimed intake selection.
-  const treatment = treatmentFromSub ?? intake.treatment;
+  // Prefer an active, non-rejected subscription medicine. After a provider rejects an
+  // order the subscription is cancelled, so do not fall back to the intake selection.
+  const intakeTreatmentClosed = isClosedOrderStatus(
+    intake.treatment?.medicineId
+      ? latestByMedicine.get(intake.treatment.medicineId)?.status
+      : latestOverall?.status,
+  );
+  const treatment = treatmentFromSub ?? (intakeTreatmentClosed ? null : intake.treatment);
 
   return {
     fullName: identity.fullName,
@@ -223,8 +265,9 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
     bmiCategory: getBmiCategory(intake.bmi),
     goals: intake.goals,
     treatment,
-    activeTreatmentCount: meds.length,
+    activeTreatmentCount: visibleMeds.length,
     pendingPayments,
     consultationsEnabled: isQuickbloxConfigured(),
+    latestOrderClosed,
   };
 }

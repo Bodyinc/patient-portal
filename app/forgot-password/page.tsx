@@ -85,14 +85,6 @@ export default function ForgotPasswordPage() {
                 {busy ? "Sending..." : "Send Reset Link"}
               </Button>
 
-              <p className="mt-6 break-words text-center text-sm leading-snug text-[#152A51] sm:text-base">
-                Can&apos;t access your email?{" "}
-                <Link href="/support" className="font-semibold underline underline-offset-4">
-                  Contact support
-                </Link>{" "}
-                for assistance.
-              </p>
-
               <div className="mt-8 text-center">
                 <Link
                   href="/auth"

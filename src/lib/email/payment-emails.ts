@@ -2,31 +2,6 @@ import "server-only";
 
 import { EMAIL_THEME, emailLayout, emailSoftPanel, formatAmount } from "./layout";
 
-export function paymentReceiptEmail(params: {
-  amountCents: number;
-  currency: string;
-  description?: string | null;
-  invoiceNumber?: string | null;
-  invoiceUrl?: string | null;
-}): { subject: string; html: string } {
-  const amount = formatAmount(params.amountCents, params.currency);
-  const rows = [
-    `<p>Thank you for your payment. Here's your confirmation:</p>`,
-    emailSoftPanel(
-      `<p style="margin:0;font-size:24px;font-weight:600;color:${EMAIL_THEME.navy};">${amount}</p>`,
-    ),
-    params.description ? `<p><strong>For:</strong> ${params.description}</p>` : "",
-    params.invoiceNumber ? `<p><strong>Invoice:</strong> ${params.invoiceNumber}</p>` : "",
-    params.invoiceUrl
-      ? `<p><a href="${params.invoiceUrl}" style="color:${EMAIL_THEME.navy};font-weight:600;text-decoration:underline;">View your invoice</a></p>`
-      : "",
-  ];
-  return {
-    subject: `Your Body Inc payment of ${amount}`,
-    html: emailLayout("Payment received", rows.join("")),
-  };
-}
-
 export function refundNotificationEmail(params: {
   amountCents: number;
   currency: string;

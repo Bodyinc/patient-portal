@@ -178,14 +178,6 @@ export function ResetPasswordForm({ recovery, error }: ResetPasswordFormProps) {
                 {busy ? "Saving..." : "Save & Continue →"}
               </Button>
 
-              <p className="break-words text-center text-sm leading-snug text-[#152A51] sm:text-base">
-                Can&apos;t access your email?{" "}
-                <button type="button" className="font-semibold underline underline-offset-4">
-                  Contact support
-                </button>{" "}
-                for assistance.
-              </p>
-
               <div className="text-center">
                 <Link
                   href="/auth"
