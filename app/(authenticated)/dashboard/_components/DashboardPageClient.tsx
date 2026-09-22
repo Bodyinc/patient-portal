@@ -140,7 +140,7 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
                 Please answer all questions to the best of your ability.
               </p>
               <div className="mt-auto pt-5">
-                {consultationStatus === "closed" ? (
+                {data.latestOrderClosed ? null : consultationStatus === "closed" ? (
                   <Button
                     type="button"
                     disabled

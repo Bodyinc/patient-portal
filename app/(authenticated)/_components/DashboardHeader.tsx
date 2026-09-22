@@ -1,24 +1,15 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useState } from "react";
 
-import { isExternalMedicineImage } from "@/lib/intake/medicine-image";
-
 import NotificationBell from "./NotificationBell";
+import PatientAvatarLink from "./PatientAvatarLink";
 
 type DashboardHeaderProps = {
   fullName?: string | null;
   patientId?: string | null;
   avatarUrl?: string | null;
 };
-
-function initialsFromName(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "P";
-  if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
-  return `${parts[0].slice(0, 1)}${parts[parts.length - 1].slice(0, 1)}`.toUpperCase();
-}
 
 /** Local-time greeting for the patient dashboard. */
 function greetingForHour(hour: number): { title: string; subtitle: string } {
@@ -50,7 +41,6 @@ function greetingForHour(hour: number): { title: string; subtitle: string } {
 export default function DashboardHeader({ fullName, patientId, avatarUrl }: DashboardHeaderProps) {
   const name = fullName?.trim() || "Patient";
   const greetingName = fullName?.trim() ? `, ${fullName.trim()}` : "";
-  const external = avatarUrl ? isExternalMedicineImage(avatarUrl) : false;
 
   // Avoid SSR/client time mismatch; resolve after mount from the patient's local clock.
   const [greeting, setGreeting] = useState({
@@ -78,22 +68,7 @@ export default function DashboardHeader({ fullName, patientId, avatarUrl }: Dash
         <NotificationBell />
 
         <div className="flex min-w-0 items-center gap-3">
-          {avatarUrl ? (
-            <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full sm:h-[42px] sm:w-[42px]">
-              <Image
-                src={avatarUrl}
-                alt={name}
-                fill
-                sizes="42px"
-                unoptimized={external}
-                className="object-cover"
-              />
-            </div>
-          ) : (
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#E8EEED] text-xs font-medium text-[#152A51] sm:h-[42px] sm:w-[42px] sm:text-sm">
-              {initialsFromName(name)}
-            </div>
-          )}
+          <PatientAvatarLink fullName={name} avatarUrl={avatarUrl} />
 
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-[#152A51] sm:text-base">{name}</p>

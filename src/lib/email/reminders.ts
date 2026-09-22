@@ -36,14 +36,12 @@ const ORDER_STATUS_EMAIL_STATUS_LIST = [
 /** Must match admin-hub `notifyPatientRequestEvent` so both apps share one claim. */
 const PATIENT_STATUS_REMINDER = "order_status";
 
-function isSystemActor(actorRole: string | null | undefined): boolean {
-  return (actorRole ?? "system") === "system";
-}
-
-function shouldEmailPatientForEvent(status: string, actorRole: string | null | undefined): boolean {
-  // Auto-assign at payment is system. Combined assigned + under-review mail waits until
-  // an admin (or claiming practitioner) actually assigns the case.
-  if (status === "provider_assigned" && isSystemActor(actorRole)) return false;
+function shouldEmailPatientForEvent(status: string): boolean {
+  // Admin hub already emails these the moment the clinician acts:
+  // combined "Practitioner assigned — prescription under review", and additional payment.
+  // Sending them again from this app is the duplicate Gmail pair.
+  if (status === "provider_assigned") return false;
+  if (status === "awaiting_additional_payment") return false;
   return true;
 }
 
@@ -255,7 +253,7 @@ export async function sendUnsentOrderStatusEmails(opts?: {
       : null;
 
     if (!sentKeys.has(`${event.id}|`)) {
-      if (!shouldEmailPatientForEvent(event.status, event.actor_role)) {
+      if (!shouldEmailPatientForEvent(event.status)) {
         await markEmailSent(PATIENT_STATUS_REMINDER, event.id, "");
         sentKeys.add(`${event.id}|`);
       } else if (!patient) {

@@ -46,9 +46,11 @@ type AddPayRow = {
   user_id: string | null;
   reason: string | null;
   status: string;
+  to_package_id: string | null;
 };
 
-const ADD_PAY_COLS = "id, request_id, amount_cents, currency, user_id, reason, status";
+const ADD_PAY_COLS =
+  "id, request_id, amount_cents, currency, user_id, reason, status, to_package_id";
 
 function stripeCustomerId(pi: Stripe.PaymentIntent): string | null {
   const c = pi.customer;
@@ -170,16 +172,37 @@ async function recordAdditionalCharge(row: AddPayRow, pi: Stripe.PaymentIntent):
     .maybeSingle();
   if (existing) return;
 
+  const { data: req } = await supabaseAdmin
+    .from("medication_requests")
+    .select("package_id, subscription_id")
+    .eq("id", row.request_id)
+    .maybeSingle();
+
+  let stripeSubscriptionId: string | null = null;
+  if (req?.subscription_id) {
+    const { data: sub } = await supabaseAdmin
+      .from("subscriptions")
+      .select("stripe_subscription_id")
+      .eq("id", req.subscription_id)
+      .maybeSingle();
+    stripeSubscriptionId = sub?.stripe_subscription_id ?? null;
+  }
+
   const description = row.reason ?? "Additional payment";
-  await recordPayment({
-    user_id: row.user_id,
-    stripe_payment_intent_id: pi.id,
-    stripe_customer_id: stripeCustomerId(pi),
-    amount_cents: row.amount_cents,
-    currency: row.currency ?? "usd",
-    status: "succeeded",
-    raw_event: { lines: { data: [{ description }] } } as unknown as Json,
-  });
+  await recordPayment(
+    {
+      user_id: row.user_id,
+      plan_id: row.to_package_id ?? req?.package_id ?? null,
+      stripe_subscription_id: stripeSubscriptionId,
+      stripe_payment_intent_id: pi.id,
+      stripe_customer_id: stripeCustomerId(pi),
+      amount_cents: row.amount_cents,
+      currency: row.currency ?? "usd",
+      status: "succeeded",
+      raw_event: { lines: { data: [{ description }] } } as unknown as Json,
+    },
+    { settle: false },
+  );
 }
 
 async function advanceRequestAfterAdditionalPayment(requestId: string): Promise<void> {

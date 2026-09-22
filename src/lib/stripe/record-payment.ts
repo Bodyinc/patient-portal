@@ -29,8 +29,10 @@ async function settleOrder(paymentId: string, opts?: { sendPatientMail?: boolean
 
 export async function recordPayment(
   payment: PaymentInsert,
-  opts?: { sendPatientMail?: boolean },
+  opts?: { sendPatientMail?: boolean; settle?: boolean },
 ): Promise<string | null> {
+  const shouldSettle = opts?.settle !== false && payment.status === "succeeded";
+
   if (payment.stripe_invoice_id) {
     const { data: existing } = await supabaseAdmin
       .from("payments")
@@ -39,7 +41,7 @@ export async function recordPayment(
       .maybeSingle();
     if (existing) {
       await supabaseAdmin.from("payments").update(payment).eq("id", existing.id);
-      if (payment.status === "succeeded") {
+      if (shouldSettle) {
         await settleOrder(existing.id, opts);
       }
       return existing.id;
@@ -58,7 +60,7 @@ export async function recordPayment(
   }
 
   const paymentId = inserted?.id ?? null;
-  if (paymentId && payment.status === "succeeded") {
+  if (paymentId && shouldSettle) {
     await settleOrder(paymentId, opts);
   }
   return paymentId;

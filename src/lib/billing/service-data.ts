@@ -193,14 +193,53 @@ type PaymentRow = {
   created_at: string;
   stripe_subscription_id: string | null;
   stripe_invoice_id: string | null;
+  stripe_payment_intent_id: string | null;
   raw_event: Json | null;
   plan_id: string | null;
 };
 
 const PAYMENT_SELECT =
-  "id, amount_cents, status, created_at, stripe_subscription_id, stripe_invoice_id, raw_event, plan_id";
+  "id, amount_cents, status, created_at, stripe_subscription_id, stripe_invoice_id, stripe_payment_intent_id, raw_event, plan_id";
 
-async function enrichBillingPayments(payments: PaymentRow[]): Promise<BillingPaymentDto[]> {
+function medicineNameFromAdditionalReason(reason: string | null): string | null {
+  if (!reason) return null;
+  const match = reason.match(/price difference(?:\s+for(?:\s+changing\s+to)?)?\s+(.+)/i);
+  if (!match?.[1]) return null;
+  // Variant labels are appended in parentheses, including nested ones like "LYO 10/5mg (2mL)".
+  return match[1].replace(/\s*\(.*$/, "").trim() || null;
+}
+
+function additionalPaymentDescription(medicineName: string | null, reason: string | null): string {
+  const name =
+    medicineName?.trim() || medicineNameFromAdditionalReason(reason) || "your medication";
+  return `Price difference for ${name}`;
+}
+
+type AdditionalPayLookup = {
+  stripe_payment_intent_id: string | null;
+  reason: string | null;
+  to_package_id: string | null;
+  request_id: string;
+  amount_cents: number;
+};
+
+function toPackageInfo(pkg: {
+  id: string;
+  name: string;
+  duration_months: number;
+  medicine_variants?: { name: string } | null;
+}): { name: string; durationMonths: number; variantName: string | null } {
+  return {
+    name: pkg.name,
+    durationMonths: Number(pkg.duration_months),
+    variantName: pkg.medicine_variants?.name ?? null,
+  };
+}
+
+async function enrichBillingPayments(
+  payments: PaymentRow[],
+  userId: string,
+): Promise<BillingPaymentDto[]> {
   const subscriptionIds = [
     ...new Set(payments.map((payment) => payment.stripe_subscription_id).filter(Boolean)),
   ] as string[];
@@ -208,35 +247,150 @@ async function enrichBillingPayments(payments: PaymentRow[]): Promise<BillingPay
     ...new Set(payments.map((payment) => payment.plan_id).filter(Boolean)),
   ] as string[];
 
-  const [{ data: subscriptions }, { data: packages }] = await Promise.all([
-    subscriptionIds.length
-      ? supabaseAdmin
-          .from("subscriptions")
-          .select("stripe_subscription_id, medicine_id, package_id, medicines(name)")
-          .in("stripe_subscription_id", subscriptionIds)
-      : Promise.resolve({ data: [] }),
-    packageIds.length
-      ? supabaseAdmin
-          .from("packages")
-          .select("id, name, duration_months, medicine_variants(name)")
-          .in("id", packageIds)
-      : Promise.resolve({ data: [] }),
-  ]);
+  const [{ data: subscriptions }, { data: packages }, { data: additionalPays }] = await Promise.all(
+    [
+      subscriptionIds.length
+        ? supabaseAdmin
+            .from("subscriptions")
+            .select("stripe_subscription_id, medicine_id, package_id, medicines(name)")
+            .in("stripe_subscription_id", subscriptionIds)
+        : Promise.resolve({ data: [] }),
+      packageIds.length
+        ? supabaseAdmin
+            .from("packages")
+            .select("id, name, duration_months, medicine_variants(name)")
+            .in("id", packageIds)
+        : Promise.resolve({ data: [] }),
+      supabaseAdmin
+        .from("additional_payments")
+        .select("stripe_payment_intent_id, reason, to_package_id, request_id, amount_cents")
+        .eq("user_id", userId)
+        .in("status", ["paid", "pending"]),
+    ],
+  );
+
+  const addPays = (additionalPays ?? []) as AdditionalPayLookup[];
+  const addPayByIntent = new Map(
+    addPays
+      .filter((row) => row.stripe_payment_intent_id)
+      .map((row) => [row.stripe_payment_intent_id as string, row]),
+  );
+  const extraRequestIds = [...new Set(addPays.map((row) => row.request_id).filter(Boolean))];
+
+  const { data: extraRequests } = extraRequestIds.length
+    ? await supabaseAdmin
+        .from("medication_requests")
+        .select("id, medicine_id, variant_id, package_id, subscription_id")
+        .in("id", extraRequestIds)
+    : {
+        data: [] as Array<{
+          id: string;
+          medicine_id: string | null;
+          variant_id: string | null;
+          package_id: string | null;
+          subscription_id: string | null;
+        }>,
+      };
+
+  const extraMedicineIds = [
+    ...new Set(
+      (extraRequests ?? []).map((row) => row.medicine_id).filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const extraVariantIds = [
+    ...new Set(
+      (extraRequests ?? []).map((row) => row.variant_id).filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const extraSubIds = [
+    ...new Set(
+      (extraRequests ?? [])
+        .map((row) => row.subscription_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+
+  const [{ data: extraMedicines }, { data: extraVariants }, { data: extraSubs }] =
+    await Promise.all([
+      extraMedicineIds.length
+        ? supabaseAdmin.from("medicines").select("id, name").in("id", extraMedicineIds)
+        : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+      extraVariantIds.length
+        ? supabaseAdmin.from("medicine_variants").select("id, name").in("id", extraVariantIds)
+        : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+      extraSubIds.length
+        ? supabaseAdmin
+            .from("subscriptions")
+            .select("id, package_id, medicines(name)")
+            .in("id", extraSubIds)
+        : Promise.resolve({ data: [] as Array<{ id: string; package_id: string | null }> }),
+    ]);
+
+  const neededPackageIds = [
+    ...new Set(
+      [
+        ...packageIds,
+        ...addPays.map((row) => row.to_package_id),
+        ...(extraRequests ?? []).map((row) => row.package_id),
+        ...(extraSubs ?? []).map((row) => row.package_id),
+      ].filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const missingPackageIds = neededPackageIds.filter((id) => !packageIds.includes(id));
+  const { data: extraPackages } = missingPackageIds.length
+    ? await supabaseAdmin
+        .from("packages")
+        .select("id, name, duration_months, medicine_variants(name)")
+        .in("id", missingPackageIds)
+    : { data: [] };
 
   const packageById = new Map(
-    (packages ?? []).map((pkg) => [
+    [...(packages ?? []), ...(extraPackages ?? [])].map((pkg) => [
       pkg.id,
-      {
-        name: pkg.name as string,
-        durationMonths: Number(pkg.duration_months),
-        variantName:
-          (pkg as { medicine_variants?: { name: string } | null }).medicine_variants?.name ?? null,
-      },
+      toPackageInfo(
+        pkg as {
+          id: string;
+          name: string;
+          duration_months: number;
+          medicine_variants?: { name: string } | null;
+        },
+      ),
     ]),
   );
   const subscriptionByStripeId = new Map(
     (subscriptions ?? []).map((sub) => [sub.stripe_subscription_id, sub]),
   );
+  const requestById = new Map((extraRequests ?? []).map((row) => [row.id, row]));
+  const medicineNameById = new Map((extraMedicines ?? []).map((row) => [row.id, row.name]));
+  const variantNameById = new Map((extraVariants ?? []).map((row) => [row.id, row.name]));
+  const extraSubById = new Map((extraSubs ?? []).map((row) => [row.id, row]));
+
+  const usedAddPayIntents = new Set<string>();
+
+  function matchAdditionalPay(
+    payment: PaymentRow,
+    parsedDescription: string,
+  ): AdditionalPayLookup | undefined {
+    if (payment.stripe_payment_intent_id) {
+      const byIntent = addPayByIntent.get(payment.stripe_payment_intent_id);
+      if (byIntent) {
+        usedAddPayIntents.add(payment.stripe_payment_intent_id);
+        return byIntent;
+      }
+    }
+    if (!/price difference/i.test(parsedDescription)) return undefined;
+    const fallback = addPays.find((row) => {
+      if (row.amount_cents !== payment.amount_cents) return false;
+      if (row.stripe_payment_intent_id && usedAddPayIntents.has(row.stripe_payment_intent_id)) {
+        return false;
+      }
+      return true;
+    });
+    if (fallback?.stripe_payment_intent_id) {
+      usedAddPayIntents.add(fallback.stripe_payment_intent_id);
+    }
+    return fallback;
+  }
 
   return payments.map((payment) => {
     const subscription = payment.stripe_subscription_id
@@ -245,20 +399,50 @@ async function enrichBillingPayments(payments: PaymentRow[]): Promise<BillingPay
     const medicine = (subscription as { medicines?: { name: string } | null } | undefined)
       ?.medicines;
     const pkg = payment.plan_id ? packageById.get(payment.plan_id) : undefined;
-    const description =
+    const parsedDescription = parsePaymentDescription(
+      payment.raw_event,
+      pkg ? `${pkg.name} renewal` : "Subscription payment",
+    );
+
+    const addPay = matchAdditionalPay(payment, parsedDescription);
+    const addRequest = addPay?.request_id ? requestById.get(addPay.request_id) : undefined;
+    const addSub = addRequest?.subscription_id
+      ? extraSubById.get(addRequest.subscription_id)
+      : undefined;
+    const addPkgId = addPay?.to_package_id ?? addRequest?.package_id ?? addSub?.package_id ?? null;
+    const addPkg = addPkgId ? packageById.get(addPkgId) : undefined;
+    const addMedicineName = addRequest?.medicine_id
+      ? (medicineNameById.get(addRequest.medicine_id) ?? null)
+      : null;
+    const addVariantName =
+      addPkg?.variantName ??
+      (addRequest?.variant_id ? (variantNameById.get(addRequest.variant_id) ?? null) : null);
+    const addSubMedicine = (addSub as { medicines?: { name: string } | null } | undefined)
+      ?.medicines?.name;
+
+    const medicineName =
+      addMedicineName ??
+      medicineNameFromAdditionalReason(addPay?.reason ?? parsedDescription) ??
       medicine?.name ??
-      pkg?.name ??
-      parsePaymentDescription(
-        payment.raw_event,
-        pkg ? `${pkg.name} renewal` : "Subscription payment",
-      );
+      addSubMedicine ??
+      null;
+    const isAdditional = Boolean(addPay) || /price difference/i.test(parsedDescription);
+    const description = isAdditional
+      ? additionalPaymentDescription(medicineName, addPay?.reason ?? parsedDescription)
+      : (medicineName ?? parsedDescription);
+
     const subscriptionName =
-      medicine?.name ?? pkg?.name ?? (subscription ? "Treatment Subscription" : "—");
-    const planLabel = pkg
-      ? planTitleFromDuration(pkg.durationMonths)
-      : subscription
-        ? "Subscription"
-        : "—";
+      medicineName ??
+      pkg?.name ??
+      addPkg?.name ??
+      (subscription || addSub ? "Treatment Subscription" : "—");
+    const planLabel = addPkg
+      ? planTitleFromDuration(addPkg.durationMonths)
+      : pkg
+        ? planTitleFromDuration(pkg.durationMonths)
+        : subscription || addSub
+          ? "Subscription"
+          : "—";
     const { invoiceUrl, invoicePdfUrl } = parseInvoiceUrls(payment.raw_event);
 
     return {
@@ -267,7 +451,7 @@ async function enrichBillingPayments(payments: PaymentRow[]): Promise<BillingPay
       date: payment.created_at,
       description,
       subscriptionName,
-      variantName: pkg?.variantName ?? null,
+      variantName: addVariantName ?? pkg?.variantName ?? null,
       planLabel,
       amount: Number(payment.amount_cents) / 100,
       paymentMethod: formatPaymentMethod(payment.raw_event),
@@ -301,7 +485,7 @@ export async function fetchBillingPayments(
       .range(start, start + pageSize - 1);
     if (error) throw new Error(error.message);
 
-    const items = await enrichBillingPayments((payments ?? []) as PaymentRow[]);
+    const items = await enrichBillingPayments((payments ?? []) as PaymentRow[], userId);
     const total = count ?? 0;
     const totalPages = total === 0 ? 0 : Math.ceil(total / pageSize);
     return { items, total, page, pageSize, totalPages, query };
@@ -315,7 +499,7 @@ export async function fetchBillingPayments(
     .limit(200);
   if (error) throw new Error(error.message);
 
-  const enriched = await enrichBillingPayments((payments ?? []) as PaymentRow[]);
+  const enriched = await enrichBillingPayments((payments ?? []) as PaymentRow[], userId);
   const filtered = enriched.filter((payment) => matchesPaymentQuery(payment, query));
   const total = filtered.length;
   const totalPages = total === 0 ? 0 : Math.ceil(total / pageSize);
