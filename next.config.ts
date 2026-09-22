@@ -12,7 +12,12 @@ function getSupabaseHostname(): string | undefined {
 
 const supabaseHostname = getSupabaseHostname();
 
+const isDevCommand = process.argv.includes("dev");
+
 const nextConfig: NextConfig = {
+  // `next dev` and `next build` must not share `.next` — a running dev server
+  // truncates app-path-routes-manifest.json and collect-page-data fails with ENOENT.
+  distDir: process.env.NEXT_DIST_DIR || (isDevCommand ? ".next-dev" : ".next"),
   reactStrictMode: true,
   serverExternalPackages: ["nodemailer"],
   // Profile avatar uploads go through a Server Action; default limit is 1 MB.
@@ -38,6 +43,21 @@ const nextConfig: NextConfig = {
         pathname: "/storage/v1/object/public/**",
       },
     ],
+  },
+  async redirects() {
+    return [
+      {
+        source: "/onboarding/choose-medicine",
+        destination: "/onboarding/medications",
+        permanent: false,
+      },
+      { source: "/onboarding/quiz", destination: "/onboarding/goal", permanent: false },
+      {
+        source: "/onboarding/recommend2",
+        destination: "/onboarding/medications",
+        permanent: false,
+      },
+    ];
   },
 };
 

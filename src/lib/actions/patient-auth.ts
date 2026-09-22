@@ -10,11 +10,15 @@ import {
 import { claimIntakeSession } from "@/lib/actions/intake";
 import { requireIntakeSession } from "@/lib/intake/session";
 import {
+  AUTH_EMAIL_SKIP_QUERY,
+  AUTH_MAGICLINK_CLAIM,
+  AUTH_RECOVERY_CLAIM,
   passwordResetEmail,
   verificationCodeEmail,
   type VerificationEmailPurpose,
 } from "@/lib/email/auth-emails";
 import { appUrl } from "@/lib/email/recipients";
+import { sendOnce, wasEmailSent } from "@/lib/email/idempotency";
 import { sendTransactionalEmail } from "@/lib/email/send";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -390,6 +394,7 @@ export async function completePostCheckoutSignIn(): Promise<CompletePostCheckout
   const { data, error } = await supabaseAdmin.auth.admin.generateLink({
     type: "magiclink",
     email: accountResult.email,
+    options: { redirectTo: `${appUrl()}/auth/callback?${AUTH_EMAIL_SKIP_QUERY}` },
   });
 
   const tokenHash = data?.properties?.hashed_token;
@@ -414,9 +419,13 @@ export async function sendPatientLoginOtp(
     return { ok: false, message: parsed.error.issues[0]?.message ?? "Enter a valid email" };
   }
 
+  const purpose = opts?.purpose ?? "login";
   const { data, error } = await supabaseAdmin.auth.admin.generateLink({
     type: "magiclink",
     email: parsed.data,
+    options: {
+      redirectTo: `${appUrl()}/verify-otp?purpose=${encodeURIComponent(purpose)}`,
+    },
   });
   if (error) return { ok: false, message: error.message };
 
@@ -425,12 +434,17 @@ export async function sendPatientLoginOtp(
     return { ok: false, message: "Could not send a verification code. Please try again." };
   }
 
+  const userId = data.user?.id;
+  if (userId && (await wasEmailSent(AUTH_MAGICLINK_CLAIM, userId, code))) {
+    return { ok: true };
+  }
+
   let fullName: string | null = null;
-  if (data.user?.id) {
+  if (userId) {
     const { data: profile } = await supabaseAdmin
       .from("profiles")
       .select("full_name")
-      .eq("id", data.user.id)
+      .eq("id", userId)
       .maybeSingle();
     fullName = profile?.full_name ?? null;
   }
@@ -438,13 +452,16 @@ export async function sendPatientLoginOtp(
   const { subject, html } = verificationCodeEmail({
     code,
     fullName,
-    purpose: opts?.purpose ?? "login",
+    purpose,
   });
-  const sent = await sendTransactionalEmail({ to: parsed.data, subject, html });
-  if (!sent) {
-    return { ok: false, message: "Could not send email. Please try again." };
+  const deliver = () => sendTransactionalEmail({ to: parsed.data, subject, html });
+  const sent = userId
+    ? await sendOnce(AUTH_MAGICLINK_CLAIM, userId, deliver, code)
+    : await deliver();
+  if (sent || (userId && (await wasEmailSent(AUTH_MAGICLINK_CLAIM, userId, code)))) {
+    return { ok: true };
   }
-  return { ok: true };
+  return { ok: false, message: "Could not send email. Please try again." };
 }
 
 /** Sends a password-reset link using the Body Inc email theme (not the Supabase Auth template). */
@@ -478,24 +495,37 @@ export async function sendPatientPasswordReset(
     options: { redirectTo },
   });
   const resetUrl = data?.properties?.action_link?.trim();
+  const tokenHash = data?.properties?.hashed_token?.trim();
   if (error || !resetUrl) {
     return { ok: false, message: "Could not send a reset link. Please try again." };
   }
 
+  const userId = data.user?.id;
+  if (userId && tokenHash && (await wasEmailSent(AUTH_RECOVERY_CLAIM, userId, tokenHash))) {
+    return { ok: true };
+  }
+
   let fullName: string | null = null;
-  if (data.user?.id) {
+  if (userId) {
     const { data: profile } = await supabaseAdmin
       .from("profiles")
       .select("full_name")
-      .eq("id", data.user.id)
+      .eq("id", userId)
       .maybeSingle();
     fullName = profile?.full_name ?? null;
   }
 
   const { subject, html } = passwordResetEmail({ resetUrl, fullName });
-  const sent = await sendTransactionalEmail({ to: parsed.data, subject, html });
-  if (!sent) {
-    return { ok: false, message: "Could not send email. Please try again." };
+  const deliver = () => sendTransactionalEmail({ to: parsed.data, subject, html });
+  const sent =
+    userId && tokenHash
+      ? await sendOnce(AUTH_RECOVERY_CLAIM, userId, deliver, tokenHash)
+      : await deliver();
+  if (
+    sent ||
+    (userId && tokenHash && (await wasEmailSent(AUTH_RECOVERY_CLAIM, userId, tokenHash)))
+  ) {
+    return { ok: true };
   }
-  return { ok: true };
+  return { ok: false, message: "Could not send email. Please try again." };
 }

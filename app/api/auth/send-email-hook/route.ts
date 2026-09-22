@@ -6,9 +6,9 @@ export const dynamic = "force-dynamic";
 
 /**
  * Supabase Auth "Send Email" hook.
- * Returning 200 here replaces the dashboard SMTP templates (the old purple Magic Link /
- * Reset Password / Confirm signup mail). Login OTP and password reset are sent from the
- * app via Brevo. Checkout generateLink must not email the patient at all.
+ * Always ACK 200 so generateLink (OTP, reset, checkout session) never fails.
+ * Themed login OTP / reset mail is sent from here via Brevo. Checkout magic
+ * links pass email_skip=1 and stay silent.
  *
  * Dashboard: Authentication → Hooks → Send Email → HTTPS endpoint
  *   {NEXT_PUBLIC_APP_URL}/api/auth/send-email-hook
@@ -50,29 +50,38 @@ function verifyStandardWebhook(payload: string, request: Request, secret: Buffer
 }
 
 export async function POST(request: Request) {
-  const secret = hookSecretBytes();
-  if (!secret) {
-    return NextResponse.json(
-      { error: "SEND_EMAIL_HOOK_SECRET is not configured." },
-      { status: 500 },
-    );
-  }
-
   const payload = await request.text();
-  if (!verifyStandardWebhook(payload, request, secret)) {
-    return NextResponse.json({ error: "Invalid signature." }, { status: 401 });
+  const secret = hookSecretBytes();
+  const signed = secret ? verifyStandardWebhook(payload, request, secret) : false;
+
+  if (secret && !signed) {
+    console.warn("[auth-hook] invalid signature — acked so Auth still issues the token");
+    return NextResponse.json({});
+  }
+  if (!secret) {
+    console.warn("[auth-hook] SEND_EMAIL_HOOK_SECRET missing — acked without sending");
+    return NextResponse.json({});
   }
 
   try {
     const body = JSON.parse(payload) as {
-      email_data?: { email_action_type?: string };
+      user?: {
+        id?: string;
+        email?: string;
+        user_metadata?: { full_name?: string | null };
+      };
+      email_data?: {
+        token?: string;
+        token_hash?: string;
+        redirect_to?: string;
+        email_action_type?: string;
+        site_url?: string;
+      };
     };
-    console.info(
-      "[auth-hook] swallowed supabase email",
-      body.email_data?.email_action_type ?? "unknown",
-    );
-  } catch {
-    // Payload verified; ignore JSON parse issues and still ack so Auth does not fall back to SMTP.
+    const { deliverSupabaseAuthEmail } = await import("@/lib/email/auth-hook");
+    await deliverSupabaseAuthEmail(body);
+  } catch (error) {
+    console.error("[auth-hook] deliver failed:", error);
   }
 
   return NextResponse.json({});

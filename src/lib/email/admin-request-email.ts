@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { formatOrderId } from "@/lib/orders/order-id";
+import { ensureMedicationOrderForPayment } from "@/lib/orders/ensure-medication-order";
 import { sendOnce } from "./idempotency";
 import { adminAppUrl, adminRecipientEmails, patientEmailByUserId } from "./recipients";
 import { sendTransactionalEmail } from "./send";
@@ -73,6 +74,7 @@ function adminNewRequestEmail(params: {
 async function findOrderForPayment(payment: {
   id: string;
   stripe_invoice_id: string | null;
+  stripe_subscription_id?: string | null;
 }): Promise<OrderRow | null> {
   const { data: byPayment } = await supabaseAdmin
     .from("medication_requests")
@@ -83,15 +85,46 @@ async function findOrderForPayment(payment: {
     .maybeSingle();
   if (byPayment) return byPayment as OrderRow;
 
-  if (!payment.stripe_invoice_id) return null;
-  const { data: byInvoice } = await supabaseAdmin
+  if (payment.stripe_invoice_id) {
+    const { data: byInvoice } = await supabaseAdmin
+      .from("medication_requests")
+      .select(ORDER_COLUMNS)
+      .eq("stripe_invoice_id", payment.stripe_invoice_id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (byInvoice) return byInvoice as OrderRow;
+  }
+
+  if (!payment.stripe_subscription_id) return null;
+  const { data: sub } = await supabaseAdmin
+    .from("subscriptions")
+    .select("id")
+    .eq("stripe_subscription_id", payment.stripe_subscription_id)
+    .maybeSingle();
+  if (!sub?.id) return null;
+  const { data: bySub } = await supabaseAdmin
     .from("medication_requests")
     .select(ORDER_COLUMNS)
-    .eq("stripe_invoice_id", payment.stripe_invoice_id)
+    .eq("subscription_id", sub.id)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  return (byInvoice as OrderRow | null) ?? null;
+  return (bySub as OrderRow | null) ?? null;
+}
+
+async function waitForOrder(payment: {
+  id: string;
+  stripe_invoice_id: string | null;
+  stripe_subscription_id?: string | null;
+}): Promise<OrderRow | null> {
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 300));
+    await ensureMedicationOrderForPayment({ paymentId: payment.id });
+    const order = await findOrderForPayment(payment);
+    if (order) return order;
+  }
+  return null;
 }
 
 async function resolvePatient(order: OrderRow): Promise<{
@@ -121,12 +154,12 @@ async function resolvePatient(order: OrderRow): Promise<{
 export async function sendAdminNewRequestEmail(paymentId: string): Promise<boolean> {
   const { data: payment } = await supabaseAdmin
     .from("payments")
-    .select("id, status, stripe_invoice_id")
+    .select("id, status, stripe_invoice_id, stripe_subscription_id")
     .eq("id", paymentId)
     .maybeSingle();
   if (!payment || payment.status !== "succeeded") return false;
 
-  const order = await findOrderForPayment(payment);
+  const order = await waitForOrder(payment);
   if (!order) {
     console.warn("[email] admin new-request skipped: no order row yet for payment", paymentId);
     return false;
