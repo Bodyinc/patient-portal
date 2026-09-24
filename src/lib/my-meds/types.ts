@@ -10,6 +10,8 @@ export type MyMedsCurrentMedicationDto = {
   variantName: string | null;
   nextRefillDate: string | null;
   imageSrc: string;
+  /** Manual refill is open: order delivered, last week of the plan, and not auto-pay. */
+  canRequestRefill: boolean;
 };
 
 export type MyMedsPastMedicationDto = {

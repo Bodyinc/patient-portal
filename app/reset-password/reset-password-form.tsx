@@ -42,6 +42,8 @@ export function ResetPasswordForm({ recovery, error }: ResetPasswordFormProps) {
     const recoveryParam = recovery === "1";
     const hash = window.location.hash;
     const hashRecovery = hash.includes("type=recovery") || hash.includes("access_token");
+    const tokenHash = new URLSearchParams(window.location.search).get("token_hash");
+    let cancelled = false;
 
     const {
       data: { subscription },
@@ -52,6 +54,26 @@ export function ResetPasswordForm({ recovery, error }: ResetPasswordFormProps) {
     });
 
     async function resolveState() {
+      if (tokenHash) {
+        const { error: verifyError } = await supabase.auth.verifyOtp({
+          token_hash: tokenHash,
+          type: "recovery",
+        });
+        if (cancelled) return;
+        if (verifyError) {
+          const { data: sessionData } = await supabase.auth.getSession();
+          if (cancelled) return;
+          if (!sessionData.session) {
+            setPageState("invalid");
+            return;
+          }
+        }
+        if (cancelled) return;
+        window.history.replaceState(null, "", "/reset-password?recovery=1");
+        setPageState("ready");
+        return;
+      }
+
       const { data } = await supabase.auth.getSession();
       const hasSession = Boolean(data.session);
 
@@ -80,7 +102,10 @@ export function ResetPasswordForm({ recovery, error }: ResetPasswordFormProps) {
 
     void resolveState();
 
-    return () => subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, [error, recovery, supabase.auth]);
 
   async function onSubmit(e: React.FormEvent) {

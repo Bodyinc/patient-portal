@@ -18,9 +18,8 @@ export default function DashboardShell({ children }: DashboardShellProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   return (
-    // Change min-h-screen to h-screen overflow-hidden
-    <div className="dashboard-font flex h-screen overflow-hidden bg-white lg:flex-row">
-      <div className="flex items-center justify-between border-b border-[#E5E7EB] bg-white px-4 py-2.5 lg:hidden">
+    <div className="dashboard-font flex h-dvh flex-col overflow-hidden bg-white lg:flex-row">
+      <div className="flex w-full shrink-0 items-center justify-between border-b border-[#E5E7EB] bg-white px-4 py-2.5 lg:hidden">
         <Image src="/logo.svg" alt="BodyInc" width={96} height={30} priority />
         <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
           <SheetTrigger asChild>

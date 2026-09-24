@@ -60,8 +60,7 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
         duePayment.amountCents / 100,
       )
     : null;
-  const canRefill =
-    data.treatment?.consultationStatus === "closed" && Boolean(data.treatment.medicineId);
+  const canRefill = Boolean(data.treatment?.canRequestRefill);
   const consultationStatus = data.treatment?.consultationStatus ?? "none";
   const showConsultationCta = data.consultationsEnabled && Boolean(data.treatment?.subscriptionId);
 

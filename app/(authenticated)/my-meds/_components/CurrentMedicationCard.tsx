@@ -71,7 +71,7 @@ export default function CurrentMedicationCard({
   }
 
   const imageSrc = toDbImageSrc(medication.imageSrc);
-  const canRefill = Boolean(medication.medicineId);
+  const canRefill = medication.canRequestRefill && Boolean(medication.medicineId);
 
   const fields = [
     { label: "Medication Name", value: medication.medicationName },
@@ -122,19 +122,20 @@ export default function CurrentMedicationCard({
             ))}
           </div>
 
-          <div className="hidden min-w-[64px] flex-1 lg:block" aria-hidden />
+          {canRefill ? <div className="hidden min-w-[64px] flex-1 lg:block" aria-hidden /> : null}
 
-          <div className="flex shrink-0 items-center sm:ml-auto lg:ml-0">
-            <button
-              type="button"
-              onClick={handleRefillRequest}
-              disabled={!canRefill}
-              className="inline-flex h-[46px] w-full items-center justify-center gap-2 rounded-full border border-[#152A51]/20 bg-white px-5 text-sm font-medium text-[#152A51] hover:bg-[#F3F6F6] disabled:cursor-not-allowed disabled:opacity-50 sm:w-fit"
-            >
-              New Refill Request
-              <ArrowRight className="h-4 w-4" />
-            </button>
-          </div>
+          {canRefill ? (
+            <div className="flex shrink-0 items-center sm:ml-auto lg:ml-0">
+              <button
+                type="button"
+                onClick={handleRefillRequest}
+                className="inline-flex h-[46px] w-full items-center justify-center gap-2 rounded-full border border-[#152A51]/20 bg-white px-5 text-sm font-medium text-[#152A51] hover:bg-[#F3F6F6] sm:w-fit"
+              >
+                New Refill Request
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
     </article>

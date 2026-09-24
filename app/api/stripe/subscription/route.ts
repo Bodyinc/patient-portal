@@ -7,6 +7,7 @@ import { getOrCreateStripeCustomer } from "@/lib/stripe/customers";
 import { formatSavedCardLabel, getDefaultPaymentMethod } from "@/lib/stripe/payment-methods";
 import { createSubscriptionForPrice } from "@/lib/stripe/subscriptions";
 import { resolveCheckoutDiscount, incrementPromoRedemption } from "@/lib/stripe/promos";
+import { getManualRefillBlock } from "@/lib/orders/refill-eligibility";
 import { computeShopOrderFees } from "@/lib/shop/order-fees";
 import { getPlatformSettings } from "@/lib/settings/platform-settings";
 
@@ -85,6 +86,11 @@ export async function POST(request: Request) {
         { error: "This plan is not available for purchase yet." },
         { status: 400 },
       );
+    }
+
+    const refillBlock = await getManualRefillBlock(user.id, medicineId);
+    if (refillBlock) {
+      return NextResponse.json({ error: refillBlock }, { status: 400 });
     }
 
     const { shippingCents, consultationCents } = fees;

@@ -1,4 +1,5 @@
 import { requirePatientSession } from "@/lib/auth/require-patient";
+import { getManualRefillBlock } from "@/lib/orders/refill-eligibility";
 import { getPatientDisplayIdentity } from "@/lib/profile/identity";
 import { fetchShopCheckoutBootstrapData } from "@/lib/shop/service-data";
 import { getCustomerCreditCents, getOrCreateStripeCustomer } from "@/lib/stripe/customers";
@@ -43,6 +44,17 @@ export default async function ShopCheckoutPage({
   }
 
   try {
+    const refillBlock = await getManualRefillBlock(user.id, medicineId);
+    if (refillBlock) {
+      return (
+        <main className="mx-auto flex w-full max-w-[1440px] flex-1 flex-col overflow-x-hidden px-4 py-4 sm:px-6 lg:h-full lg:min-h-0 lg:overflow-hidden lg:px-1">
+          <div className="rounded-[16px] border border-[#E8EEED] bg-white p-4 text-sm text-[#152A51]">
+            {refillBlock}
+          </div>
+        </main>
+      );
+    }
+
     const [bootstrap, walletCreditCents, identity, savedCardLabel] = await Promise.all([
       fetchShopCheckoutBootstrapData({ medicineId, variantId }),
       getCustomerCreditCents(user.id),

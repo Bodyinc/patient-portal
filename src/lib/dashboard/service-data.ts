@@ -134,6 +134,7 @@ async function fetchClaimedIntakeExtras(userId: string): Promise<{
         nextRefillDate: null,
         imageSrc: toDbImageSrc(medicine.image_url),
         consultationStatus: "none",
+        canRequestRefill: false,
       }
     : null;
 
@@ -245,6 +246,7 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
         nextRefillDate: currentMed.nextRefillDate,
         imageSrc: toDbImageSrc(currentMed.imageSrc),
         consultationStatus,
+        canRequestRefill: currentMed.canRequestRefill,
       }
     : null;
 
