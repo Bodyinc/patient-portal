@@ -454,6 +454,17 @@ async function inspectAppointment(appointmentId: string, token?: string) {
   }
 }
 
+/** Open appointments for this plan's QuickBlox user, including whether the intake form is done. */
+export async function listOpenVisitsForClient(params: {
+  clientToken: string;
+  clientId: number;
+}): Promise<{ id: string; hasDialog: boolean }[]> {
+  const items = await findClientOpenAppointments(params.clientToken, params.clientId);
+  return items
+    .filter((item) => Boolean(item._id))
+    .map((item) => ({ id: item._id, hasDialog: Boolean(item.dialog_id) }));
+}
+
 /** Prefer an already-started open visit (waiting room) over a brand-new intake stub. */
 export async function pickReusableAppointmentId(params: {
   storedIds: string[];

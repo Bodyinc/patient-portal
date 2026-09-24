@@ -36,3 +36,7 @@ dist-ssr
 .env
 .env.local
 .env.*
+
+# Local user-guide copies (kept on the Desktop, not in the repo)
+docs/user-guide.md
+docs/Body Inc Patient Portal User Guide.docx

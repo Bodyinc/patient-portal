@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
+import { appointmentIdToReopen, visitIdToOpen } from "./appointment-id";
 import { isEligibleSubscriptionStatus, isQuickbloxConfigured } from "./config";
 import type { StartConsultationResult } from "./types";
 import {
@@ -10,6 +11,7 @@ import {
   createQuickbloxAppointment,
   ensureQuickbloxClient,
   getCachedClientSession,
+  listOpenVisitsForClient,
   resumeStoredAppointment,
 } from "./quickblox";
 import { readQbClientSession, saveQbClientSession } from "./session-cookie";
@@ -110,16 +112,13 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
   }
   const allRows = allRowsResult.data ?? [];
   const forThisSub = allRows.find((row) => row.subscription_id === subscription.id);
-  const idsUsedByOtherPlans = new Set(
-    allRows
-      .filter((row) => row.subscription_id !== subscription.id)
-      .map((row) => row.qb_appointment_id)
-      .filter(Boolean),
+  const ownAppointmentId = appointmentIdToReopen(
+    allRows.map((row) => ({
+      subscriptionId: row.subscription_id,
+      appointmentId: row.qb_appointment_id,
+    })),
+    subscription.id,
   );
-  const ownAppointmentId =
-    forThisSub?.qb_appointment_id && !idsUsedByOtherPlans.has(forThisSub.qb_appointment_id)
-      ? forThisSub.qb_appointment_id
-      : null;
 
   const [{ data: profile }, { data: intake }] = await Promise.all([
     supabaseAdmin
@@ -164,8 +163,13 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
     });
 
     if (ownAppointmentId) {
+      const openVisits = await listOpenVisitsForClient({
+        clientToken: client.token,
+        clientId: client.userId,
+      });
+      const roomId = visitIdToOpen({ storedId: ownAppointmentId, openAppointments: openVisits });
       const appointmentId = await resumeStoredAppointment({
-        appointmentId: ownAppointmentId,
+        appointmentId: roomId,
         clientToken: client.token,
         clientId: client.userId,
       });
