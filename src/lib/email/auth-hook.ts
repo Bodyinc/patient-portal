@@ -3,8 +3,11 @@ import "server-only";
 import {
   AUTH_EMAIL_SKIP_QUERY,
   AUTH_MAGICLINK_CLAIM,
+  AUTH_PASSWORD_CHANGED_CLAIM,
   AUTH_RECOVERY_CLAIM,
+  passwordChangedEmail,
   passwordResetEmail,
+  patientPasswordResetUrl,
   verificationCodeEmail,
   type VerificationEmailPurpose,
 } from "./auth-emails";
@@ -41,14 +44,8 @@ function shouldSkipCheckoutEmail(redirectTo: string | undefined): boolean {
   return Boolean(redirectTo?.includes(AUTH_EMAIL_SKIP_QUERY));
 }
 
-function recoveryActionLink(params: { tokenHash: string; redirectTo: string }): string | null {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim().replace(/\/$/, "");
-  if (!supabaseUrl) return null;
-  const url = new URL(`${supabaseUrl}/auth/v1/verify`);
-  url.searchParams.set("token", params.tokenHash);
-  url.searchParams.set("type", "recovery");
-  url.searchParams.set("redirect_to", params.redirectTo);
-  return url.toString();
+function passwordChangedPeriod(): string {
+  return new Date().toISOString().slice(0, 16);
 }
 
 /**
@@ -104,20 +101,24 @@ export async function deliverSupabaseAuthEmail(payload: AuthHookPayload): Promis
       console.warn("[auth-hook] no recovery token_hash");
       return;
     }
-    const resetUrl = recoveryActionLink({
-      tokenHash,
-      redirectTo: redirectTo || `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/reset-password`,
-    });
-    if (!resetUrl) {
-      console.warn("[auth-hook] NEXT_PUBLIC_SUPABASE_URL missing — cannot build reset link");
-      return;
-    }
+    const resetUrl = patientPasswordResetUrl(tokenHash);
     const { subject, html } = passwordResetEmail({ resetUrl, fullName });
     await sendOnce(
       AUTH_RECOVERY_CLAIM,
       userId,
       () => sendTransactionalEmail({ to: email, subject, html }),
       tokenHash,
+    );
+    return;
+  }
+
+  if (action === "password_changed_notification") {
+    const { subject, html } = passwordChangedEmail({ fullName });
+    await sendOnce(
+      AUTH_PASSWORD_CHANGED_CLAIM,
+      userId,
+      () => sendTransactionalEmail({ to: email, subject, html }),
+      passwordChangedPeriod(),
     );
   }
 }

@@ -12,8 +12,11 @@ import { requireIntakeSession } from "@/lib/intake/session";
 import {
   AUTH_EMAIL_SKIP_QUERY,
   AUTH_MAGICLINK_CLAIM,
+  AUTH_PASSWORD_CHANGED_CLAIM,
   AUTH_RECOVERY_CLAIM,
+  passwordChangedEmail,
   passwordResetEmail,
+  patientPasswordResetUrl,
   verificationCodeEmail,
   type VerificationEmailPurpose,
 } from "@/lib/email/auth-emails";
@@ -175,7 +178,29 @@ export async function setInitialPassword(rawPassword: string): Promise<SetInitia
     app_metadata: { ...user.app_metadata, password_set: true },
   });
 
+  await sendPasswordChangedNotice(user.id, user.email, user.user_metadata?.full_name);
+
   return { ok: true };
+}
+
+/** Current Body Inc template. Skipped when the Send Email hook already sent this minute. */
+async function sendPasswordChangedNotice(
+  userId: string,
+  email: string | undefined,
+  fullName: unknown,
+): Promise<void> {
+  const to = email?.trim();
+  if (!to) return;
+  const period = new Date().toISOString().slice(0, 16);
+  if (await wasEmailSent(AUTH_PASSWORD_CHANGED_CLAIM, userId, period)) return;
+  const name = typeof fullName === "string" ? fullName : null;
+  const { subject, html } = passwordChangedEmail({ fullName: name });
+  await sendOnce(
+    AUTH_PASSWORD_CHANGED_CLAIM,
+    userId,
+    () => sendTransactionalEmail({ to, subject, html }),
+    period,
+  );
 }
 
 const changeEmailSchema = z.string().trim().email().max(255);
@@ -488,17 +513,16 @@ export async function sendPatientPasswordReset(
     return { ok: true };
   }
 
-  const redirectTo = `${appUrl()}/auth/callback?next=/reset-password`;
   const { data, error } = await supabaseAdmin.auth.admin.generateLink({
     type: "recovery",
     email: parsed.data,
-    options: { redirectTo },
+    options: { redirectTo: `${appUrl()}/reset-password` },
   });
-  const resetUrl = data?.properties?.action_link?.trim();
   const tokenHash = data?.properties?.hashed_token?.trim();
-  if (error || !resetUrl) {
+  if (error || !tokenHash) {
     return { ok: false, message: "Could not send a reset link. Please try again." };
   }
+  const resetUrl = patientPasswordResetUrl(tokenHash);
 
   const userId = data.user?.id;
   if (userId && tokenHash && (await wasEmailSent(AUTH_RECOVERY_CLAIM, userId, tokenHash))) {

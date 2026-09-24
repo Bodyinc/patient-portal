@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { fetchPatientOrders } from "@/lib/orders/service-data";
 import { healAndFetchPendingAdditionalPayments } from "@/lib/orders/additional-payment";
 import { maybeReconcileIncompleteSubscription } from "@/lib/stripe/reconcile";
+import { canRequestManualRefill } from "@/lib/orders/refill-eligibility";
 import { maybeSyncSubscriptionPeriodEnds } from "@/lib/stripe/sync-period-end";
 import type { Json } from "@/lib/supabase/types";
 import type {
@@ -18,7 +19,7 @@ import type {
 const ACTIVE_SUBSCRIPTION_STATUSES = ["active", "trialing", "past_due"];
 
 const SUBSCRIPTION_SELECT =
-  "id, medicine_id, package_id, status, current_period_end, created_at, updated_at, medicines(id, name, image_url, important_info), packages(id, name, duration_months, variant_id, medicine_variants(id, name))";
+  "id, medicine_id, package_id, status, current_period_end, cancel_at_period_end, created_at, updated_at, medicines(id, name, image_url, important_info), packages(id, name, duration_months, variant_id, medicine_variants(id, name))";
 
 type EmbeddedMedicine = {
   name: string;
@@ -40,6 +41,7 @@ type SubscriptionRow = {
   package_id: string | null;
   status: string;
   current_period_end: string | null;
+  cancel_at_period_end: boolean;
   created_at: string;
   updated_at: string;
   medicines?: EmbeddedMedicine;
@@ -108,7 +110,10 @@ function statusLabelForPast(status: string): string {
   return "Ended";
 }
 
-function mapActiveMedication(subscription: SubscriptionRow): MyMedsCurrentMedicationDto {
+function mapActiveMedication(
+  subscription: SubscriptionRow,
+  orderStatus: string | null,
+): MyMedsCurrentMedicationDto {
   const medicine = subscription.medicines ?? null;
   const pkg = subscription.packages ?? null;
 
@@ -124,6 +129,11 @@ function mapActiveMedication(subscription: SubscriptionRow): MyMedsCurrentMedica
     variantName: pkg?.medicine_variants?.name?.trim() || null,
     nextRefillDate: subscription.current_period_end,
     imageSrc: resolveMedicineImageSrc(medicine?.image_url ?? null),
+    canRequestRefill: canRequestManualRefill({
+      autoPay: !subscription.cancel_at_period_end,
+      orderStatus,
+      tenureEndsAt: subscription.current_period_end,
+    }),
   };
 }
 
@@ -165,7 +175,37 @@ export async function fetchActiveMedications(
   if (error) throw new Error(error.message);
   if (!subscriptions?.length) return [];
 
-  return (subscriptions as SubscriptionRow[]).map(mapActiveMedication);
+  const rows = subscriptions as SubscriptionRow[];
+  const orderStatusBySubscription = await latestOrderStatusBySubscription(
+    userId,
+    rows.map((row) => row.id),
+  );
+
+  return rows.map((row) => mapActiveMedication(row, orderStatusBySubscription.get(row.id) ?? null));
+}
+
+async function latestOrderStatusBySubscription(
+  userId: string,
+  subscriptionIds: string[],
+): Promise<Map<string, string>> {
+  const ids = subscriptionIds.filter(Boolean);
+  if (!ids.length) return new Map();
+
+  const { data, error } = await supabaseAdmin
+    .from("medication_requests")
+    .select("subscription_id, status, created_at")
+    .eq("user_id", userId)
+    .in("subscription_id", ids)
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
+
+  const latest = new Map<string, string>();
+  for (const row of data ?? []) {
+    if (!row.subscription_id || latest.has(row.subscription_id)) continue;
+    latest.set(row.subscription_id, row.status);
+  }
+  return latest;
 }
 
 function mapOrderToRequestDto(
@@ -277,9 +317,14 @@ export async function fetchMyMedsPageData(
   const rows = (subscriptionsResult.data ?? []) as SubscriptionRow[];
   const activeStatusSet = new Set(ACTIVE_SUBSCRIPTION_STATUSES);
 
-  const activeMedications = rows
-    .filter((row) => activeStatusSet.has(row.status))
-    .map(mapActiveMedication);
+  const activeRows = rows.filter((row) => activeStatusSet.has(row.status));
+  const orderStatusBySubscription = await latestOrderStatusBySubscription(
+    userId,
+    activeRows.map((row) => row.id),
+  );
+  const activeMedications = activeRows.map((row) =>
+    mapActiveMedication(row, orderStatusBySubscription.get(row.id) ?? null),
+  );
 
   const activeMedicineIds = new Set(
     activeMedications.map((med) => med.medicineId).filter((id): id is string => Boolean(id)),

@@ -10,7 +10,6 @@ import {
   createQuickbloxAppointment,
   ensureQuickbloxClient,
   getCachedClientSession,
-  pickReusableAppointmentId,
   resumeStoredAppointment,
 } from "./quickblox";
 import { readQbClientSession, saveQbClientSession } from "./session-cookie";
@@ -111,8 +110,16 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
   }
   const allRows = allRowsResult.data ?? [];
   const forThisSub = allRows.find((row) => row.subscription_id === subscription.id);
-  const identityRow = allRows.find((row) => row.qb_appointment_id) ?? forThisSub;
-  const storedIds = allRows.map((row) => row.qb_appointment_id).filter(Boolean);
+  const idsUsedByOtherPlans = new Set(
+    allRows
+      .filter((row) => row.subscription_id !== subscription.id)
+      .map((row) => row.qb_appointment_id)
+      .filter(Boolean),
+  );
+  const ownAppointmentId =
+    forThisSub?.qb_appointment_id && !idsUsedByOtherPlans.has(forThisSub.qb_appointment_id)
+      ? forThisSub.qb_appointment_id
+      : null;
 
   const [{ data: profile }, { data: intake }] = await Promise.all([
     supabaseAdmin
@@ -150,21 +157,15 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
   try {
     const client = await clientSessionForUser({
       userId: user.id,
-      subscriptionId: identityRow?.subscription_id ?? subscription.id,
+      subscriptionId: subscription.id,
       fullName,
       dob,
       sex,
     });
 
-    const reusableId = await pickReusableAppointmentId({
-      storedIds,
-      clientToken: client.token,
-      clientId: client.userId,
-    });
-
-    if (reusableId) {
+    if (ownAppointmentId) {
       const appointmentId = await resumeStoredAppointment({
-        appointmentId: reusableId,
+        appointmentId: ownAppointmentId,
         clientToken: client.token,
         clientId: client.userId,
       });
@@ -209,8 +210,39 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
       clientId: client.userId,
       clientToken: client.token,
       description: `${medicineName} consultation`,
-      keepAppointmentId: storedIds[0] ?? null,
+      reuseOpenVisit: false,
     });
+
+    if (forThisSub?.id) {
+      const { error: updateError } = await supabaseAdmin
+        .from("patient_consultations")
+        .update({
+          qb_user_id: client.userId,
+          qb_appointment_id: appointment._id,
+          qb_dialog_id: appointment.dialog_id ?? null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", forThisSub.id);
+      if (updateError) return { ok: false, message: updateError.message };
+
+      void sendConsultationStartedEmail({
+        userId: user.id,
+        email,
+        fullName,
+        subscriptionId: subscription.id,
+        medicineId: subscription.medicine_id,
+        medicineName,
+      });
+
+      return {
+        ok: true,
+        alreadyStarted: false,
+        embedUrl: buildConsultationEmbedUrl({
+          token: client.token,
+          appointmentId: appointment._id,
+        }),
+      };
+    }
 
     const { error: insertError } = await supabaseAdmin.from("patient_consultations").insert({
       user_id: user.id,

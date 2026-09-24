@@ -571,10 +571,14 @@ export async function createQuickbloxAppointment(params: {
   description: string;
   previousAppointmentIds?: string[];
   keepAppointmentId?: string | null;
+  /** When false, never attach this plan to another open visit. */
+  reuseOpenVisit?: boolean;
 }) {
   const providerId = configuredProviderId() ?? (await getProviderAuth()).userId;
+  const reuseOpenVisit = params.reuseOpenVisit !== false;
 
   const reuseOpen = async () => {
+    if (!reuseOpenVisit) return null;
     const open = await findClientOpenAppointments(params.clientToken, params.clientId);
     if (params.keepAppointmentId) {
       const kept = open.find((item) => item._id === params.keepAppointmentId);
