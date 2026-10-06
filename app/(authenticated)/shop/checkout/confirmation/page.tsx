@@ -122,6 +122,12 @@ export default async function ShopCheckoutConfirmationPage({
 
           <div className="flex flex-wrap gap-2">
             <Link
+              href="/consultations"
+              className="rounded-md bg-[#152A51] px-4 py-2 text-sm font-medium text-white hover:bg-[#152A51]/90"
+            >
+              Start Intake & Consultation
+            </Link>
+            <Link
               href="/shop"
               className="rounded-md border border-[#152A51]/30 px-4 py-2 text-sm font-medium text-[#152A51]"
             >

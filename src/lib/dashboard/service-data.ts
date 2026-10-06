@@ -9,7 +9,7 @@ import { maybeReconcileIncompleteSubscription } from "@/lib/stripe/reconcile";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 import { isQuickbloxConfigured } from "@/lib/consultations/config";
-import { fetchAppointmentStatuses } from "@/lib/consultations/quickblox";
+import { fetchAppointmentStatuses, getCachedClientSession } from "@/lib/consultations/quickblox";
 
 import type { DashboardGoalDto, DashboardPageDataDto, DashboardTreatmentDto } from "./types";
 
@@ -226,9 +226,10 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
     if (visit?.qb_appointment_id) {
       consultationStatus = visit.ended_at ? "closed" : "open";
       if (isQuickbloxConfigured()) {
-        const live = (await fetchAppointmentStatuses([visit.qb_appointment_id])).get(
-          visit.qb_appointment_id,
-        );
+        const clientToken = getCachedClientSession(userId, currentMed.subscriptionId)?.token;
+        const live = (
+          await fetchAppointmentStatuses([visit.qb_appointment_id], { clientToken })
+        ).get(visit.qb_appointment_id);
         if (live) consultationStatus = live.open ? "open" : "closed";
       }
     }

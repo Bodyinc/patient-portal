@@ -20,6 +20,8 @@ export type OpenVisit = {
   id: string;
   /** Set after the patient submits the intake form. That visit is the provider room. */
   hasDialog: boolean;
+  hasFormSubmission?: boolean;
+  createdAt?: number;
 };
 
 /**
@@ -27,8 +29,34 @@ export type OpenVisit = {
  * appointment (the room). Reopen must use that room id when it exists.
  */
 export function visitIdToOpen(params: { storedId: string; openAppointments: OpenVisit[] }): string {
-  const room = params.openAppointments.find(
-    (item) => item.hasDialog && item.id !== params.storedId,
-  );
-  return room?.id ?? params.storedId;
+  if (params.openAppointments.length === 0) {
+    return params.storedId;
+  }
+
+  // 1. If an appointment has a completed form submission, that is the active provider room
+  const withFormSubmission = params.openAppointments.find((item) => item.hasFormSubmission);
+  if (withFormSubmission) {
+    return withFormSubmission.id;
+  }
+
+  // 2. If another open appointment exists besides storedId, that was created after the form
+  const otherAppointments = params.openAppointments.filter((item) => item.id !== params.storedId);
+  if (otherAppointments.length > 0) {
+    // Prefer one with a dialog if available
+    const withDialog = otherAppointments.find((item) => item.hasDialog);
+    if (withDialog) {
+      return withDialog.id;
+    }
+    // Otherwise prefer the newest created
+    const stored = params.openAppointments.find((item) => item.id === params.storedId);
+    const newer = otherAppointments.find(
+      (item) => (item.createdAt ?? 0) >= (stored?.createdAt ?? 0),
+    );
+    if (newer) {
+      return newer.id;
+    }
+    return otherAppointments[0].id;
+  }
+
+  return params.storedId;
 }

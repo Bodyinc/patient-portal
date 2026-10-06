@@ -4,11 +4,11 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { openConsultationInNewTab } from "@/lib/consultations/open-visit";
 import type { ConsultationsPageData } from "@/lib/consultations/types";
 import { formatPortalDate } from "@/lib/date-format";
 import { getDbMedicineImageSrc } from "@/lib/intake/medicine-image";
 import { cn } from "@/lib/utils";
+import { CheckCircle2 } from "lucide-react";
 
 import MedicineProductImage from "../../../onboarding/_components/MedicineProductImage";
 import DashboardHeader from "../../_components/DashboardHeader";
@@ -23,11 +23,9 @@ export default function ConsultationsPageClient({ data }: ConsultationsPageClien
   const router = useRouter();
   const [pendingId, setPendingId] = useState<string | null>(null);
 
-  async function openPlan(subscriptionId: string) {
+  function openPlan(subscriptionId: string) {
     setPendingId(subscriptionId);
-    const opened = await openConsultationInNewTab(subscriptionId);
-    setPendingId(null);
-    if (opened) router.refresh();
+    router.push(`/consultations/open/${subscriptionId}`);
   }
 
   return (
@@ -58,6 +56,7 @@ export default function ConsultationsPageClient({ data }: ConsultationsPageClien
               const used = Boolean(plan.startedAt);
               const busy = pendingId === plan.subscriptionId;
               const imageSrc = getDbMedicineImageSrc(plan.imageSrc);
+              const isFinished = plan.visitStatus === "closed" || Boolean(plan.endedAt);
               const fields = [
                 { label: "Medication Name", value: plan.medicineName },
                 { label: "Current Plan", value: plan.planLabel ?? "Active plan" },
@@ -65,9 +64,11 @@ export default function ConsultationsPageClient({ data }: ConsultationsPageClien
                   label: "Consultation",
                   value: !plan.startedAt
                     ? "1 included"
-                    : plan.visitStatus === "closed"
-                      ? `Closed ${formatPortalDate(plan.endedAt ?? plan.startedAt)}`
-                      : `Started ${formatPortalDate(plan.startedAt)}`,
+                    : isFinished
+                      ? `Finished ${formatPortalDate(plan.endedAt ?? plan.startedAt)}`
+                      : !plan.hasFormSubmission
+                        ? "Intake form pending"
+                        : `Started ${formatPortalDate(plan.startedAt)}`,
                 },
               ];
 
@@ -113,20 +114,25 @@ export default function ConsultationsPageClient({ data }: ConsultationsPageClien
                       <div className="hidden min-w-[64px] flex-1 lg:block" aria-hidden />
 
                       <div className="flex shrink-0 items-center sm:ml-auto lg:ml-0">
-                        <Button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => openPlan(plan.subscriptionId)}
-                          className="h-[46px] w-full rounded-full bg-[#152A51] px-6 text-sm font-medium text-white hover:bg-[#152A51]/90 sm:w-fit"
-                        >
-                          {busy
-                            ? "Opening…"
-                            : !used
-                              ? "Start consultation"
-                              : plan.visitStatus === "closed"
-                                ? "Closed consultation"
-                                : "Open consultation"}
-                        </Button>
+                        {isFinished ? (
+                          <div className="inline-flex h-[46px] w-full items-center justify-center gap-2 rounded-full border border-[#E8EEED] bg-[#F3F6F6] px-6 text-sm font-medium text-[#152A51]/75 sm:w-fit cursor-default select-none">
+                            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                            <span>Finished</span>
+                          </div>
+                        ) : (
+                          <Button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => openPlan(plan.subscriptionId)}
+                            className="h-[46px] w-full rounded-full bg-[#152A51] px-6 text-sm font-medium text-white hover:bg-[#152A51]/90 sm:w-fit"
+                          >
+                            {busy
+                              ? "Opening…"
+                              : plan.hasFormSubmission
+                                ? "Open consultation"
+                                : "Start consultation"}
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>

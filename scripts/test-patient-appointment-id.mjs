@@ -4,9 +4,7 @@ import { appointmentIdToReopen, visitIdToOpen } from "../src/lib/consultations/a
 const firstPlan = "sub-first";
 const secondPlan = "sub-second";
 
-const afterFirstStart = [
-  { subscriptionId: firstPlan, appointmentId: "appt-first" },
-];
+const afterFirstStart = [{ subscriptionId: firstPlan, appointmentId: "appt-first" }];
 
 const reopened = appointmentIdToReopen(afterFirstStart, firstPlan);
 assert.equal(reopened, "appt-first", "closing the tab and opening again must return the first id");
@@ -47,5 +45,18 @@ const savedRoom = visitIdToOpen({
   openAppointments: [{ id: "appt-room", hasDialog: true }],
 });
 assert.equal(savedRoom, "appt-room", "once the room id is saved, reopen keeps it");
+
+const formWithDialogAfterSubmit = visitIdToOpen({
+  storedId: "appt-form",
+  openAppointments: [
+    { id: "appt-form", hasDialog: true, createdAt: 1000 },
+    { id: "appt-room-2", hasDialog: false, createdAt: 2000 },
+  ],
+});
+assert.equal(
+  formWithDialogAfterSubmit,
+  "appt-room-2",
+  "after submit, new appointment is selected even if form had dialog",
+);
 
 console.log("patient reopen: form id until submit, then the room id, then that same room id");

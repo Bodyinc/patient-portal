@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, CheckCircle2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { formatPortalDate } from "@/lib/date-format";
@@ -15,7 +15,6 @@ import { cn } from "@/lib/utils";
 
 import MedicineProductImage from "../../../onboarding/_components/MedicineProductImage";
 import DashboardHeader from "../../_components/DashboardHeader";
-import { openConsultationInNewTab } from "@/lib/consultations/open-visit";
 
 type DashboardPageClientProps = {
   data: DashboardPageDataDto;
@@ -140,13 +139,10 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
               </p>
               <div className="mt-auto pt-5">
                 {data.latestOrderClosed ? null : consultationStatus === "closed" ? (
-                  <Button
-                    type="button"
-                    disabled
-                    className="h-[46px] w-full rounded-full bg-[#E3E084] px-6 text-sm font-medium text-[#152A51] disabled:opacity-100 sm:w-fit"
-                  >
-                    Intake form closed
-                  </Button>
+                  <div className="inline-flex h-[46px] w-full items-center justify-center gap-2 rounded-full border border-[#E8EEED] bg-[#F3F6F6] px-6 text-sm font-medium text-[#152A51]/75 sm:w-fit cursor-default select-none">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    <span>Appointment finished</span>
+                  </div>
                 ) : (
                   <Button
                     asChild
@@ -223,11 +219,10 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
                   />
                 ) : null}
                 {showConsultationCta && consultationStatus === "closed" ? (
-                  <DashboardConsultationButton
-                    subscriptionId={data.treatment.subscriptionId!}
-                    label="Closed consultation"
-                    variant="secondary"
-                  />
+                  <div className="inline-flex h-[46px] shrink-0 items-center justify-center gap-2 rounded-full border border-[#E8EEED] bg-[#F3F6F6] px-5 text-sm font-medium text-[#152A51]/75 cursor-default select-none">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    <span>Appointment finished</span>
+                  </div>
                 ) : null}
                 {canRefill ? (
                   <button
@@ -270,20 +265,12 @@ function DashboardConsultationButton({
   variant?: "primary" | "secondary";
 }) {
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
 
   return (
     <button
       type="button"
-      disabled={busy}
       onClick={() => {
-        void (async () => {
-          setBusy(true);
-          const opened = await openConsultationInNewTab(subscriptionId);
-          setBusy(false);
-          if (!opened) return;
-          router.refresh();
-        })();
+        router.push(`/consultations/open/${subscriptionId}`);
       }}
       className={
         variant === "secondary"
@@ -291,7 +278,7 @@ function DashboardConsultationButton({
           : "inline-flex h-[46px] shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-[#152A51] px-5 text-sm font-medium text-white hover:bg-[#152A51]/90 disabled:opacity-60"
       }
     >
-      {busy ? "Opening…" : label}
+      {label}
     </button>
   );
 }

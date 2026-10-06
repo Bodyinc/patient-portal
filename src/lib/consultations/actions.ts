@@ -4,16 +4,28 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 import { appointmentIdToReopen, visitIdToOpen } from "./appointment-id";
-import { isEligibleSubscriptionStatus, isQuickbloxConfigured } from "./config";
-import type { StartConsultationResult } from "./types";
+import { getQuickbloxConfig, isEligibleSubscriptionStatus, isQuickbloxConfigured } from "./config";
+import type {
+  IntakeAnswerItem,
+  PatientConsultationData,
+  QuickbloxSdkConfig,
+  StartConsultationResult,
+} from "./types";
 import {
+  attachFormSubmissionToAppointment,
   buildConsultationEmbedUrl,
   createQuickbloxAppointment,
   ensureQuickbloxClient,
+  fetchAppointmentStatuses,
   getCachedClientSession,
+  inspectAppointment,
   listOpenVisitsForClient,
+  qbClientEmail,
+  qbPasswordForPlan,
   resumeStoredAppointment,
+  type QbClientSession,
 } from "./quickblox";
+import { checkJotformSubmission, fetchJotformSubmissionAnswers, getJotformConfig } from "./jotform";
 import { readQbClientSession, saveQbClientSession } from "./session-cookie";
 import { sendTransactionalEmail } from "@/lib/email/send";
 import {
@@ -50,6 +62,73 @@ function friendlyQbError(error: unknown) {
   return "QuickBlox could not sign in this consultation. Wait a minute, then try Start once.";
 }
 
+function buildSdkConfig(params: {
+  userId: string;
+  subscriptionId: string;
+  client: QbClientSession;
+  appointmentId: string;
+  dialogId: string | null;
+  providerId: number | null;
+  patientName: string;
+  medicineName: string;
+}): QuickbloxSdkConfig {
+  const cfg = getQuickbloxConfig();
+  const jotformCfg = getJotformConfig();
+  return {
+    appId: cfg.appId,
+    authKey: cfg.authKey,
+    authSecret: cfg.authSecret,
+    accountKey: cfg.accountKey,
+    userId: params.client.userId,
+    email: qbClientEmail(params.userId, params.subscriptionId),
+    password: qbPasswordForPlan(params.userId, params.subscriptionId),
+    token: params.client.token,
+    dialogId: params.dialogId,
+    dialogJid: params.dialogId ? `${cfg.appId}_${params.dialogId}@muc.chat.quickblox.com` : null,
+    providerId: params.providerId,
+    appointmentId: params.appointmentId,
+    patientName: params.patientName,
+    medicineName: params.medicineName,
+    intakeFormId: jotformCfg.intakeFormId,
+  };
+}
+
+function buildPatientData(params: {
+  fullName: string;
+  email: string;
+  dob: string | null;
+  age: number | null;
+  sex: string | null;
+  phone: string | null;
+  stateCode: string | null;
+  heightCm: number | null;
+  weightKg: number | null;
+  medicineName: string;
+  hasFormSubmission: boolean;
+  jotformSubmittedAt: string | null;
+  jotformSubmissionId: string | null;
+  intakeAnswers: IntakeAnswerItem[];
+}): PatientConsultationData {
+  return {
+    fullName: params.fullName,
+    email: params.email,
+    dob: params.dob,
+    age: params.age,
+    sex: params.sex,
+    phone: params.phone,
+    stateCode: params.stateCode,
+    heightCm: params.heightCm,
+    weightKg: params.weightKg,
+    medicineName: params.medicineName,
+    planLabel: null,
+    imageSrc: null,
+    intakeSubmitted: params.hasFormSubmission,
+    intakeSubmittedAt: params.jotformSubmittedAt,
+    intakeSubmissionId: params.jotformSubmissionId,
+    intakeAnswers: params.intakeAnswers,
+  };
+}
+
 async function clientSessionForUser(params: {
   userId: string;
   subscriptionId: string;
@@ -74,6 +153,70 @@ async function clientSessionForUser(params: {
   });
   await saveQbClientSession(params.userId, params.subscriptionId, session);
   return session;
+}
+
+export async function updateConsultationFormSubmittedRecord(params: {
+  userId: string;
+  subscriptionId: string;
+  appointmentId: string;
+  submissionId: string;
+  submittedAt: string;
+}) {
+  const { userId, subscriptionId, appointmentId, submissionId, submittedAt } = params;
+  const updatePayload = {
+    qb_appointment_id: appointmentId,
+    form_submitted: true,
+    form_submission_id: submissionId,
+    form_submitted_at: submittedAt,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error } = await supabaseAdmin
+    .from("patient_consultations")
+    .update(updatePayload)
+    .eq("user_id", userId)
+    .eq("subscription_id", subscriptionId);
+
+  if (error && /form_submitted/i.test(error.message)) {
+    await supabaseAdmin
+      .from("patient_consultations")
+      .update({
+        qb_appointment_id: appointmentId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", userId)
+      .eq("subscription_id", subscriptionId);
+  }
+}
+
+async function insertPatientConsultationRecord(params: {
+  user_id: string;
+  subscription_id: string;
+  qb_user_id: number;
+  qb_appointment_id: string;
+  qb_dialog_id: string | null;
+  form_submitted?: boolean;
+}) {
+  const insertPayload = {
+    user_id: params.user_id,
+    subscription_id: params.subscription_id,
+    qb_user_id: params.qb_user_id,
+    qb_appointment_id: params.qb_appointment_id,
+    qb_dialog_id: params.qb_dialog_id,
+    form_submitted: Boolean(params.form_submitted),
+  };
+
+  const res = await supabaseAdmin.from("patient_consultations").insert(insertPayload);
+  if (res.error && /form_submitted/i.test(res.error.message)) {
+    return supabaseAdmin.from("patient_consultations").insert({
+      user_id: params.user_id,
+      subscription_id: params.subscription_id,
+      qb_user_id: params.qb_user_id,
+      qb_appointment_id: params.qb_appointment_id,
+      qb_dialog_id: params.qb_dialog_id,
+    });
+  }
+  return res;
 }
 
 export async function startConsultation(subscriptionId: string): Promise<StartConsultationResult> {
@@ -102,15 +245,44 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
     return { ok: false, message: "Consultations are only available on an active plan." };
   }
 
-  const allRowsResult = await supabaseAdmin
+  let allRowsResult = await supabaseAdmin
     .from("patient_consultations")
-    .select("id, subscription_id, qb_appointment_id, qb_user_id, started_at")
+    .select(
+      "id, subscription_id, qb_appointment_id, qb_user_id, qb_dialog_id, started_at, ended_at, form_submitted, form_submission_id, form_submitted_at",
+    )
     .eq("user_id", user.id)
     .order("started_at", { ascending: true });
+
+  if (
+    allRowsResult.error &&
+    (/form_submitted/i.test(allRowsResult.error.message) ||
+      /ended_at/i.test(allRowsResult.error.message))
+  ) {
+    allRowsResult = (await supabaseAdmin
+      .from("patient_consultations")
+      .select("id, subscription_id, qb_appointment_id, qb_user_id, qb_dialog_id, started_at")
+      .eq("user_id", user.id)
+      .order("started_at", { ascending: true })) as typeof allRowsResult;
+  }
   if (allRowsResult.error && !/patient_consultations/i.test(allRowsResult.error.message)) {
     return { ok: false, message: allRowsResult.error.message };
   }
-  const allRows = allRowsResult.data ?? [];
+  const allRows = (allRowsResult.data ?? []).map((row) => ({
+    ...row,
+    ended_at: "ended_at" in row ? ((row as { ended_at?: string | null }).ended_at ?? null) : null,
+    form_submitted:
+      "form_submitted" in row
+        ? Boolean((row as { form_submitted?: boolean | null }).form_submitted)
+        : false,
+    form_submission_id:
+      "form_submission_id" in row
+        ? ((row as { form_submission_id?: string | null }).form_submission_id ?? null)
+        : null,
+    form_submitted_at:
+      "form_submitted_at" in row
+        ? ((row as { form_submitted_at?: string | null }).form_submitted_at ?? null)
+        : null,
+  }));
   const forThisSub = allRows.find((row) => row.subscription_id === subscription.id);
   const ownAppointmentId = appointmentIdToReopen(
     allRows.map((row) => ({
@@ -128,7 +300,7 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
       .maybeSingle(),
     supabaseAdmin
       .from("intake_sessions")
-      .select("dob, sex, full_name, phone")
+      .select("dob, sex, full_name, phone, state_code, height_cm, weight_kg")
       .eq("claimed_by_user_id", user.id)
       .eq("status", "completed")
       .order("updated_at", { ascending: false })
@@ -148,8 +320,19 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
     };
   }
 
+  let age: number | null = null;
+  const birthDate = new Date(dob);
+  if (!isNaN(birthDate.getTime())) {
+    const diff = Date.now() - birthDate.getTime();
+    age = Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000));
+  }
+
   const fullName = profile?.full_name?.trim() || intake?.full_name?.trim() || "Patient";
   const sex = profile?.sex ?? intake?.sex ?? null;
+  const phone = profile?.phone?.trim() || intake?.phone?.trim() || null;
+  const stateCode = (intake as { state_code?: string | null })?.state_code || null;
+  const heightCm = (intake as { height_cm?: number | null })?.height_cm || null;
+  const weightKg = (intake as { weight_kg?: number | null })?.weight_kg || null;
   const medicineName =
     (subscription as { medicines?: { name?: string } | null }).medicines?.name ?? "treatment";
 
@@ -189,24 +372,162 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
             .eq("id", forThisSub.id);
         }
       } else {
-        const { error: insertError } = await supabaseAdmin.from("patient_consultations").insert({
+        const { error: insertError } = await insertPatientConsultationRecord({
           user_id: user.id,
           subscription_id: subscription.id,
           qb_user_id: client.userId,
           qb_appointment_id: appointmentId,
+          qb_dialog_id: null,
+          form_submitted: false,
         });
         if (insertError && insertError.code !== "23505") {
           return { ok: false, message: insertError.message };
         }
       }
 
+      const activeVisit = openVisits.find((v) => v.id === appointmentId);
+
+      // Check if the visit has already been finished by doctor / admin (date_end set)
+      let isFinished = Boolean(forThisSub?.ended_at);
+      let liveStatus = null;
+      if (!isFinished) {
+        const statusMap = await fetchAppointmentStatuses([appointmentId], {
+          clientToken: client.token,
+        });
+        liveStatus = statusMap.get(appointmentId) || null;
+        if (liveStatus && !liveStatus.open) {
+          isFinished = true;
+        } else {
+          const inspected = await inspectAppointment(appointmentId, client.token);
+          if (inspected?.date_end) {
+            isFinished = true;
+          }
+        }
+      }
+
+      if (isFinished && forThisSub?.id && !forThisSub.ended_at) {
+        const finishTime = liveStatus?.dateEnd || now;
+        await supabaseAdmin
+          .from("patient_consultations")
+          .update({
+            ended_at: finishTime,
+            updated_at: now,
+          })
+          .eq("id", forThisSub.id);
+      }
+
+      // Check if form submission exists on this specific QuickBlox appointment / consultation
+      let hasFormSubmission = Boolean(
+        forThisSub?.form_submitted ||
+        forThisSub?.form_submission_id ||
+        activeVisit?.hasFormSubmission ||
+        activeVisit?.formSubmissionId ||
+        liveStatus?.hasFormSubmission ||
+        liveStatus?.formSubmissionId,
+      );
+      let jotformSubmissionId =
+        forThisSub?.form_submission_id ||
+        activeVisit?.formSubmissionId ||
+        liveStatus?.formSubmissionId ||
+        null;
+      let jotformSubmittedAt: string | null = forThisSub?.form_submitted_at || null;
+
+      if (!hasFormSubmission) {
+        // Also check direct inspection of appointment
+        const directAppt = await inspectAppointment(appointmentId, client.token);
+        if (directAppt?.form_submission_id) {
+          hasFormSubmission = true;
+          jotformSubmissionId = directAppt.form_submission_id;
+        }
+      }
+
+      if (!hasFormSubmission) {
+        // Collect submission IDs claimed by other consultations so we never steal them
+        const excludeSubmissionIds = allRows
+          .filter((r) => r.subscription_id !== subscription.id && r.form_submission_id)
+          .map((r) => r.form_submission_id as string);
+
+        const jotformCheck = await checkJotformSubmission({
+          qbUserId: client.userId,
+          email,
+          fullName,
+          dob,
+          phone,
+          consultationId: forThisSub?.id,
+          subscriptionId: subscription.id,
+          appointmentId,
+          since: forThisSub?.started_at,
+          excludeSubmissionIds,
+        });
+        if (jotformCheck.submitted && jotformCheck.submissionId) {
+          hasFormSubmission = true;
+          jotformSubmissionId = jotformCheck.submissionId;
+          jotformSubmittedAt = jotformCheck.submittedAt;
+          void updateConsultationFormSubmittedRecord({
+            userId: user.id,
+            subscriptionId: subscription.id,
+            appointmentId,
+            submissionId: jotformCheck.submissionId,
+            submittedAt: jotformCheck.submittedAt || now,
+          });
+          void attachFormSubmissionToAppointment({
+            appointmentId,
+            submissionId: jotformCheck.submissionId,
+            clientToken: client.token,
+          });
+        }
+      }
+
+      let intakeAnswers: IntakeAnswerItem[] = [];
+      if (jotformSubmissionId) {
+        intakeAnswers = await fetchJotformSubmissionAnswers(jotformSubmissionId);
+      }
+
+      // ONLY consider it a room if form submission actually exists, or appointment is finished
+      const isRoom = Boolean(isFinished || hasFormSubmission);
+
+      const dialogId = forThisSub?.qb_dialog_id ?? activeVisit?.dialogId ?? null;
+      const providerId = activeVisit?.providerId ?? null;
+
+      const patientData = buildPatientData({
+        fullName,
+        email,
+        dob,
+        age,
+        sex,
+        phone,
+        stateCode,
+        heightCm,
+        weightKg,
+        medicineName,
+        hasFormSubmission,
+        jotformSubmittedAt,
+        jotformSubmissionId,
+        intakeAnswers,
+      });
+
       return {
         ok: true,
-        alreadyStarted: true,
+        alreadyStarted: isRoom,
+        isRoom,
+        isFinished,
+        appointmentId,
+        hasFormSubmission,
         embedUrl: buildConsultationEmbedUrl({
           token: client.token,
           appointmentId,
         }),
+        sdkConfig: buildSdkConfig({
+          userId: user.id,
+          subscriptionId: subscription.id,
+          client,
+          appointmentId,
+          dialogId,
+          providerId,
+          patientName: fullName,
+          medicineName,
+        }),
+        patientData,
       };
     }
 
@@ -217,6 +538,28 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
       reuseOpenVisit: false,
     });
 
+    const newHasFormSubmission = false;
+    const newJotformSubmissionId: string | null = null;
+    const newJotformSubmittedAt: string | null = null;
+    const newIntakeAnswers: IntakeAnswerItem[] = [];
+
+    const patientData = buildPatientData({
+      fullName,
+      email,
+      dob,
+      age,
+      sex,
+      phone,
+      stateCode,
+      heightCm,
+      weightKg,
+      medicineName,
+      hasFormSubmission: false,
+      jotformSubmittedAt: null,
+      jotformSubmissionId: null,
+      intakeAnswers: [],
+    });
+
     if (forThisSub?.id) {
       const { error: updateError } = await supabaseAdmin
         .from("patient_consultations")
@@ -224,6 +567,7 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
           qb_user_id: client.userId,
           qb_appointment_id: appointment._id,
           qb_dialog_id: appointment.dialog_id ?? null,
+          form_submitted: false,
           updated_at: new Date().toISOString(),
         })
         .eq("id", forThisSub.id);
@@ -241,36 +585,65 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
       return {
         ok: true,
         alreadyStarted: false,
+        isRoom: false,
+        appointmentId: appointment._id,
+        hasFormSubmission: false,
         embedUrl: buildConsultationEmbedUrl({
           token: client.token,
           appointmentId: appointment._id,
         }),
+        sdkConfig: buildSdkConfig({
+          userId: user.id,
+          subscriptionId: subscription.id,
+          client,
+          appointmentId: appointment._id,
+          dialogId: appointment.dialog_id ?? null,
+          providerId: appointment.provider_id ?? null,
+          patientName: fullName,
+          medicineName,
+        }),
+        patientData,
       };
     }
 
-    const { error: insertError } = await supabaseAdmin.from("patient_consultations").insert({
+    const { error: insertError } = await insertPatientConsultationRecord({
       user_id: user.id,
       subscription_id: subscription.id,
       qb_user_id: client.userId,
       qb_appointment_id: appointment._id,
       qb_dialog_id: appointment.dialog_id ?? null,
+      form_submitted: false,
     });
 
     if (insertError) {
       if (insertError.code === "23505") {
         const { data: raced } = await supabaseAdmin
           .from("patient_consultations")
-          .select("qb_appointment_id")
+          .select("qb_appointment_id, qb_dialog_id")
           .eq("subscription_id", subscription.id)
           .maybeSingle();
         if (raced?.qb_appointment_id) {
           return {
             ok: true,
-            alreadyStarted: true,
+            alreadyStarted: false,
+            isRoom: false,
+            appointmentId: raced.qb_appointment_id,
+            hasFormSubmission: newHasFormSubmission,
             embedUrl: buildConsultationEmbedUrl({
               token: client.token,
               appointmentId: raced.qb_appointment_id,
             }),
+            sdkConfig: buildSdkConfig({
+              userId: user.id,
+              subscriptionId: subscription.id,
+              client,
+              appointmentId: raced.qb_appointment_id,
+              dialogId: (raced as { qb_dialog_id?: string | null })?.qb_dialog_id ?? null,
+              providerId: null,
+              patientName: fullName,
+              medicineName,
+            }),
+            patientData,
           };
         }
       }
@@ -289,15 +662,335 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
     return {
       ok: true,
       alreadyStarted: false,
+      isRoom: false,
+      appointmentId: appointment._id,
+      hasFormSubmission: newHasFormSubmission,
       embedUrl: buildConsultationEmbedUrl({
         token: client.token,
         appointmentId: appointment._id,
       }),
+      sdkConfig: buildSdkConfig({
+        userId: user.id,
+        subscriptionId: subscription.id,
+        client,
+        appointmentId: appointment._id,
+        dialogId: appointment.dialog_id ?? null,
+        providerId: appointment.provider_id ?? null,
+        patientName: fullName,
+        medicineName,
+      }),
+      patientData,
     };
   } catch (error) {
     console.error("[consultations] start failed:", error);
     return { ok: false, message: friendlyQbError(error) };
   }
+}
+
+export async function recordConsultationRoom(params: {
+  subscriptionId: string;
+  appointmentId: string;
+}): Promise<{ ok: boolean; message?: string }> {
+  if (!isQuickbloxConfigured()) {
+    return { ok: false, message: "Consultations are not available yet." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, message: "Please sign in to update consultation." };
+  }
+
+  const { subscriptionId, appointmentId } = params;
+  if (!subscriptionId || !appointmentId) {
+    return { ok: false, message: "Missing required parameters." };
+  }
+
+  const { data: subscription, error: subError } = await supabaseAdmin
+    .from("subscriptions")
+    .select("id, status")
+    .eq("id", subscriptionId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (subError || !subscription) {
+    return { ok: false, message: "Subscription not found." };
+  }
+
+  const now = new Date().toISOString();
+  const { error: updateError } = await supabaseAdmin
+    .from("patient_consultations")
+    .update({
+      qb_appointment_id: appointmentId,
+      updated_at: now,
+    })
+    .eq("user_id", user.id)
+    .eq("subscription_id", subscriptionId);
+
+  if (updateError) {
+    console.warn("[consultations] recordConsultationRoom update failed:", updateError);
+  }
+
+  return { ok: true };
+}
+
+export async function recordConsultationFormSubmission(params: {
+  subscriptionId: string;
+  appointmentId: string;
+  submissionId?: string;
+}): Promise<{ ok: boolean; message?: string }> {
+  if (!isQuickbloxConfigured()) {
+    return { ok: false, message: "Consultations are not available yet." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, message: "Please sign in to update consultation." };
+  }
+
+  const { subscriptionId, appointmentId, submissionId } = params;
+  if (!subscriptionId || !appointmentId) {
+    return { ok: false, message: "Missing required parameters." };
+  }
+
+  const now = new Date().toISOString();
+  await supabaseAdmin
+    .from("patient_consultations")
+    .update({
+      qb_appointment_id: appointmentId,
+      updated_at: now,
+    })
+    .eq("user_id", user.id)
+    .eq("subscription_id", subscriptionId);
+
+  let finalSubId =
+    submissionId && /^\d+$/.test(submissionId.trim()) ? submissionId.trim() : undefined;
+  if (!finalSubId) {
+    const [{ data: profile }, { data: intake }, { data: consult }, { data: otherConsults }] =
+      await Promise.all([
+        supabaseAdmin
+          .from("profiles")
+          .select("full_name, email, dob, sex, phone")
+          .eq("id", user.id)
+          .maybeSingle(),
+        supabaseAdmin
+          .from("intake_sessions")
+          .select("dob, full_name, phone")
+          .eq("claimed_by_user_id", user.id)
+          .eq("status", "completed")
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabaseAdmin
+          .from("patient_consultations")
+          .select("id, qb_user_id, started_at")
+          .eq("user_id", user.id)
+          .eq("subscription_id", subscriptionId)
+          .maybeSingle(),
+        supabaseAdmin
+          .from("patient_consultations")
+          .select("form_submission_id")
+          .eq("user_id", user.id)
+          .neq("subscription_id", subscriptionId),
+      ]);
+
+    const excludeSubmissionIds = (otherConsults ?? [])
+      .map((c) => c.form_submission_id)
+      .filter((id): id is string => Boolean(id));
+
+    const check = await checkJotformSubmission({
+      qbUserId: consult?.qb_user_id ?? null,
+      email: profile?.email || user.email,
+      fullName: profile?.full_name?.trim() || intake?.full_name?.trim() || null,
+      dob: (profile?.dob || intake?.dob)?.slice(0, 10) || null,
+      phone: profile?.phone || intake?.phone || null,
+      consultationId: consult?.id,
+      subscriptionId,
+      appointmentId,
+      since: consult?.started_at,
+      excludeSubmissionIds,
+    });
+    if (check.submissionId && /^\d+$/.test(check.submissionId.trim())) {
+      finalSubId = check.submissionId.trim();
+    }
+  }
+
+  if (finalSubId) {
+    await updateConsultationFormSubmittedRecord({
+      userId: user.id,
+      subscriptionId,
+      appointmentId,
+      submissionId: finalSubId,
+      submittedAt: now,
+    });
+    await attachFormSubmissionToAppointment({
+      appointmentId,
+      submissionId: finalSubId,
+    });
+  }
+
+  return { ok: true };
+}
+
+export async function verifyAndRecordJotformSubmission(params: {
+  subscriptionId: string;
+  appointmentId: string;
+  submissionId?: string;
+}): Promise<{
+  ok: boolean;
+  submitted: boolean;
+  submissionId: string | null;
+  answers: IntakeAnswerItem[];
+  message?: string;
+}> {
+  if (!isQuickbloxConfigured()) {
+    return {
+      ok: false,
+      submitted: false,
+      submissionId: null,
+      answers: [],
+      message: "Consultations are not configured.",
+    };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return {
+      ok: false,
+      submitted: false,
+      submissionId: null,
+      answers: [],
+      message: "Please sign in.",
+    };
+  }
+
+  const { subscriptionId, appointmentId, submissionId } = params;
+  if (!subscriptionId || !appointmentId) {
+    return {
+      ok: false,
+      submitted: false,
+      submissionId: null,
+      answers: [],
+      message: "Missing required parameters.",
+    };
+  }
+
+  const [{ data: profile }, { data: intake }, { data: consult }, { data: otherConsults }] =
+    await Promise.all([
+      supabaseAdmin
+        .from("profiles")
+        .select("full_name, email, dob, sex, phone")
+        .eq("id", user.id)
+        .maybeSingle(),
+      supabaseAdmin
+        .from("intake_sessions")
+        .select("dob, full_name, phone")
+        .eq("claimed_by_user_id", user.id)
+        .eq("status", "completed")
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabaseAdmin
+        .from("patient_consultations")
+        .select("id, qb_user_id, started_at")
+        .eq("user_id", user.id)
+        .eq("subscription_id", subscriptionId)
+        .maybeSingle(),
+      supabaseAdmin
+        .from("patient_consultations")
+        .select("form_submission_id")
+        .eq("user_id", user.id)
+        .neq("subscription_id", subscriptionId),
+    ]);
+
+  let finalSubId = submissionId && /^\d+$/.test(submissionId.trim()) ? submissionId.trim() : null;
+
+  if (!finalSubId) {
+    const excludeSubmissionIds = (otherConsults ?? [])
+      .map((c) => c.form_submission_id)
+      .filter((id): id is string => Boolean(id));
+
+    const check = await checkJotformSubmission({
+      qbUserId: consult?.qb_user_id ?? null,
+      email: profile?.email || user.email,
+      fullName: profile?.full_name?.trim() || intake?.full_name?.trim() || null,
+      dob: (profile?.dob || intake?.dob)?.slice(0, 10) || null,
+      phone: profile?.phone || intake?.phone || null,
+      consultationId: consult?.id,
+      subscriptionId,
+      appointmentId,
+      since: consult?.started_at,
+      excludeSubmissionIds,
+    });
+    if (check.submitted && check.submissionId) {
+      finalSubId = check.submissionId;
+    }
+  }
+
+  if (!finalSubId) {
+    return {
+      ok: true,
+      submitted: false,
+      submissionId: null,
+      answers: [],
+      message: "No submission detected yet. Please make sure you clicked submit on the form.",
+    };
+  }
+
+  const now = new Date().toISOString();
+  await updateConsultationFormSubmittedRecord({
+    userId: user.id,
+    subscriptionId,
+    appointmentId,
+    submissionId: finalSubId,
+    submittedAt: now,
+  });
+
+  await attachFormSubmissionToAppointment({
+    appointmentId,
+    submissionId: finalSubId,
+  });
+
+  const answers = await fetchJotformSubmissionAnswers(finalSubId);
+
+  return {
+    ok: true,
+    submitted: true,
+    submissionId: finalSubId,
+    answers,
+  };
+}
+
+export async function recordConsultationFinished(params: {
+  subscriptionId: string;
+  appointmentId?: string;
+}): Promise<{ ok: boolean }> {
+  if (!isQuickbloxConfigured()) return { ok: false };
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false };
+
+  const now = new Date().toISOString();
+  await supabaseAdmin
+    .from("patient_consultations")
+    .update({
+      ended_at: now,
+      updated_at: now,
+    })
+    .eq("user_id", user.id)
+    .eq("subscription_id", params.subscriptionId);
+
+  return { ok: true };
 }
 
 async function sendConsultationStartedEmail(params: {

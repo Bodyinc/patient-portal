@@ -20,7 +20,7 @@ export default async function OrderConfirmationPage() {
     supabaseAdmin
       .from("subscriptions")
       .select(
-        "package_id, medicine_id, created_at, packages(name, price, duration_months), medicines(name)",
+        "id, package_id, medicine_id, created_at, packages(name, price, duration_months), medicines(name)",
       )
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
@@ -187,6 +187,12 @@ export default async function OrderConfirmationPage() {
         </div>
 
         <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-center">
+          <Link
+            href={sub?.id ? `/consultations/open/${sub.id}` : "/consultations"}
+            className="rounded-md bg-[#152A51] px-6 py-2.5 text-center text-sm font-medium text-white hover:bg-[#152A51]/90"
+          >
+            Start Intake & Consultation
+          </Link>
           <Link
             href="/dashboard"
             className="rounded-md bg-[#E3E084] px-6 py-2.5 text-center text-sm font-medium text-[#152A51] hover:bg-[#D9D674]"

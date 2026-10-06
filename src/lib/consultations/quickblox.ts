@@ -29,6 +29,8 @@ type QbAppointment = {
   dialog_id?: string | null;
   description?: string;
   date_end?: string | null;
+  form_submission_id?: string | null;
+  created_at?: number;
 };
 
 export type QbClientSession = {
@@ -115,7 +117,7 @@ function isUserExistsError(error: unknown) {
   return status === 422 && /already|exists|taken|duplicate/i.test(message);
 }
 
-function qbPasswordForPlan(userId: string, subscriptionId: string) {
+export function qbPasswordForPlan(userId: string, subscriptionId: string) {
   const { userSecret } = getQuickbloxConfig();
   const digest = createHmac("sha256", userSecret)
     .update(`${userId}:${subscriptionId}`)
@@ -123,7 +125,7 @@ function qbPasswordForPlan(userId: string, subscriptionId: string) {
   return `Bi.${digest.slice(0, 24)}!`;
 }
 
-function qbClientEmail(userId: string, subscriptionId: string) {
+export function qbClientEmail(userId: string, subscriptionId: string) {
   const { userSecret } = getQuickbloxConfig();
   const digest = createHmac("sha256", userSecret)
     .update(`${userId}:${subscriptionId}`)
@@ -138,7 +140,7 @@ function qbGender(sex: string | null | undefined): "male" | "female" {
 
 async function qbFetch<T>(
   path: string,
-  init: RequestInit & { token?: string; apiKey?: string } = {},
+  init: RequestInit & { token?: string; apiKey?: string; isRetry?: boolean } = {},
 ): Promise<T> {
   const { apiUrl } = getQuickbloxConfig();
   const headers = new Headers(init.headers);
@@ -181,14 +183,43 @@ async function qbFetch<T>(
   }
 
   if (!res.ok) {
+    if (res.status === 401 && init.token) {
+      if (providerSessionCache?.token === init.token) {
+        providerSessionCache = null;
+        if (!init.isRetry) {
+          try {
+            const fresh = await getProviderAuth();
+            return await qbFetch<T>(path, {
+              ...init,
+              token: fresh.token,
+              isRetry: true,
+            });
+          } catch {
+            // Fall through to error reporting
+          }
+        }
+      }
+      for (const [key, cached] of clientSessionCache.entries()) {
+        if (cached.token === init.token) {
+          clientSessionCache.delete(key);
+        }
+      }
+    }
     const err = (json ?? {}) as QbErrorBody;
     const raw = err.message || err.error;
     const detail = Array.isArray(raw) ? raw.join(", ") : raw;
     const message = detail || `QuickBlox request failed (${res.status} ${path})`;
-    console.error(
-      `[consultations] ${init.method ?? "GET"} ${path} ${res.status}:`,
-      text.slice(0, 500),
-    );
+    if (res.status === 401 || res.status === 403 || res.status === 404) {
+      console.warn(
+        `[consultations] ${init.method ?? "GET"} ${path} ${res.status}:`,
+        text.slice(0, 500),
+      );
+    } else {
+      console.error(
+        `[consultations] ${init.method ?? "GET"} ${path} ${res.status}:`,
+        text.slice(0, 500),
+      );
+    }
     const error = new Error(message) as Error & { status: number; body: unknown };
     error.status = res.status;
     error.body = json;
@@ -376,6 +407,8 @@ function isAppointmentOpen(appointment: QbAppointment) {
 export type AppointmentCloseState = {
   open: boolean;
   dateEnd: string | null;
+  formSubmissionId?: string | null;
+  hasFormSubmission?: boolean;
 };
 
 async function appointmentAuth() {
@@ -386,11 +419,67 @@ async function appointmentAuth() {
 }
 
 /** Live QuickBlox close state (`date_end`) for stored appointment ids. */
-export async function fetchAppointmentStatuses(ids: string[]) {
+export async function fetchAppointmentStatuses(
+  ids: string[],
+  options?: { clientToken?: string; clientTokens?: string[] },
+) {
   const unique = [...new Set(ids.filter(Boolean))];
   const wanted = new Set(unique);
   const map = new Map<string, AppointmentCloseState>();
   if (unique.length === 0) return map;
+
+  const fill = (items: QbAppointment[]) => {
+    for (const item of items) {
+      if (!item._id || !wanted.has(item._id)) continue;
+      map.set(item._id, {
+        open: isAppointmentOpen(item),
+        dateEnd: item.date_end ?? null,
+        formSubmissionId: item.form_submission_id ?? null,
+        hasFormSubmission: Boolean(item.form_submission_id),
+      });
+    }
+  };
+
+  const clientTokens = [
+    ...(options?.clientToken ? [options.clientToken] : []),
+    ...(options?.clientTokens ?? []),
+  ].filter(Boolean);
+
+  // If client token(s) are supplied, try querying client appointments first
+  for (const cToken of clientTokens) {
+    try {
+      const my = await qbFetch<{ items?: QbAppointment[] }>(
+        "/appointments/my?limit=100&sort_desc=updated_at",
+        { token: cToken },
+      );
+      fill(my.items ?? []);
+    } catch {
+      // Non-fatal
+    }
+  }
+
+  // Check if any are still missing
+  let missing = unique.filter((id) => !map.has(id));
+  if (missing.length === 0) return map;
+
+  // For any missing, if client tokens exist, try direct lookup with client tokens
+  if (clientTokens.length > 0) {
+    for (const id of missing) {
+      for (const cToken of clientTokens) {
+        try {
+          const item = await qbFetch<QbAppointment>(`/appointments/${id}`, { token: cToken });
+          if (item?._id) {
+            fill([item]);
+            break;
+          }
+        } catch {
+          // Non-fatal
+        }
+      }
+    }
+    missing = unique.filter((id) => !map.has(id));
+    if (missing.length === 0) return map;
+  }
 
   let auth: { token?: string; apiKey?: string };
   try {
@@ -400,52 +489,60 @@ export async function fetchAppointmentStatuses(ids: string[]) {
     return map;
   }
 
-  const fill = (items: QbAppointment[]) => {
-    for (const item of items) {
-      if (!item._id || !wanted.has(item._id)) continue;
-      map.set(item._id, {
-        open: isAppointmentOpen(item),
-        dateEnd: item.date_end ?? null,
-      });
-    }
-  };
-
   try {
-    const listed = await qbFetch<{ items?: QbAppointment[] }>(
-      "/appointments?limit=1000&sort_desc=updated_at",
-      auth,
-    );
+    const listPath = auth.apiKey
+      ? "/appointments?limit=1000&sort_desc=updated_at"
+      : "/appointments/my?limit=1000&sort_desc=updated_at";
+    const listed = await qbFetch<{ items?: QbAppointment[] }>(listPath, auth);
     fill(listed.items ?? []);
   } catch (error) {
     console.warn("[consultations] list appointments for status failed:", error);
   }
 
-  const missing = unique.filter((id) => !map.has(id));
-  for (let i = 0; i < missing.length; i += 8) {
-    const chunk = missing.slice(i, i + 8);
-    await Promise.all(
-      chunk.map(async (id) => {
-        try {
-          const item = await qbFetch<QbAppointment>(`/appointments/${id}`, auth);
-          fill([item]);
-        } catch (error) {
-          console.warn("[consultations] get appointment status failed:", id, error);
-        }
-      }),
-    );
+  missing = unique.filter((id) => !map.has(id));
+  // Only attempt direct lookup with provider auth if apiKey is present
+  // (without an API key, provider auth only has access to their own /appointments/my list which we already checked)
+  if (missing.length > 0 && auth.apiKey) {
+    for (let i = 0; i < missing.length; i += 8) {
+      const chunk = missing.slice(i, i + 8);
+      await Promise.all(
+        chunk.map(async (id) => {
+          try {
+            const item = await qbFetch<QbAppointment>(`/appointments/${id}`, auth);
+            fill([item]);
+          } catch (error) {
+            console.warn("[consultations] get appointment status failed:", id, error);
+          }
+        }),
+      );
+    }
   }
 
   return map;
 }
 
-async function inspectAppointment(appointmentId: string, token?: string) {
+export async function inspectAppointment(appointmentId: string, token?: string) {
+  // If client/patient token is provided, inspect via client auth first
   if (token) {
     try {
-      return await qbFetch<QbAppointment>(`/appointments/${appointmentId}`, { token });
+      const item = await qbFetch<QbAppointment>(`/appointments/${appointmentId}`, { token });
+      if (item?._id) return item;
     } catch {
-      // Fall through to provider/api key.
+      // Direct lookup with token failed; try looking up via client's /appointments/my list
+      try {
+        const my = await qbFetch<{ items?: QbAppointment[] }>(
+          "/appointments/my?limit=100&sort_desc=updated_at",
+          { token },
+        );
+        const found = (my.items ?? []).find((item) => item._id === appointmentId);
+        if (found) return found;
+      } catch {
+        // Fall through
+      }
     }
   }
+
+  // Fall back to Provider/Admin auth
   try {
     const auth = await appointmentAuth();
     return await qbFetch<QbAppointment>(`/appointments/${appointmentId}`, auth);
@@ -454,15 +551,78 @@ async function inspectAppointment(appointmentId: string, token?: string) {
   }
 }
 
+export async function attachFormSubmissionToAppointment(params: {
+  appointmentId: string;
+  submissionId: string;
+  clientToken?: string;
+}): Promise<boolean> {
+  if (!params.submissionId || !/^\d+$/.test(params.submissionId.trim())) {
+    return false;
+  }
+
+  const body = JSON.stringify({
+    form_submission_id: params.submissionId.trim(),
+  });
+
+  // Prefer updating with client auth if available since the patient owns the appointment
+  if (params.clientToken) {
+    try {
+      await qbFetch(`/appointments/${params.appointmentId}`, {
+        method: "PATCH",
+        token: params.clientToken,
+        body,
+      });
+      return true;
+    } catch {
+      // Fall through to provider auth
+    }
+  }
+
+  try {
+    const auth = await appointmentAuth();
+    await qbFetch(`/appointments/${params.appointmentId}`, {
+      method: "PATCH",
+      ...auth,
+      body,
+    });
+    return true;
+  } catch (error) {
+    console.warn(
+      "[consultations] attachFormSubmissionToAppointment failed:",
+      params.appointmentId,
+      error,
+    );
+    return false;
+  }
+}
+
 /** Open appointments for this plan's QuickBlox user, including whether the intake form is done. */
 export async function listOpenVisitsForClient(params: {
   clientToken: string;
   clientId: number;
-}): Promise<{ id: string; hasDialog: boolean }[]> {
+}): Promise<
+  {
+    id: string;
+    hasDialog: boolean;
+    hasFormSubmission: boolean;
+    formSubmissionId?: string | null;
+    dialogId?: string | null;
+    providerId?: number | null;
+    createdAt?: number;
+  }[]
+> {
   const items = await findClientOpenAppointments(params.clientToken, params.clientId);
   return items
     .filter((item) => Boolean(item._id))
-    .map((item) => ({ id: item._id, hasDialog: Boolean(item.dialog_id) }));
+    .map((item) => ({
+      id: item._id,
+      hasDialog: Boolean(item.dialog_id),
+      hasFormSubmission: Boolean(item.form_submission_id),
+      formSubmissionId: item.form_submission_id ?? null,
+      dialogId: item.dialog_id ?? null,
+      providerId: item.provider_id ?? null,
+      createdAt: item.created_at,
+    }));
 }
 
 /** Prefer an already-started open visit (waiting room) over a brand-new intake stub. */
@@ -491,20 +651,56 @@ export async function pickReusableAppointmentId(params: {
 }
 
 async function findClientOpenAppointments(clientToken: string, clientId: number) {
+  const items: QbAppointment[] = [];
   try {
     const listed = await qbFetch<{ items?: QbAppointment[] }>("/appointments/my?limit=20", {
       token: clientToken,
     });
-    return (listed.items ?? []).filter(
-      (appointment) =>
-        Boolean(appointment._id) &&
-        isAppointmentOpen(appointment) &&
-        (appointment.client_id == null || appointment.client_id === clientId),
-    );
+    if (listed.items) items.push(...listed.items);
   } catch (error) {
     console.warn("[consultations] list my appointments failed:", error);
-    return [] as QbAppointment[];
   }
+
+  // Also check /injury-appointment/my which is QuickBlox's primary endpoint for the active intake consultation
+  try {
+    const injuryRes = await qbFetch<{ appointment?: QbAppointment }>("/injury-appointment/my", {
+      token: clientToken,
+    });
+    if (
+      injuryRes.appointment?._id &&
+      !items.some((row) => row._id === injuryRes.appointment!._id)
+    ) {
+      items.push(injuryRes.appointment);
+    }
+  } catch {
+    // Non-fatal if no injury appointment exists yet
+  }
+
+  // If no appointment found via patient token, check via provider auth for this client
+  if (items.length === 0) {
+    try {
+      const auth = await appointmentAuth();
+      const listPath = auth.apiKey
+        ? `/appointments?limit=50&sort_desc=updated_at`
+        : `/appointments/my?limit=50&sort_desc=updated_at`;
+      const providerListed = await qbFetch<{ items?: QbAppointment[] }>(listPath, auth);
+      if (providerListed.items) {
+        const clientItems = providerListed.items.filter(
+          (a) => a.client_id === clientId || !a.client_id,
+        );
+        items.push(...clientItems);
+      }
+    } catch {
+      // Non-fatal
+    }
+  }
+
+  return items.filter(
+    (appointment) =>
+      Boolean(appointment._id) &&
+      isAppointmentOpen(appointment) &&
+      (appointment.client_id == null || appointment.client_id === clientId),
+  );
 }
 
 /** Open the stored visit. Never create a new QuickBlox appointment for this plan. */
@@ -514,10 +710,17 @@ export async function resumeStoredAppointment(params: {
   clientId?: number;
 }) {
   const { appointmentId, clientToken } = params;
+  if (clientToken) {
+    try {
+      await qbFetch<QbAppointment>(`/appointments/${appointmentId}`, { token: clientToken });
+      return appointmentId;
+    } catch {
+      // Fall through to provider auth
+    }
+  }
   try {
-    await qbFetch<QbAppointment>(`/appointments/${appointmentId}`, {
-      token: clientToken,
-    });
+    const auth = await appointmentAuth();
+    await qbFetch<QbAppointment>(`/appointments/${appointmentId}`, auth);
   } catch (error) {
     console.warn("[consultations] load stored appointment failed:", appointmentId, error);
   }
@@ -531,26 +734,16 @@ export async function claimStoredAppointment(params: {
   clientToken: string;
 }) {
   try {
+    const auth = await appointmentAuth();
     await qbFetch(`/appointments/${params.appointmentId}`, {
       method: "PATCH",
-      token: params.clientToken,
+      ...auth,
       body: JSON.stringify({
         client_id: params.clientId,
       }),
     });
-  } catch {
-    try {
-      const provider = await getProviderAuth();
-      await qbFetch(`/appointments/${params.appointmentId}`, {
-        method: "PATCH",
-        token: provider.token,
-        body: JSON.stringify({
-          client_id: params.clientId,
-        }),
-      });
-    } catch (error) {
-      console.warn("[consultations] claim appointment failed:", params.appointmentId, error);
-    }
+  } catch (error) {
+    console.warn("[consultations] claim appointment failed:", params.appointmentId, error);
   }
   return resumeStoredAppointment({
     appointmentId: params.appointmentId,
@@ -589,7 +782,6 @@ export async function createQuickbloxAppointment(params: {
   const reuseOpenVisit = params.reuseOpenVisit !== false;
 
   const reuseOpen = async () => {
-    if (!reuseOpenVisit) return null;
     const open = await findClientOpenAppointments(params.clientToken, params.clientId);
     if (params.keepAppointmentId) {
       const kept = open.find((item) => item._id === params.keepAppointmentId);
@@ -598,8 +790,10 @@ export async function createQuickbloxAppointment(params: {
     return open[0] ?? null;
   };
 
-  const alreadyOpen = await reuseOpen();
-  if (alreadyOpen) return alreadyOpen;
+  if (reuseOpenVisit) {
+    const alreadyOpen = await reuseOpen();
+    if (alreadyOpen) return alreadyOpen;
+  }
 
   const tryPost = async (token: string) => {
     try {
@@ -611,9 +805,10 @@ export async function createQuickbloxAppointment(params: {
       });
     } catch (error) {
       if (isLoginLockedError(error)) throw error;
-      if (!isActiveAppointmentError(error)) throw error;
-      const existingOpen = await reuseOpen();
-      if (existingOpen) return existingOpen;
+      if (isActiveAppointmentError(error)) {
+        const existingOpen = await reuseOpen();
+        if (existingOpen) return existingOpen;
+      }
       throw error;
     }
   };
@@ -622,6 +817,10 @@ export async function createQuickbloxAppointment(params: {
     return await tryPost(params.clientToken);
   } catch (error) {
     if (isLoginLockedError(error)) throw error;
+    if (isActiveAppointmentError(error)) {
+      const existingOpen = await reuseOpen();
+      if (existingOpen) return existingOpen;
+    }
     if (!isUnauthorized(error)) throw error;
   }
 
@@ -635,6 +834,10 @@ export async function createQuickbloxAppointment(params: {
         (cfg.providerEmail ? loginLockUntil.get(lockKey("provider", cfg.providerEmail)) : 0) ||
         Date.now() + LOGIN_LOCK_MS;
       throw new Error(lockedUntilMessage(until));
+    }
+    if (isActiveAppointmentError(error)) {
+      const existingOpen = await reuseOpen();
+      if (existingOpen) return existingOpen;
     }
     throw error;
   }

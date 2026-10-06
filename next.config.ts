@@ -20,6 +20,18 @@ const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR || (isDevCommand ? ".next-dev" : ".next"),
   reactStrictMode: true,
   serverExternalPackages: ["nodemailer"],
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        child_process: false,
+        tls: false,
+        net: false,
+        fs: false,
+      };
+    }
+    return config;
+  },
   // Profile avatar uploads go through a Server Action; default limit is 1 MB.
   experimental: {
     serverActions: {

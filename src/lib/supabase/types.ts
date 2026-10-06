@@ -1143,6 +1143,9 @@ export type Database = {
           qb_dialog_id: string | null;
           started_at: string;
           ended_at: string | null;
+          form_submitted: boolean;
+          form_submission_id: string | null;
+          form_submitted_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -1155,6 +1158,9 @@ export type Database = {
           qb_dialog_id?: string | null;
           started_at?: string;
           ended_at?: string | null;
+          form_submitted?: boolean;
+          form_submission_id?: string | null;
+          form_submitted_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -1167,6 +1173,9 @@ export type Database = {
           qb_dialog_id?: string | null;
           started_at?: string;
           ended_at?: string | null;
+          form_submitted?: boolean;
+          form_submission_id?: string | null;
+          form_submitted_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
