@@ -23,6 +23,7 @@ import {
   qbClientEmail,
   qbPasswordForPlan,
   resumeStoredAppointment,
+  fetchQuickbloxUserName,
   type QbClientSession,
 } from "./quickblox";
 import { checkJotformSubmission, fetchJotformSubmissionAnswers, getJotformConfig } from "./jotform";
@@ -69,6 +70,7 @@ function buildSdkConfig(params: {
   appointmentId: string;
   dialogId: string | null;
   providerId: number | null;
+  providerName?: string | null;
   patientName: string;
   medicineName: string;
 }): QuickbloxSdkConfig {
@@ -86,6 +88,7 @@ function buildSdkConfig(params: {
     dialogId: params.dialogId,
     dialogJid: params.dialogId ? `${cfg.appId}_${params.dialogId}@muc.chat.quickblox.com` : null,
     providerId: params.providerId,
+    providerName: params.providerName ?? null,
     appointmentId: params.appointmentId,
     patientName: params.patientName,
     medicineName: params.medicineName,
@@ -488,6 +491,14 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
 
       const dialogId = forThisSub?.qb_dialog_id ?? activeVisit?.dialogId ?? null;
       const providerId = activeVisit?.providerId ?? null;
+      let providerName: string | null = null;
+      if (providerId) {
+        try {
+          providerName = await fetchQuickbloxUserName(providerId);
+        } catch {
+          // ignore
+        }
+      }
 
       const patientData = buildPatientData({
         fullName,
@@ -524,6 +535,7 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
           appointmentId,
           dialogId,
           providerId,
+          providerName,
           patientName: fullName,
           medicineName,
         }),

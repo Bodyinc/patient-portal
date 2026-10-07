@@ -31,6 +31,7 @@ export type QuickbloxSdkConfig = {
   dialogId: string | null;
   dialogJid?: string | null;
   providerId: number | null;
+  providerName?: string | null;
   appointmentId: string;
   patientName: string;
   medicineName: string;

@@ -140,7 +140,7 @@ function qbGender(sex: string | null | undefined): "male" | "female" {
 
 async function qbFetch<T>(
   path: string,
-  init: RequestInit & { token?: string; apiKey?: string; isRetry?: boolean } = {},
+  init: RequestInit & { token?: string; apiKey?: string; isRetry?: boolean; silent?: boolean } = {},
 ): Promise<T> {
   const { apiUrl } = getQuickbloxConfig();
   const headers = new Headers(init.headers);
@@ -209,16 +209,19 @@ async function qbFetch<T>(
     const raw = err.message || err.error;
     const detail = Array.isArray(raw) ? raw.join(", ") : raw;
     const message = detail || `QuickBlox request failed (${res.status} ${path})`;
-    if (res.status === 401 || res.status === 403 || res.status === 404) {
-      console.warn(
-        `[consultations] ${init.method ?? "GET"} ${path} ${res.status}:`,
-        text.slice(0, 500),
-      );
-    } else {
-      console.error(
-        `[consultations] ${init.method ?? "GET"} ${path} ${res.status}:`,
-        text.slice(0, 500),
-      );
+    const isExpectedDuplicate = res.status === 422 && /already|exists|taken|duplicate/i.test(text);
+    if (!init.silent) {
+      if (res.status === 401 || res.status === 403 || res.status === 404 || isExpectedDuplicate) {
+        console.warn(
+          `[consultations] ${init.method ?? "GET"} ${path} ${res.status}:`,
+          text.slice(0, 500),
+        );
+      } else {
+        console.error(
+          `[consultations] ${init.method ?? "GET"} ${path} ${res.status}:`,
+          text.slice(0, 500),
+        );
+      }
     }
     const error = new Error(message) as Error & { status: number; body: unknown };
     error.status = res.status;
@@ -232,7 +235,12 @@ async function qbFetch<T>(
   return json as T;
 }
 
-async function login(role: "client" | "provider", email: string, password: string) {
+async function login(
+  role: "client" | "provider",
+  email: string,
+  password: string,
+  options: { silent?: boolean } = {},
+) {
   await assertNotLoginLocked(role, email);
   try {
     const result = await qbFetch<{ session: QbSession; data?: QbUser; user?: QbUser }>(
@@ -240,6 +248,7 @@ async function login(role: "client" | "provider", email: string, password: strin
       {
         method: "POST",
         body: JSON.stringify({ role, email, password }),
+        silent: options.silent,
       },
     );
     const user = result.data ?? result.user;
@@ -318,13 +327,16 @@ export function getCachedClientSession(
   return { token: cached.token, userId: cached.userId };
 }
 
-async function createClientUser(params: {
-  email: string;
-  password: string;
-  fullName: string;
-  dob: string;
-  sex: string | null;
-}) {
+async function createClientUser(
+  params: {
+    email: string;
+    password: string;
+    fullName: string;
+    dob: string;
+    sex: string | null;
+  },
+  options: { silent?: boolean } = {},
+) {
   return qbFetch<{ session: QbSession; user: QbUser }>("/users/client", {
     method: "POST",
     body: JSON.stringify({
@@ -334,6 +346,7 @@ async function createClientUser(params: {
       birthdate: params.dob,
       gender: qbGender(params.sex),
     }),
+    silent: options.silent,
   });
 }
 
@@ -350,8 +363,8 @@ function sessionFromCreated(
 
 /**
  * One QuickBlox client per paid plan, using a portal-owned email (never the
- * patient's real inbox). Create returns a session so we can skip /auth/login
- * on first start — that login is what QuickBlox locks.
+ * patient's real inbox). Attempts login first to avoid 422 ("email has already
+ * been taken") for existing patients on reload/reconnect.
  */
 export async function ensureQuickbloxClient(params: {
   userId: string;
@@ -373,9 +386,19 @@ export async function ensureQuickbloxClient(params: {
     sex: params.sex,
   };
 
+  // Attempt login first: for existing patients (e.g. repeat visits or dev server reloads),
+  // this immediately returns an active session and avoids triggering POST /users/client 422.
+  try {
+    const session = await login("client", email, password, { silent: true });
+    return cacheSession(params.userId, params.subscriptionId, session.token, session.user.id);
+  } catch (error) {
+    if (isLoginLockedError(error)) throw error;
+    // If not locked, the account may not exist yet; proceed to create.
+  }
+
   try {
     return sessionFromCreated(
-      await createClientUser(payload),
+      await createClientUser(payload, { silent: true }),
       params.userId,
       params.subscriptionId,
     );
@@ -848,4 +871,16 @@ export function buildConsultationEmbedUrl(params: { token: string; appointmentId
   const url = new URL(`${clientAppUrl}/appointment/${params.appointmentId}`);
   url.searchParams.set("token", params.token);
   return url.toString();
+}
+
+export async function fetchQuickbloxUserName(userId: number): Promise<string | null> {
+  if (!userId || userId <= 0) return null;
+  try {
+    const auth = await appointmentAuth();
+    const user = await qbFetch<{ id: number; full_name?: string }>(`/users/${userId}`, auth);
+    return user.full_name?.trim() || null;
+  } catch (error) {
+    console.warn("[consultations] fetchQuickbloxUserName failed for", userId, error);
+    return null;
+  }
 }

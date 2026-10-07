@@ -57,6 +57,7 @@ type ChatMessageItem = {
   body: string;
   dateSent: number;
   isSelf: boolean;
+  type?: "message" | "joined";
   attachments?: ChatAttachmentItem[];
 };
 
@@ -95,6 +96,40 @@ interface QuickBloxClient {
     creds: { email?: string; id?: number; login?: string; password?: string },
     callback: (err: unknown, res: { token: string; user_id?: number }) => void,
   ) => void;
+  users?: {
+    get: (
+      paramsOrId: number | { login?: string; full_name?: string; email?: string },
+      callback: (
+        err: unknown,
+        res: {
+          user?: {
+            id: number;
+            full_name?: string;
+            email?: string;
+            login?: string;
+            user_tags?: string;
+          };
+        },
+      ) => void,
+    ) => void;
+    listUsers?: (
+      params: { filter?: Array<{ field: string; param: string; value: unknown }> },
+      callback: (
+        err: unknown,
+        res: {
+          items?: Array<{
+            user: {
+              id: number;
+              full_name?: string;
+              email?: string;
+              login?: string;
+              user_tags?: string;
+            };
+          }>;
+        },
+      ) => void,
+    ) => void;
+  };
   content?: {
     createAndUpload: (
       params: {
@@ -130,7 +165,7 @@ interface QuickBloxClient {
       msg: {
         type: string;
         body: string;
-        extension: { save_to_history: number; dialog_id?: string | null };
+        extension: { save_to_history: number; dialog_id?: string | null; type?: string };
         markable?: number;
       },
     ) => string;
@@ -142,11 +177,19 @@ interface QuickBloxClient {
         _id?: string;
         id?: string;
         body?: string;
+        type?: string;
         date_sent?: number;
-        extension?: { dialog_id?: string };
+        extension?: {
+          dialog_id?: string;
+          type?: string;
+          notification_type?: string;
+          attachments?: ChatAttachmentItem[];
+        };
       },
     ) => void;
     onMessageTypingListener?: (isTyping: boolean, userId: number, dialogId: string) => void;
+    onJoinOccupant?: (dialogId: string, userId: number) => void;
+    onLeaveOccupant?: (dialogId: string, userId: number) => void;
     muc: {
       join: (jid: string, callback: (res: unknown) => void) => void;
       leave: (jid: string, callback?: () => void) => void;
@@ -218,6 +261,30 @@ declare global {
   }
 }
 
+function getDateDividerLabel(timestamp: number): string {
+  const msgDate = new Date(timestamp);
+  const now = new Date();
+  const isToday =
+    msgDate.getFullYear() === now.getFullYear() &&
+    msgDate.getMonth() === now.getMonth() &&
+    msgDate.getDate() === now.getDate();
+  if (isToday) return "Today";
+
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const isYesterday =
+    msgDate.getFullYear() === yesterday.getFullYear() &&
+    msgDate.getMonth() === yesterday.getMonth() &&
+    msgDate.getDate() === yesterday.getDate();
+  if (isYesterday) return "Yesterday";
+
+  return msgDate.toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+    year: msgDate.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
+  });
+}
+
 export default function QuickbloxConsultationRoom({
   subscriptionId,
   sdkConfig,
@@ -239,6 +306,128 @@ export default function QuickbloxConsultationRoom({
     sdkConfig.dialogJid || null,
   );
   const [doctorTyping, setDoctorTyping] = useState(false);
+  const [typingUserId, setTypingUserId] = useState<number | null>(null);
+
+  // User display names mapping (id -> display name, e.g. Admin, Test Provider, You)
+  const [userNames, setUserNames] = useState<Record<number, string>>(() => {
+    const initial: Record<number, string> = {
+      142814409: "Admin",
+      [sdkConfig.userId]: "You",
+    };
+    if (sdkConfig.providerId && sdkConfig.providerName) {
+      initial[sdkConfig.providerId] = sdkConfig.providerName;
+    }
+    return initial;
+  });
+  const userNamesRef = useRef<Record<number, string>>(userNames);
+  userNamesRef.current = userNames;
+  const resolvingUsersRef = useRef<Set<number>>(new Set());
+
+  // Resolve user display names from QuickBlox SDK
+  const resolveUserNames = useCallback(
+    (userIds: number[]) => {
+      const QB = typeof window !== "undefined" ? window.QB : undefined;
+      if (!QB?.users) return;
+
+      const toFetch = userIds.filter((id) => {
+        if (!id || id <= 0) return false;
+        if (id === sdkConfig.userId) return false;
+        if (userNamesRef.current[id]) return false;
+        if (resolvingUsersRef.current.has(id)) return false;
+        return true;
+      });
+
+      if (toFetch.length === 0) return;
+
+      toFetch.forEach((id) => {
+        resolvingUsersRef.current.add(id);
+
+        if (id === 142814409) {
+          setUserNames((prev) => ({ ...prev, [id]: "Admin" }));
+          return;
+        }
+
+        try {
+          QB.users?.get(
+            id,
+            (
+              err: unknown,
+              res: {
+                user?: {
+                  id: number;
+                  full_name?: string;
+                  email?: string;
+                  login?: string;
+                  user_tags?: string;
+                };
+              },
+            ) => {
+              if (!err && res?.user) {
+                const u = res.user;
+                const isAdmin =
+                  u.user_tags?.includes("admin") ||
+                  u.full_name?.toLowerCase().includes("admin") ||
+                  u.email?.toLowerCase().includes("admin") ||
+                  u.id === 142814409;
+                const name = isAdmin
+                  ? "Admin"
+                  : u.full_name?.trim() ||
+                    u.login?.trim() ||
+                    (u.id === sdkConfig.providerId
+                      ? sdkConfig.providerName || "Provider"
+                      : "Healthcare Provider");
+                setUserNames((prev) => ({ ...prev, [u.id]: name }));
+              } else {
+                resolvingUsersRef.current.delete(id);
+              }
+            },
+          );
+        } catch {
+          resolvingUsersRef.current.delete(id);
+        }
+      });
+    },
+    [sdkConfig.userId, sdkConfig.providerId, sdkConfig.providerName],
+  );
+
+  const getSenderDisplayName = useCallback(
+    (senderId: number, isSelf: boolean) => {
+      if (isSelf || senderId === sdkConfig.userId) return "You";
+      if (senderId === 142814409) return "Admin";
+      if (userNames[senderId]) return userNames[senderId];
+      if (senderId === sdkConfig.providerId) {
+        return sdkConfig.providerName || "Provider";
+      }
+      return "Healthcare Provider";
+    },
+    [sdkConfig.userId, sdkConfig.providerId, sdkConfig.providerName, userNames],
+  );
+
+  const isJoinedMessage = useCallback(
+    (item: {
+      type?: string;
+      notification_type?: string;
+      message?: string;
+      body?: string;
+      extension?: { type?: string; notification_type?: string };
+    }) => {
+      const t =
+        item.type ||
+        item.notification_type ||
+        item.extension?.type ||
+        item.extension?.notification_type;
+      if (t === "joined") return true;
+      const text = (item.message || item.body || "").trim().toLowerCase();
+      return (
+        text === "joined" ||
+        text.includes("has joined the chat") ||
+        text.includes("you have joined the chat") ||
+        text.includes("joined this chat") ||
+        text.includes("has joined into the chat")
+      );
+    },
+    [],
+  );
 
   // Document attachment state
   const [uploadingFile, setUploadingFile] = useState(false);
@@ -273,6 +462,16 @@ export default function QuickbloxConsultationRoom({
   const ringtoneAudioRef = useRef<HTMLAudioElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isConnectingRef = useRef(false);
+  const hasConnectedRef = useRef(false);
+  const sdkConfigRef = useRef(sdkConfig);
+  sdkConfigRef.current = sdkConfig;
+  const resolveUserNamesRef = useRef(resolveUserNames);
+  resolveUserNamesRef.current = resolveUserNames;
+  const isJoinedMessageRef = useRef(isJoinedMessage);
+  isJoinedMessageRef.current = isJoinedMessage;
+  const playRingtoneRef = useRef<() => void>(() => {});
+  const endCallRef = useRef<() => void>(() => {});
 
   // Auto scroll messages to bottom
   const scrollToBottom = useCallback(() => {
@@ -297,6 +496,7 @@ export default function QuickbloxConsultationRoom({
       console.warn("[QuickbloxConsultationRoom] Audio error:", e);
     }
   }, []);
+  playRingtoneRef.current = playRingtone;
 
   const stopRingtone = useCallback(() => {
     if (ringtoneAudioRef.current) {
@@ -348,6 +548,7 @@ export default function QuickbloxConsultationRoom({
     setIsMuted(false);
     setIsVideoDisabled(false);
   }, [cleanupMediaStreams, stopRingtone]);
+  endCallRef.current = endCall;
 
   // Reject incoming call
   const declineIncomingCall = useCallback(() => {
@@ -434,6 +635,210 @@ export default function QuickbloxConsultationRoom({
     }
   }, [activeCall, isVideoDisabled]);
 
+  // Setup Chat Listeners and Dialog History once connected
+  const setupChatListeners = useCallback((currentUserId: number) => {
+    const QB = window.QB;
+    if (!QB?.chat) return;
+
+    const config = sdkConfigRef.current;
+
+    // Listen for incoming messages
+    QB.chat.onMessageListener = (userId, msg) => {
+      console.log("[QuickBlox] onMessageListener:", userId, msg);
+      if (userId === currentUserId) return; // ignore our own reflections
+
+      const rawExt = msg.extension as
+        | {
+            type?: string;
+            notification_type?: string;
+            attachments?: ChatAttachmentItem[];
+          }
+        | undefined;
+
+      const isJoined = isJoinedMessageRef.current({
+        type: msg.type,
+        notification_type: rawExt?.notification_type,
+        body: msg.body,
+        extension: rawExt,
+      });
+
+      const body = msg.body || "";
+      const attachments = rawExt?.attachments || [];
+      if (!isJoined && !body && attachments.length === 0) return;
+
+      setMessages((prev) => {
+        const id = msg._id || msg.id || String(Date.now());
+        if (prev.some((m) => m.id === id)) return prev;
+        return [
+          ...prev,
+          {
+            id,
+            senderId: userId,
+            body: isJoined
+              ? ""
+              : body || (attachments[0]?.name ? `📎 ${attachments[0].name}` : "Attachment"),
+            dateSent: msg.date_sent ? msg.date_sent * 1000 : Date.now(),
+            isSelf: false,
+            type: isJoined ? ("joined" as const) : ("message" as const),
+            attachments,
+          },
+        ];
+      });
+
+      resolveUserNamesRef.current([userId]);
+    };
+
+    // Listen for occupant join/leave presence
+    QB.chat.onJoinOccupant = (_dialogId, userId) => {
+      console.log("[QuickBlox] onJoinOccupant:", userId);
+      if (!userId) return;
+      resolveUserNamesRef.current([userId]);
+
+      setMessages((prev) => {
+        const isSelf = userId === currentUserId;
+        const recentJoined = prev.some(
+          (m) => m.type === "joined" && m.senderId === userId && Date.now() - m.dateSent < 8000,
+        );
+        if (recentJoined) return prev;
+        return [
+          ...prev,
+          {
+            id: `join_${userId}_${Date.now()}`,
+            senderId: userId,
+            body: "",
+            dateSent: Date.now(),
+            isSelf,
+            type: "joined",
+          },
+        ];
+      });
+    };
+
+    // Listen for typing indicator
+    if (QB.chat.onMessageTypingListener) {
+      QB.chat.onMessageTypingListener = (isTyping, userId) => {
+        if (userId !== currentUserId) {
+          setDoctorTyping(isTyping);
+          setTypingUserId(isTyping ? userId : null);
+          if (isTyping) {
+            resolveUserNamesRef.current([userId]);
+            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+            typingTimeoutRef.current = setTimeout(() => {
+              setDoctorTyping(false);
+              setTypingUserId(null);
+            }, 4000);
+          }
+        }
+      };
+    }
+
+    // Step 4: Load Dialog details & Join MUC room if group chat
+    const targetDialogId = config.dialogId;
+    if (targetDialogId) {
+      QB.chat.dialog.list({ _id: targetDialogId }, (dErr, dRes) => {
+        if (!dErr && dRes?.items?.length) {
+          const dialog = dRes.items[0];
+          if (dialog.occupants_ids?.length) {
+            resolveUserNamesRef.current(dialog.occupants_ids);
+          }
+          const roomJid = dialog.xmpp_room_jid;
+          if (roomJid) {
+            setActiveDialogJid(roomJid);
+            QB.chat.muc.join(roomJid, () => {
+              console.log("[QuickBlox] Joined MUC room:", roomJid);
+
+              // Broadcast joined notification stanza into the room
+              try {
+                QB.chat.send(roomJid, {
+                  type: "groupchat",
+                  body: "",
+                  extension: {
+                    save_to_history: 1,
+                    dialog_id: targetDialogId,
+                    type: "joined",
+                  },
+                });
+              } catch (jErr) {
+                console.warn("[QuickBlox] Send joined stanza notice:", jErr);
+              }
+
+              // Ensure local "You have joined the chat" pill is added if not yet present
+              setMessages((prev) => {
+                if (prev.some((m) => m.type === "joined" && m.isSelf)) return prev;
+                return [
+                  ...prev,
+                  {
+                    id: `join_self_${Date.now()}`,
+                    senderId: currentUserId,
+                    body: "",
+                    dateSent: Date.now(),
+                    isSelf: true,
+                    type: "joined",
+                  },
+                ];
+              });
+            });
+          }
+        }
+      });
+
+      // Step 5: Fetch message history
+      QB.chat.message.list(
+        { chat_dialog_id: targetDialogId, sort_desc: "date_sent", limit: 50 },
+        (mErr, mRes) => {
+          if (!mErr && mRes?.items?.length) {
+            const historical: ChatMessageItem[] = mRes.items
+              .map((item) => {
+                const rawItem = item as unknown as {
+                  _id: string;
+                  sender_id: number;
+                  message?: string;
+                  date_sent: number;
+                  type?: string;
+                  notification_type?: string;
+                  extension?: {
+                    type?: string;
+                    notification_type?: string;
+                    attachments?: ChatAttachmentItem[];
+                  };
+                  attachments?: ChatAttachmentItem[];
+                };
+                const isJoined = isJoinedMessageRef.current(rawItem);
+                return {
+                  id: rawItem._id,
+                  senderId: rawItem.sender_id,
+                  body: isJoined ? "" : rawItem.message || "",
+                  dateSent: rawItem.date_sent * 1000,
+                  isSelf: rawItem.sender_id === currentUserId,
+                  type: isJoined ? ("joined" as const) : ("message" as const),
+                  attachments: rawItem.attachments || rawItem.extension?.attachments || [],
+                };
+              })
+              .reverse();
+
+            setMessages((prev) => {
+              const existingIds = new Set(historical.map((m) => m.id));
+              const localJoins = prev.filter(
+                (m) => m.type === "joined" && m.isSelf && !existingIds.has(m.id),
+              );
+              if (
+                localJoins.length > 0 &&
+                !historical.some((m) => m.type === "joined" && m.isSelf)
+              ) {
+                return [...historical, ...localJoins];
+              }
+              return historical;
+            });
+
+            // Resolve all sender names from historical messages
+            const senders = historical.map((m) => m.senderId);
+            resolveUserNamesRef.current(senders);
+          }
+        },
+      );
+    }
+  }, []);
+
   // Initialize QuickBlox SDK & Connect to Chat
   const initQuickBlox = useCallback(() => {
     const QB = window.QB;
@@ -443,8 +848,26 @@ export default function QuickbloxConsultationRoom({
       return;
     }
 
+    if (hasConnectedRef.current || isConnectingRef.current) {
+      return;
+    }
+
+    const config = sdkConfigRef.current;
+    if (QB.chat?.isConnected) {
+      hasConnectedRef.current = true;
+      setConnected(true);
+      setConnecting(false);
+      setConnectionError(null);
+      setupChatListeners(Number(config.userId));
+      return;
+    }
+
+    isConnectingRef.current = true;
+    setConnecting(true);
+    setConnectionError(null);
+
     try {
-      QB.init(sdkConfig.appId, sdkConfig.authKey, sdkConfig.authSecret, sdkConfig.accountKey);
+      QB.init(config.appId, config.authKey, config.authSecret, config.accountKey);
 
       // Setup WebRTC Listeners: Doctor calls Patient
       if (QB.webrtc) {
@@ -457,7 +880,7 @@ export default function QuickbloxConsultationRoom({
             isVideo,
             callerId: session.initiatorId,
           });
-          playRingtone();
+          playRingtoneRef.current();
         };
 
         QB.webrtc.onRemoteStreamListener = (session, userId, stream) => {
@@ -474,140 +897,80 @@ export default function QuickbloxConsultationRoom({
 
         QB.webrtc.onStopCallListener = () => {
           console.log("[QuickBlox] onStopCallListener");
-          endCall();
+          endCallRef.current();
         };
 
         QB.webrtc.onRejectCallListener = () => {
           console.log("[QuickBlox] onRejectCallListener");
-          endCall();
+          endCallRef.current();
         };
 
         QB.webrtc.onSessionCloseListener = () => {
           console.log("[QuickBlox] onSessionCloseListener");
-          endCall();
+          endCallRef.current();
         };
 
         QB.webrtc.onUserNotAnswerListener = () => {
           console.log("[QuickBlox] onUserNotAnswerListener");
-          endCall();
+          endCallRef.current();
         };
       }
 
       // Step 1: Create Session with Client Email & Plan Password
-      QB.createSession(
-        { email: sdkConfig.email, password: sdkConfig.password },
-        (sessErr, sessRes) => {
-          if (sessErr) {
-            console.error("[QuickBlox] createSession error:", sessErr);
-            setConnectionError("Could not authenticate consultation session. Please try again.");
-            setConnecting(false);
-            return;
-          }
+      QB.createSession({ email: config.email, password: config.password }, (sessErr, sessRes) => {
+        if (sessErr) {
+          console.error("[QuickBlox] createSession error:", sessErr);
+          isConnectingRef.current = false;
+          setConnectionError("Could not authenticate consultation session. Please try again.");
+          setConnecting(false);
+          return;
+        }
 
-          console.log("[QuickBlox] createSession success:", sessRes.token);
+        console.log("[QuickBlox] createSession success:", sessRes?.token);
+        const targetUserId = sessRes?.user_id ? Number(sessRes.user_id) : Number(config.userId);
 
-          // Step 2: Connect to Chat Server
-          QB.chat.connect({ userId: sdkConfig.userId, password: sdkConfig.password }, (chatErr) => {
-            if (chatErr) {
+        // Step 2: Connect to Chat Server
+        if (QB.chat?.isConnected) {
+          console.log("[QuickBlox] Chat is already connected, skipping chat.connect.");
+          hasConnectedRef.current = true;
+          isConnectingRef.current = false;
+          setConnected(true);
+          setConnecting(false);
+          setConnectionError(null);
+          setupChatListeners(targetUserId);
+          return;
+        }
+
+        QB.chat.connect({ userId: targetUserId, password: config.password }, (chatErr) => {
+          if (chatErr) {
+            if (QB.chat?.isConnected) {
+              console.log("[QuickBlox] chat reported status notice but isConnected is true.");
+            } else {
               console.error("[QuickBlox] chat.connect error:", chatErr);
+              isConnectingRef.current = false;
               setConnectionError("Could not establish chat connection. Please try again.");
               setConnecting(false);
               return;
             }
+          }
 
-            console.log("[QuickBlox] chat.connect success!");
-            setConnected(true);
-            setConnecting(false);
-            setConnectionError(null);
+          hasConnectedRef.current = true;
+          isConnectingRef.current = false;
+          console.log("[QuickBlox] chat.connect success!");
+          setConnected(true);
+          setConnecting(false);
+          setConnectionError(null);
 
-            // Step 3: Listen for incoming messages
-            QB.chat.onMessageListener = (userId, msg) => {
-              console.log("[QuickBlox] onMessageListener:", userId, msg);
-              if (userId === sdkConfig.userId) return; // ignore our own reflections
-              const body = msg.body || "";
-              const attachments =
-                (msg.extension as { attachments?: ChatAttachmentItem[] })?.attachments || [];
-              if (!body && attachments.length === 0) return;
-
-              setMessages((prev) => {
-                const id = msg._id || msg.id || String(Date.now());
-                if (prev.some((m) => m.id === id)) return prev;
-                return [
-                  ...prev,
-                  {
-                    id,
-                    senderId: userId,
-                    body:
-                      body || (attachments[0]?.name ? `📎 ${attachments[0].name}` : "Attachment"),
-                    dateSent: msg.date_sent ? msg.date_sent * 1000 : Date.now(),
-                    isSelf: false,
-                    attachments,
-                  },
-                ];
-              });
-            };
-
-            // Listen for typing indicator
-            if (QB.chat.onMessageTypingListener) {
-              QB.chat.onMessageTypingListener = (isTyping, userId) => {
-                if (userId !== sdkConfig.userId) {
-                  setDoctorTyping(isTyping);
-                  if (isTyping) {
-                    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-                    typingTimeoutRef.current = setTimeout(() => {
-                      setDoctorTyping(false);
-                    }, 4000);
-                  }
-                }
-              };
-            }
-
-            // Step 4: Load Dialog details & Join MUC room if group chat
-            const targetDialogId = sdkConfig.dialogId;
-            if (targetDialogId) {
-              QB.chat.dialog.list({ _id: targetDialogId }, (dErr, dRes) => {
-                if (!dErr && dRes?.items?.length) {
-                  const dialog = dRes.items[0];
-                  if (dialog.xmpp_room_jid) {
-                    setActiveDialogJid(dialog.xmpp_room_jid);
-                    QB.chat.muc.join(dialog.xmpp_room_jid, () => {
-                      console.log("[QuickBlox] Joined MUC room:", dialog.xmpp_room_jid);
-                    });
-                  }
-                }
-              });
-
-              // Step 5: Fetch message history
-              QB.chat.message.list(
-                { chat_dialog_id: targetDialogId, sort_desc: "date_sent", limit: 50 },
-                (mErr, mRes) => {
-                  if (!mErr && mRes?.items?.length) {
-                    const historical: ChatMessageItem[] = mRes.items
-                      .map((item) => ({
-                        id: item._id,
-                        senderId: item.sender_id,
-                        body: item.message,
-                        dateSent: item.date_sent * 1000,
-                        isSelf: item.sender_id === sdkConfig.userId,
-                        attachments:
-                          (item as unknown as { attachments?: ChatAttachmentItem[] }).attachments ||
-                          [],
-                      }))
-                      .reverse();
-                    setMessages(historical);
-                  }
-                },
-              );
-            }
-          });
-        },
-      );
+          setupChatListeners(targetUserId);
+        });
+      });
     } catch (e) {
       console.error("[QuickBlox] init exception:", e);
+      isConnectingRef.current = false;
       setConnectionError("Failed to initialize QuickBlox. Please refresh.");
       setConnecting(false);
     }
-  }, [sdkConfig, playRingtone, endCall]);
+  }, [setupChatListeners]);
 
   // Once script is loaded, initialize
   useEffect(() => {
@@ -657,6 +1020,7 @@ export default function QuickbloxConsultationRoom({
         body: text,
         dateSent: Date.now(),
         isSelf: true,
+        type: "message",
       };
       setMessages((prev) => [...prev, newMsg]);
       setInputText("");
@@ -740,6 +1104,7 @@ export default function QuickbloxConsultationRoom({
               body: `📎 ${file.name}`,
               dateSent: Date.now(),
               isSelf: true,
+              type: "message",
               attachments: [attachmentItem],
             };
             setMessages((prev) => [...prev, newMsg]);
@@ -773,6 +1138,8 @@ export default function QuickbloxConsultationRoom({
     return () => {
       stopRingtone();
       cleanupMediaStreams();
+      hasConnectedRef.current = false;
+      isConnectingRef.current = false;
       if (typeof window !== "undefined" && window.QB?.chat?.isConnected) {
         try {
           window.QB.chat.disconnect();
@@ -823,7 +1190,8 @@ export default function QuickbloxConsultationRoom({
               )}
             </div>
             <p className="text-xs text-[#152A51]/60">
-              Provider Consultation Room · Appt #{sdkConfig.appointmentId.slice(-6).toUpperCase()}
+              {sdkConfig.providerName ? `${sdkConfig.providerName} · ` : ""}Consultation Room · Appt
+              #{sdkConfig.appointmentId.slice(-6).toUpperCase()}
             </p>
           </div>
         </div>
@@ -1039,84 +1407,115 @@ export default function QuickbloxConsultationRoom({
                   No messages yet. Send a greeting to your provider below!
                 </div>
               ) : (
-                messages.map((msg) => {
+                messages.map((msg, index) => {
+                  const prevMsg = index > 0 ? messages[index - 1] : null;
+                  const showDateDivider =
+                    !prevMsg ||
+                    new Date(prevMsg.dateSent).toDateString() !==
+                      new Date(msg.dateSent).toDateString();
+                  const dateLabel = showDateDivider ? getDateDividerLabel(msg.dateSent) : null;
+
                   const timeStr = new Date(msg.dateSent).toLocaleTimeString([], {
                     hour: "2-digit",
                     minute: "2-digit",
                   });
-                  return (
-                    <div
-                      key={msg.id}
-                      className={`flex flex-col ${msg.isSelf ? "items-end" : "items-start"}`}
-                    >
-                      <div className="flex items-baseline gap-1.5 text-[11px] text-[#152A51]/60">
-                        <span className="font-medium text-[#152A51]/80">
-                          {msg.isSelf ? "You" : "Healthcare Provider"}
-                        </span>
-                        <span>{timeStr}</span>
-                      </div>
-                      <div
-                        className={`mt-1 max-w-[85%] rounded-2xl px-4 py-2.5 text-sm shadow-xs sm:max-w-md ${
-                          msg.isSelf
-                            ? "rounded-tr-none bg-[#152A51] text-white"
-                            : "rounded-tl-none border border-[#E8EEED] bg-white text-[#152A51]"
-                        }`}
-                      >
-                        <p className="whitespace-pre-wrap leading-relaxed">{msg.body}</p>
+                  const senderName = getSenderDisplayName(msg.senderId, msg.isSelf);
 
-                        {/* Attachments rendering */}
-                        {msg.attachments && msg.attachments.length > 0 ? (
-                          <div className="mt-2.5 space-y-2">
-                            {msg.attachments.map((att, idx) => {
-                              const isPhoto =
-                                att.type === "photo" ||
-                                /\.(png|jpe?g|gif|webp)$/i.test(att.name || "");
-                              return (
-                                <div key={idx} className="overflow-hidden rounded-xl">
-                                  {isPhoto && att.url ? (
-                                    <a
-                                      href={att.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="block transition hover:opacity-90"
-                                      title={att.name || "View image"}
-                                    >
-                                      <img
-                                        src={att.url}
-                                        alt={att.name || "Attachment"}
-                                        className="max-h-56 max-w-full rounded-lg bg-black/10 object-contain"
-                                      />
-                                    </a>
-                                  ) : (
-                                    <a
-                                      href={att.url || "#"}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      download={att.name || "document"}
-                                      className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs transition ${
-                                        msg.isSelf
-                                          ? "bg-white/15 text-white hover:bg-white/25"
-                                          : "border border-[#E8EEED] bg-[#F9FBFA] text-[#152A51] hover:bg-[#F3F6F6]"
-                                      }`}
-                                    >
-                                      <FileText className="h-4 w-4 shrink-0" />
-                                      <span className="max-w-[180px] truncate font-medium">
-                                        {att.name || "Attached document"}
-                                      </span>
-                                      {att.size ? (
-                                        <span className="text-[10px] opacity-70">
-                                          ({(att.size / 1024).toFixed(0)} KB)
-                                        </span>
-                                      ) : null}
-                                      <Download className="ml-auto h-3.5 w-3.5 shrink-0 opacity-80" />
-                                    </a>
-                                  )}
-                                </div>
-                              );
-                            })}
+                  return (
+                    <div key={msg.id} className="space-y-2.5">
+                      {/* Date Divider Pill (e.g. "Today", "Yesterday") */}
+                      {showDateDivider && dateLabel ? (
+                        <div className="my-2.5 flex justify-center">
+                          <span className="rounded-full bg-[#E5ECF0]/85 px-3.5 py-0.5 text-[11px] font-medium text-[#152A51]/75 shadow-2xs">
+                            {dateLabel}
+                          </span>
+                        </div>
+                      ) : null}
+
+                      {/* Joined Chat Center Pill Badge */}
+                      {msg.type === "joined" ? (
+                        <div className="my-2 flex justify-center">
+                          <div className="inline-flex items-center gap-1.5 rounded-full bg-[#E5ECF0] px-4 py-1.5 text-xs font-medium text-[#152A51]/90 shadow-2xs">
+                            <span>
+                              {msg.isSelf
+                                ? "You have joined the chat"
+                                : `${senderName} has joined the chat`}
+                            </span>
                           </div>
-                        ) : null}
-                      </div>
+                        </div>
+                      ) : (
+                        /* Regular Message Bubble */
+                        <div
+                          className={`flex flex-col ${msg.isSelf ? "items-end" : "items-start"}`}
+                        >
+                          <div className="flex items-baseline gap-1.5 text-[11px] text-[#152A51]/60">
+                            <span className="font-semibold text-[#152A51]/85">{senderName}</span>
+                            <span>{timeStr}</span>
+                          </div>
+                          <div
+                            className={`mt-1 max-w-[85%] rounded-2xl px-4 py-2.5 text-sm shadow-xs sm:max-w-md ${
+                              msg.isSelf
+                                ? "rounded-tr-none bg-[#152A51] text-white"
+                                : "rounded-tl-none border border-[#E8EEED] bg-white text-[#152A51]"
+                            }`}
+                          >
+                            <p className="whitespace-pre-wrap leading-relaxed">{msg.body}</p>
+
+                            {/* Attachments rendering */}
+                            {msg.attachments && msg.attachments.length > 0 ? (
+                              <div className="mt-2.5 space-y-2">
+                                {msg.attachments.map((att, idx) => {
+                                  const isPhoto =
+                                    att.type === "photo" ||
+                                    /\.(png|jpe?g|gif|webp)$/i.test(att.name || "");
+                                  return (
+                                    <div key={idx} className="overflow-hidden rounded-xl">
+                                      {isPhoto && att.url ? (
+                                        <a
+                                          href={att.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="block transition hover:opacity-90"
+                                          title={att.name || "View image"}
+                                        >
+                                          <img
+                                            src={att.url}
+                                            alt={att.name || "Attachment"}
+                                            className="max-h-56 max-w-full rounded-lg bg-black/10 object-contain"
+                                          />
+                                        </a>
+                                      ) : (
+                                        <a
+                                          href={att.url || "#"}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          download={att.name || "document"}
+                                          className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs transition ${
+                                            msg.isSelf
+                                              ? "bg-white/15 text-white hover:bg-white/25"
+                                              : "border border-[#E8EEED] bg-[#F9FBFA] text-[#152A51] hover:bg-[#F3F6F6]"
+                                          }`}
+                                        >
+                                          <FileText className="h-4 w-4 shrink-0" />
+                                          <span className="max-w-[180px] truncate font-medium">
+                                            {att.name || "Attached document"}
+                                          </span>
+                                          {att.size ? (
+                                            <span className="text-[10px] opacity-70">
+                                              ({(att.size / 1024).toFixed(0)} KB)
+                                            </span>
+                                          ) : null}
+                                          <Download className="ml-auto h-3.5 w-3.5 shrink-0 opacity-80" />
+                                        </a>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })
@@ -1124,7 +1523,11 @@ export default function QuickbloxConsultationRoom({
               {doctorTyping ? (
                 <div className="flex items-center gap-1.5 text-xs text-[#152A51]/60">
                   <span className="h-1.5 w-1.5 rounded-full bg-[#152A51]/40 animate-pulse" />
-                  <span>Provider is typing…</span>
+                  <span>
+                    {typingUserId
+                      ? `${getSenderDisplayName(typingUserId, false)} is typing…`
+                      : "Provider is typing…"}
+                  </span>
                 </div>
               ) : null}
               <div ref={messagesEndRef} />
