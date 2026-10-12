@@ -17,7 +17,6 @@ import {
   User,
   Info,
   ChevronRight,
-  LogOut,
   Loader2,
   FileText,
   AlertCircle,
@@ -1201,24 +1200,10 @@ export default function QuickbloxConsultationRoom({
             type="button"
             variant="outline"
             onClick={() => setShowDetailsSidebar(!showDetailsSidebar)}
-            className="hidden h-9 items-center gap-1.5 rounded-full border-[#E8EEED] px-3.5 text-xs font-medium text-[#152A51] hover:bg-[#F3F6F6] md:inline-flex"
+            className="h-9 items-center gap-1.5 rounded-full border-[#E8EEED] px-3.5 text-xs font-medium text-[#152A51] hover:bg-[#F3F6F6] inline-flex"
           >
             <Info className="h-3.5 w-3.5 text-[#152A51]/70" />
             <span>{showDetailsSidebar ? "Hide Medical Details" : "View Medical Details"}</span>
-          </Button>
-
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              if (confirm("Are you sure you want to exit the consultation room?")) {
-                router.push("/dashboard");
-              }
-            }}
-            className="h-9 gap-1.5 rounded-full px-3 text-xs font-medium text-[#152A51]/75 hover:bg-[#F3F6F6] hover:text-[#152A51]"
-          >
-            <LogOut className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Exit Room</span>
           </Button>
         </div>
       </header>

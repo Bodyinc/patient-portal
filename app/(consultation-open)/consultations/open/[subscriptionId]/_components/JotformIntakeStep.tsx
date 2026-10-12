@@ -42,6 +42,7 @@ export default function JotformIntakeStep({
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
 
   const completedRef = useRef(false);
+  const iframeLoadedOnceRef = useRef(false);
 
   // Construct Jotform URL with pre-filled parameters
   const jotformUrl = (() => {
@@ -96,14 +97,32 @@ export default function JotformIntakeStep({
       if (completedRef.current || verifying) return;
       setVerifying(true);
       setErrorMessage(null);
-      setStatusMessage("Checking your intake submission status…");
+      setStatusMessage("Intake form submitted! Verifying your responses…");
 
       try {
-        const result = await verifyAndRecordJotformSubmission({
+        if (typeof window !== "undefined") {
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+      } catch {
+        // scrollTo failure is non-critical; ignore
+      }
+
+      try {
+        let result = await verifyAndRecordJotformSubmission({
           subscriptionId,
           appointmentId: sdkConfig.appointmentId,
           submissionId: providedSubId,
         });
+
+        // If not immediately found, wait 1.5s and retry once in case of Jotform API indexing latency
+        if (!result.submitted && !completedRef.current) {
+          await new Promise((r) => setTimeout(r, 1500));
+          result = await verifyAndRecordJotformSubmission({
+            subscriptionId,
+            appointmentId: sdkConfig.appointmentId,
+            submissionId: providedSubId,
+          });
+        }
 
         if (result.ok && result.submitted) {
           completedRef.current = true;
@@ -114,11 +133,11 @@ export default function JotformIntakeStep({
               submissionId: result.submissionId,
               answers: result.answers || [],
             });
-          }, 1200);
+          }, 1500);
         } else {
           setErrorMessage(
             result.message ||
-              "We have not received your submission yet. Please click Submit on the form below.",
+              "We have not received your submission yet. Please complete and submit the form.",
           );
           setStatusMessage(null);
         }
@@ -133,28 +152,63 @@ export default function JotformIntakeStep({
     [subscriptionId, sdkConfig.appointmentId, verifying, onComplete],
   );
 
+  const handleIframeLoad = useCallback(() => {
+    if (!iframeLoadedOnceRef.current) {
+      iframeLoadedOnceRef.current = true;
+      setIframeLoading(false);
+    } else {
+      // Secondary load signifies form submission redirect in Jotform iframe
+      if (!completedRef.current && !verifying) {
+        void handleVerifySubmission();
+      }
+    }
+  }, [handleVerifySubmission, verifying]);
+
   // Listen for Jotform postMessage events from iframe
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
       try {
-        const data = event.data;
+        let data = event.data;
         if (!data) return;
 
+        if (typeof data === "string") {
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed && typeof parsed === "object") {
+              data = parsed;
+            }
+          } catch {
+            // Not JSON
+          }
+        }
+
         // JotForm postMessage patterns:
-        // 1. String "submission-completed" or object with action: "submission-completed"
-        // 2. data.type === "submission-completed" or data.event === "submission-completed"
         const isCompleted =
           data === "submission-completed" ||
-          (typeof data === "string" && data.includes("submission-completed")) ||
+          data === "formSubmitted" ||
+          (typeof data === "string" &&
+            (data.includes("submission-completed") ||
+              data.includes("submissionCompleted") ||
+              data.includes("formSubmitted") ||
+              data.includes("form-submit"))) ||
           (typeof data === "object" &&
+            data !== null &&
             (data.action === "submission-completed" ||
+              data.action === "submissionCompleted" ||
+              data.action === "formSubmitted" ||
+              data.action === "form-submit" ||
               data.type === "submission-completed" ||
-              data.event === "submission-completed"));
+              data.event === "submission-completed" ||
+              data.event === "formSubmitted"));
 
         if (isCompleted && !completedRef.current) {
           const submissionId =
-            typeof data === "object" && typeof data.submissionID === "string"
-              ? data.submissionID
+            typeof data === "object" && data !== null
+              ? typeof data.submissionID === "string"
+                ? data.submissionID
+                : typeof data.submissionId === "string"
+                  ? data.submissionId
+                  : undefined
               : undefined;
           void handleVerifySubmission(submissionId);
         }
@@ -190,7 +244,7 @@ export default function JotformIntakeStep({
                   submissionId: result.submissionId,
                   answers: result.answers || [],
                 });
-              }, 1200);
+              }, 1500);
             }
           } catch {
             // Ignore polling errors
@@ -261,7 +315,7 @@ export default function JotformIntakeStep({
               </div>
             </div>
 
-            <Button
+            {/* <Button
               type="button"
               disabled={verifying || submittedSuccess}
               onClick={() => void handleVerifySubmission()}
@@ -283,7 +337,7 @@ export default function JotformIntakeStep({
                   <ArrowRight className="h-4 w-4" />
                 </>
               )}
-            </Button>
+            </Button> */}
           </div>
 
           {statusMessage ? (
@@ -323,17 +377,68 @@ export default function JotformIntakeStep({
             </div>
           ) : null}
 
+          {/* Loader Overlay when Jotform is submitted / verifying / completed */}
+          {verifying || submittedSuccess ? (
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/95 p-6 text-center backdrop-blur-md">
+              <div className="mx-auto flex max-w-md flex-col items-center justify-center">
+                {/* Loader / Status Graphic */}
+                <div className="relative mb-5 flex items-center justify-center">
+                  {submittedSuccess ? (
+                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 shadow-sm animate-in zoom-in-95 duration-300">
+                      <CheckCircle2 className="h-9 w-9 text-emerald-600" />
+                    </div>
+                  ) : (
+                    <div className="relative flex h-16 w-16 items-center justify-center">
+                      <div className="absolute inset-0 rounded-2xl bg-[#152A51]/10 animate-ping opacity-25" />
+                      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#152A51]/10 text-[#152A51] shadow-xs">
+                        <Loader2 className="h-8 w-8 animate-spin text-[#152A51]" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Primary Text into / below the loader */}
+                <h3 className="text-lg font-bold tracking-tight text-[#152A51] sm:text-xl">
+                  {submittedSuccess ? "Intake Form Submitted & Verified" : "Intake Form Submitted"}
+                </h3>
+
+                {/* Explanatory text below loader */}
+                <p className="mt-2 text-sm leading-relaxed text-[#152A51]/75">
+                  {submittedSuccess
+                    ? "Thank you! Your intake responses have been recorded. Entering your consultation room now…"
+                    : statusMessage ||
+                      "Verifying your intake submission and preparing your consultation room…"}
+                </p>
+
+                {/* Real-time progress indicator badge below loader */}
+                <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-[#E8EEED] bg-white px-4 py-2 text-xs font-medium text-[#152A51] shadow-2xs">
+                  {submittedSuccess ? (
+                    <>
+                      <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>Entering consultation room…</span>
+                    </>
+                  ) : (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-[#152A51]" />
+                      <span>Connecting you with your clinician…</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           <iframe
             src={jotformUrl}
             title="Peptide Therapy Medical Intake Form"
             className="h-full min-h-[750px] w-full flex-1 border-0"
             allow="camera; microphone; geolocation"
-            onLoad={() => setIframeLoading(false)}
+            onLoad={handleIframeLoad}
           />
         </div>
 
         {/* Sticky Action Footer */}
-        <div className="sticky bottom-4 z-10 mt-4 rounded-2xl border border-[#E8EEED] bg-white/95 p-3.5 shadow-lg backdrop-blur-md sm:p-4">
+        {/* <div className="sticky bottom-4 z-10 mt-4 rounded-2xl border border-[#E8EEED] bg-white/95 p-3.5 shadow-lg backdrop-blur-md sm:p-4">
           <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
             <div className="flex items-center gap-2 text-xs text-[#152A51]/75">
               <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -364,7 +469,7 @@ export default function JotformIntakeStep({
               )}
             </Button>
           </div>
-        </div>
+        </div> */}
       </main>
     </div>
   );

@@ -20,6 +20,9 @@ const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR || (isDevCommand ? ".next-dev" : ".next"),
   reactStrictMode: true,
   serverExternalPackages: ["nodemailer"],
+  // nodemailer is in serverExternalPackages so Turbopack never bundles it
+  // on the client. An empty turbopack config silences the webpack-conflict error.
+  turbopack: {},
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.fallback = {
