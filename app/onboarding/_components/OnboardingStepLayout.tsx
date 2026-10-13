@@ -64,8 +64,8 @@ export default function OnboardingStepLayout({
 
   const cardClass = isBare
     ? cn(
-        "border-0 bg-transparent p-0 shadow-none",
-        isCentered ? "shrink-0" : "flex min-h-0 flex-1 flex-col overflow-hidden",
+        "rounded-none border-0 bg-transparent p-0 shadow-none",
+        isCentered ? "shrink-0" : "flex min-h-0 flex-1 flex-col",
       )
     : isCentered
       ? "shrink-0 overflow-hidden rounded-2xl border-[#152A51]/20 p-4 shadow-none sm:p-5"
@@ -76,7 +76,7 @@ export default function OnboardingStepLayout({
       ? "mt-4 sm:mt-10"
       : "mt-3 sm:mt-4"
     : isBare
-      ? "mt-6 min-h-0 flex-1 overflow-y-auto scrollbar-hide sm:mt-8"
+      ? "mt-6 min-h-0 flex-1 overflow-y-auto scrollbar-hide pb-4 sm:mt-8 sm:pb-6"
       : "mt-3 min-h-0 flex-1 overflow-y-auto scrollbar-hide sm:mt-4";
 
   const footer = onContinue ? (
