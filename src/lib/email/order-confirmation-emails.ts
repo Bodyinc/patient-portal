@@ -24,10 +24,12 @@ export function orderConfirmedEmail(params: {
   requiresConsultation: boolean;
   isRefill: boolean;
   myMedsUrl: string;
+  consultationsUrl?: string;
   invoiceUrl?: string | null;
 }): { subject: string; html: string } {
   const amount = formatAmount(params.amountCents, params.currency);
   const heading = params.isRefill ? "Payment and refill confirmed" : "Payment and order confirmed";
+  const consultationsUrl = params.consultationsUrl ?? "https://patient.bodyinc.com/consultations";
 
   const detailRow = (label: string, value: string) =>
     `<tr><td style="padding:6px 0;color:${EMAIL_THEME.navyFaint};">${label}</td><td style="padding:6px 0;text-align:right;font-weight:600;color:${EMAIL_THEME.navy};">${value}</td></tr>`;
@@ -53,6 +55,7 @@ export function orderConfirmedEmail(params: {
     invoiceLink,
     `<p>${nextStepCopy(params.requiresConsultation)}</p>`,
     emailButton("Track my order", params.myMedsUrl),
+    emailButton("Start consultation", consultationsUrl),
   ].join("");
 
   return {

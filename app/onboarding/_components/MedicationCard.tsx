@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { Check, ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -18,6 +18,9 @@ type MedicationCardProps = {
   onSelect?: (id: string, variantId: string | null) => void;
   onViewDetails?: (id: string) => void;
 };
+
+// Hidden for now during signup: keep base dose
+const SHOW_DOSE_SELECTOR = false;
 
 export default function MedicationCard({
   medication,
@@ -103,7 +106,8 @@ export default function MedicationCard({
           {formatFromPrice(displayFromPriceCents)}
         </p>
 
-        {hasVariants ? (
+        {/* Dose selector hidden for now — base dose is kept automatically */}
+        {SHOW_DOSE_SELECTOR && hasVariants ? (
           <div className="min-w-0 w-full pt-0.5" onClick={(e) => e.stopPropagation()}>
             <label className="mb-1.5 block text-[12px] font-normal text-[#152A51]/70">
               Select option

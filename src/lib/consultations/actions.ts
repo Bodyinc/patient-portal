@@ -298,7 +298,7 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
   const [{ data: profile }, { data: intake }] = await Promise.all([
     supabaseAdmin
       .from("profiles")
-      .select("full_name, email, dob, sex, phone")
+      .select("full_name, email, dob, sex, phone, state_code")
       .eq("id", user.id)
       .maybeSingle(),
     supabaseAdmin
@@ -333,7 +333,10 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
   const fullName = profile?.full_name?.trim() || intake?.full_name?.trim() || "Patient";
   const sex = profile?.sex ?? intake?.sex ?? null;
   const phone = profile?.phone?.trim() || intake?.phone?.trim() || null;
-  const stateCode = (intake as { state_code?: string | null })?.state_code || null;
+  const stateCode =
+    (profile as { state_code?: string | null })?.state_code?.trim() ||
+    (intake as { state_code?: string | null })?.state_code?.trim() ||
+    null;
   const heightCm = (intake as { height_cm?: number | null })?.height_cm || null;
   const weightKg = (intake as { weight_kg?: number | null })?.weight_kg || null;
   const medicineName =

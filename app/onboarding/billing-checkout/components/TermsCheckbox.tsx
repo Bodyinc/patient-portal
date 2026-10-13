@@ -21,7 +21,7 @@ export default function TermsCheckbox({ checked, onChange }: TermsCheckboxProps)
       <span className="text-[12px] leading-snug text-[#152A51]/80 sm:text-[13px]">
         I agree to the{" "}
         <a
-          href="/terms"
+          href="https://www.bodyinc.com/terms-of-service"
           target="_blank"
           rel="noopener noreferrer"
           className="font-medium text-[#152A51] underline underline-offset-2"
@@ -31,7 +31,7 @@ export default function TermsCheckbox({ checked, onChange }: TermsCheckboxProps)
         </a>{" "}
         and{" "}
         <a
-          href="https://bodyinc.com/privacy-policy"
+          href="https://www.bodyinc.com/privacy-policy"
           target="_blank"
           rel="noopener noreferrer"
           className="font-medium text-[#152A51] underline underline-offset-2"

@@ -101,11 +101,11 @@ export default function OnboardingStepLayout({
         )}
       >
         <Card className={`mx-auto w-full ${maxWidthClass[maxWidth]} ${cardClass}`}>
-          <div className={cn("shrink-0 onboarding-font", textAlign)}>
+          <div className={cn("shrink-0 onboarding-font pt-1", textAlign)}>
             <h1
               className={cn(
                 isBare
-                  ? "text-[28px] font-medium leading-none tracking-[-0.5px] text-[#152A51] sm:text-[32px]"
+                  ? "text-[28px] font-medium leading-tight sm:leading-snug tracking-[-0.5px] text-[#152A51] sm:text-[32px] pt-1"
                   : "text-lg font-semibold text-[#152A51] sm:text-xl lg:text-2xl",
                 titleClassName,
               )}

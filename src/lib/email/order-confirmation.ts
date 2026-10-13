@@ -186,6 +186,7 @@ export async function sendOrderConfirmationEmail(paymentId: string): Promise<boo
     requiresConsultation: order.requires_consultation,
     isRefill: order.kind !== "initial",
     myMedsUrl: `${appUrl()}/my-meds`,
+    consultationsUrl: `${appUrl()}/consultations`,
     invoiceUrl: invoiceUrlFromRawEvent(payment.raw_event),
   });
 

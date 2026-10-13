@@ -117,7 +117,7 @@ export default function ConsultationsPageClient({ data }: ConsultationsPageClien
                         {isFinished ? (
                           <div className="inline-flex h-[46px] w-full items-center justify-center gap-2 rounded-full border border-[#E8EEED] bg-[#F3F6F6] px-6 text-sm font-medium text-[#152A51]/75 sm:w-fit cursor-default select-none">
                             <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                            <span>Finished</span>
+                            <span>Finished consultation</span>
                           </div>
                         ) : (
                           <Button

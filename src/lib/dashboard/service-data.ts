@@ -10,6 +10,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 import { isQuickbloxConfigured } from "@/lib/consultations/config";
 import { fetchAppointmentStatuses, getCachedClientSession } from "@/lib/consultations/quickblox";
+import { readQbClientSession } from "@/lib/consultations/session-cookie";
 
 import type { DashboardGoalDto, DashboardPageDataDto, DashboardTreatmentDto } from "./types";
 
@@ -161,7 +162,7 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
       fetchClaimedIntakeExtras(userId),
       supabaseAdmin
         .from("medication_requests")
-        .select("subscription_id, medicine_id, status, created_at")
+        .select("id, subscription_id, medicine_id, status, created_at")
         .eq("user_id", userId)
         .order("created_at", { ascending: false }),
     ]);
@@ -226,11 +227,35 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
     if (visit?.qb_appointment_id) {
       consultationStatus = visit.ended_at ? "closed" : "open";
       if (isQuickbloxConfigured()) {
-        const clientToken = getCachedClientSession(userId, currentMed.subscriptionId)?.token;
+        const clientToken =
+          getCachedClientSession(userId, currentMed.subscriptionId)?.token ??
+          (await readQbClientSession(userId, currentMed.subscriptionId))?.token;
         const live = (
           await fetchAppointmentStatuses([visit.qb_appointment_id], { clientToken })
         ).get(visit.qb_appointment_id);
         if (live) consultationStatus = live.open ? "open" : "closed";
+      }
+    }
+
+    // Also check if provider/doctor completed the visit via medication_request_events
+    if (consultationStatus !== "closed" && currentMed.subscriptionId) {
+      const matchingReq = requests.find((r) => r.subscription_id === currentMed.subscriptionId);
+      if (matchingReq?.id) {
+        const { data: events } = await supabaseAdmin
+          .from("medication_request_events")
+          .select("note, status")
+          .eq("request_id", matchingReq.id);
+        const hasCompletedEvent = (events ?? []).some((ev) => {
+          const note = (ev.note ?? "").toLowerCase();
+          const status = (ev.status ?? "").toLowerCase();
+          return (
+            note.includes("consultation completed") ||
+            note.includes("consultation finished") ||
+            status === "consultation_completed" ||
+            status === "consultation_finished"
+          );
+        });
+        if (hasCompletedEvent) consultationStatus = "closed";
       }
     }
   }

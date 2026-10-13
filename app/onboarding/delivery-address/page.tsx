@@ -380,13 +380,13 @@ export default function DeliveryAddressPage() {
               onCheckedChange={(checked) => setField("smsConsent", checked === true)}
             />
             <span>
-              I consent to receive SMS/text messages related to my care, including appointment
-              reminders, intake updates, account notifications, and care-related communications from
-              OpenLoop on behalf of Fridays Health. I acknowledge that using these communication
-              methods presents a potential security risk of unauthorized access to protected health
-              information (PHI), and I accept this risk and consent to receiving communications
-              through these methods. I understand that message and data rates may apply and that I
-              can opt out of receiving SMS messages at any time by replying STOP.
+              I consent to receive SMS/text messages from Body Inc. and its healthcare providers
+              related to my care, including appointment reminders, intake updates, account
+              notifications, and other care-related communications. I acknowledge that these
+              communication methods may present a potential security risk of unauthorized access to
+              protected health information (PHI), and I accept this risk and consent to receive
+              communications through these methods. Message and data rates may apply. I can opt out
+              of receiving SMS messages at any time by replying STOP.
               <span className={cn("font-semibold", fieldRequiredMarkClass)}> *</span>
             </span>
           </label>
@@ -398,19 +398,18 @@ export default function DeliveryAddressPage() {
               onCheckedChange={(checked) => setField("marketingConsent", checked === true)}
             />
             <span>
-              I&apos;d also like to receive occasional promotions via call and text message. Opt out
-              anytime.
+              I would also like to receive occasional promotional messages via text message. I can
+              opt out at any time.
             </span>
           </label>
         </div>
 
         <p className="text-[11px] leading-relaxed text-[#152A51]/50">
-          By checking the option &quot;I&apos;d also like to receive occasional promotions via text
-          message. Opt out anytime.&quot;, I agree to receive marketing text messages from Fridays
-          Health at the number provided above. Messages &amp; calls may use an automatic telephone
-          dialing system. Consent is not required as a condition of purchase. Message and data rates
-          may apply. Message frequency varies. Send HELP for help or STOP to cancel. Messages &amp;
-          calls may include shopping cart reminders.
+          By checking the option to receive occasional promotional text messages, I agree to receive
+          marketing text messages from Body Inc. at the phone number provided. Messages may be sent
+          using an automatic telephone dialing system. Consent is not required as a condition of
+          purchase. Message and data rates may apply. Message frequency varies. Reply HELP for help
+          or STOP to cancel. Messages may include shopping cart reminders.
         </p>
       </div>
     </OnboardingStepLayout>

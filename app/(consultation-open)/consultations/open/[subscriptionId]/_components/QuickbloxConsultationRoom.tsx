@@ -33,6 +33,7 @@ import type {
   QuickbloxSdkConfig,
 } from "@/lib/consultations/types";
 import { recordConsultationFinished } from "@/lib/consultations/actions";
+import { getStateName } from "@/lib/profile/us-states";
 
 type QuickbloxConsultationRoomProps = {
   subscriptionId: string;
@@ -1726,7 +1727,14 @@ export default function QuickbloxConsultationRoom({
                       </div>
                       <div className="pt-2">
                         <span className="text-[#152A51]/60">State / Region</span>
-                        <p className="font-medium text-[#152A51]">{patientData.stateCode || "—"}</p>
+                        <p className="font-medium text-[#152A51]">
+                          {patientData.stateCode
+                            ? getStateName(patientData.stateCode) &&
+                              getStateName(patientData.stateCode) !== patientData.stateCode
+                              ? `${getStateName(patientData.stateCode)} (${patientData.stateCode.toUpperCase()})`
+                              : patientData.stateCode.toUpperCase()
+                            : "—"}
+                        </p>
                       </div>
                       <div className="pt-2">
                         <span className="text-[#152A51]/60">Consultation Plan</span>

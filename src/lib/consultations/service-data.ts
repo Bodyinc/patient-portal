@@ -12,6 +12,7 @@ import {
   fetchAppointmentStatuses,
   getCachedClientSession,
 } from "./quickblox";
+import { readQbClientSession } from "./session-cookie";
 import type { ConsultationPlanState, ConsultationsPageData } from "./types";
 
 function toPatientId(userId: string) {
@@ -34,22 +35,24 @@ export async function hasCompletedOnboarding(userId: string): Promise<boolean> {
 }
 
 export async function fetchConsultationsPageData(userId: string): Promise<ConsultationsPageData> {
-  const [identity, onboardingComplete, subsResult, consultsResult] = await Promise.all([
-    getPatientDisplayIdentity(userId),
-    hasCompletedOnboarding(userId),
-    supabaseAdmin
-      .from("subscriptions")
-      .select("id, status, created_at, medicines(name, image_url), packages(duration_months)")
-      .eq("user_id", userId)
-      .in("status", [...ELIGIBLE_SUBSCRIPTION_STATUSES])
-      .order("created_at", { ascending: false }),
-    supabaseAdmin
-      .from("patient_consultations")
-      .select(
-        "id, subscription_id, started_at, ended_at, qb_appointment_id, form_submitted, form_submission_id, form_submitted_at",
-      )
-      .eq("user_id", userId),
-  ]);
+  const [identity, onboardingComplete, subsResult, consultsResult, requestsResult] =
+    await Promise.all([
+      getPatientDisplayIdentity(userId),
+      hasCompletedOnboarding(userId),
+      supabaseAdmin
+        .from("subscriptions")
+        .select("id, status, created_at, medicines(name, image_url), packages(duration_months)")
+        .eq("user_id", userId)
+        .in("status", [...ELIGIBLE_SUBSCRIPTION_STATUSES])
+        .order("created_at", { ascending: false }),
+      supabaseAdmin
+        .from("patient_consultations")
+        .select(
+          "id, subscription_id, started_at, ended_at, qb_appointment_id, form_submitted, form_submission_id, form_submitted_at",
+        )
+        .eq("user_id", userId),
+      supabaseAdmin.from("medication_requests").select("id, subscription_id").eq("user_id", userId),
+    ]);
 
   if (subsResult.error) throw new Error(subsResult.error.message);
 
@@ -87,10 +90,40 @@ export async function fetchConsultationsPageData(userId: string): Promise<Consul
         : null,
   }));
 
+  // Check if provider/doctor completed the visit via medication_request_events
+  const requestIds = (requestsResult.data ?? []).map((r) => r.id);
+  const completedEventsBySub = new Map<string, string>(); // subscription_id -> completed_at
+  if (requestIds.length > 0) {
+    const { data: events } = await supabaseAdmin
+      .from("medication_request_events")
+      .select("request_id, note, status, created_at")
+      .in("request_id", requestIds)
+      .order("created_at", { ascending: false });
+
+    const subByReqId = new Map((requestsResult.data ?? []).map((r) => [r.id, r.subscription_id]));
+
+    for (const ev of events ?? []) {
+      const subId = subByReqId.get(ev.request_id);
+      if (!subId || completedEventsBySub.has(subId)) continue;
+      const note = (ev.note ?? "").toLowerCase();
+      const status = (ev.status ?? "").toLowerCase();
+      if (
+        note.includes("consultation completed") ||
+        note.includes("consultation finished") ||
+        status === "consultation_completed" ||
+        status === "consultation_finished"
+      ) {
+        completedEventsBySub.set(subId, ev.created_at);
+      }
+    }
+  }
+
   const clientTokens: string[] = [];
   if (isQuickbloxConfigured()) {
     for (const row of consultRows) {
-      let token = getCachedClientSession(userId, row.subscription_id)?.token;
+      let token =
+        getCachedClientSession(userId, row.subscription_id)?.token ??
+        (await readQbClientSession(userId, row.subscription_id))?.token;
       if (!token && !row.ended_at && row.qb_appointment_id) {
         try {
           const session = await ensureQuickbloxClient({
@@ -138,13 +171,12 @@ export async function fetchConsultationsPageData(userId: string): Promise<Consul
   const startedBySub = new Map(
     consultRows.map((row) => {
       const live = qbStatus.get(row.qb_appointment_id);
-      const visitStatus: "open" | "closed" = row.ended_at
-        ? "closed"
-        : live
-          ? live.open
-            ? "open"
-            : "closed"
-          : "open";
+      const eventCompletedAt = completedEventsBySub.get(row.subscription_id) ?? null;
+      const isEnded = Boolean(
+        row.ended_at || eventCompletedAt || (live && (!live.open || Boolean(live.dateEnd))),
+      );
+      const visitStatus: "open" | "closed" = isEnded ? "closed" : "open";
+      const endedAt = row.ended_at || eventCompletedAt || live?.dateEnd || null;
       const hasFormSubmission = Boolean(
         row.form_submitted ||
         row.form_submission_id ||
@@ -155,7 +187,7 @@ export async function fetchConsultationsPageData(userId: string): Promise<Consul
         row.subscription_id,
         {
           startedAt: row.started_at,
-          endedAt: row.ended_at,
+          endedAt,
           visitStatus,
           hasFormSubmission,
           formSubmissionId: row.form_submission_id || live?.formSubmissionId || null,
@@ -168,15 +200,23 @@ export async function fetchConsultationsPageData(userId: string): Promise<Consul
     const medicine = (subscription as { medicines?: EmbeddedMedicine }).medicines ?? null;
     const pkg = (subscription as { packages?: EmbeddedPackage }).packages ?? null;
     const started = startedBySub.get(subscription.id);
+    const eventCompletedAt = completedEventsBySub.get(subscription.id) ?? null;
+    const isFinished =
+      started?.visitStatus === "closed" || Boolean(started?.endedAt) || Boolean(eventCompletedAt);
+    const visitStatus: "open" | "closed" | null = isFinished
+      ? "closed"
+      : (started?.visitStatus ?? null);
+    const endedAt = started?.endedAt || eventCompletedAt || null;
     const hasFormSubmission = Boolean(started?.hasFormSubmission);
+
     return {
       subscriptionId: subscription.id,
       medicineName: medicine?.name ?? "Treatment plan",
       planLabel: pkg ? planTitleFromDuration(pkg.duration_months) : null,
       imageSrc: resolveMedicineImageSrc(medicine?.image_url ?? null),
       startedAt: started?.startedAt ?? null,
-      endedAt: started?.endedAt ?? null,
-      visitStatus: started?.visitStatus ?? null,
+      endedAt,
+      visitStatus,
       hasFormSubmission,
       formSubmissionId: started?.formSubmissionId || null,
     };
