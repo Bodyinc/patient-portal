@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ArrowRight, CheckCircle2 } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { formatPortalDate } from "@/lib/date-format";
@@ -138,11 +138,12 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
                 Please answer all questions to the best of your ability.
               </p>
               <div className="mt-auto pt-5">
-                {data.latestOrderClosed ? null : consultationStatus === "closed" ? (
-                  <div className="inline-flex h-[46px] w-full items-center justify-center gap-2 rounded-full border border-[#E8EEED] bg-[#F3F6F6] px-6 text-sm font-medium text-[#152A51]/75 sm:w-fit cursor-default select-none">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                    <span>Appointment finished</span>
-                  </div>
+                {data.latestOrderClosed ? null : consultationStatus === "closed" &&
+                  data.treatment?.subscriptionId ? (
+                  <DashboardConsultationButton
+                    subscriptionId={data.treatment.subscriptionId}
+                    label="Open consultation"
+                  />
                 ) : (
                   <Button
                     asChild
@@ -212,17 +213,12 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
                     label="Start consultation"
                   />
                 ) : null}
-                {showConsultationCta && consultationStatus === "open" ? (
+                {showConsultationCta &&
+                (consultationStatus === "open" || consultationStatus === "closed") ? (
                   <DashboardConsultationButton
                     subscriptionId={data.treatment.subscriptionId!}
                     label="Open consultation"
                   />
-                ) : null}
-                {showConsultationCta && consultationStatus === "closed" ? (
-                  <div className="inline-flex h-[46px] shrink-0 items-center justify-center gap-2 rounded-full border border-[#E8EEED] bg-[#F3F6F6] px-5 text-sm font-medium text-[#152A51]/75 cursor-default select-none">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                    <span>Appointment finished</span>
-                  </div>
                 ) : null}
                 {canRefill ? (
                   <button

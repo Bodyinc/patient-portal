@@ -39,6 +39,7 @@ type QuickbloxConsultationRoomProps = {
   subscriptionId: string;
   sdkConfig: QuickbloxSdkConfig;
   patientData: PatientConsultationData;
+  isFinished?: boolean;
   onFinish?: () => void;
 };
 
@@ -289,6 +290,7 @@ export default function QuickbloxConsultationRoom({
   subscriptionId,
   sdkConfig,
   patientData,
+  isFinished = false,
   onFinish,
 }: QuickbloxConsultationRoomProps) {
   const router = useRouter();
@@ -1208,6 +1210,20 @@ export default function QuickbloxConsultationRoom({
           </Button>
         </div>
       </header>
+
+      {isFinished && (
+        <div className="flex h-11 shrink-0 items-center justify-between border-b border-emerald-200 bg-emerald-50 px-4 sm:px-6 text-xs text-emerald-900 font-medium">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+            <span>
+              Consultation appointment concluded. You can continue chatting with your provider.
+            </span>
+          </div>
+          <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-800">
+            Concluded
+          </span>
+        </div>
+      )}
 
       {/* Main Container: Chat / Video Area (Left) + Patient Details Sidebar (Right) */}
       <div className="flex flex-1 overflow-hidden">

@@ -51,8 +51,6 @@ export default function OpenConsultationView({ subscriptionId }: OpenConsultatio
           subscriptionId,
           appointmentId: result.appointmentId,
         });
-        router.replace("/dashboard");
-        return;
       }
 
       if (result.sdkConfig) {
@@ -93,7 +91,6 @@ export default function OpenConsultationView({ subscriptionId }: OpenConsultatio
             subscriptionId,
             appointmentId: res.appointmentId,
           });
-          router.replace("/dashboard");
         }
       } catch (e) {
         console.warn("[OpenConsultationView] Lifecycle check error:", e);
@@ -173,28 +170,7 @@ export default function OpenConsultationView({ subscriptionId }: OpenConsultatio
     );
   }
 
-  // 3. Finished Consultation State
-  if (isFinished) {
-    return (
-      <div className="flex min-h-[500px] w-full flex-1 flex-col items-center justify-center bg-[#F9FBFA] p-4 text-[#152A51] sm:p-6">
-        <div className="flex w-full max-w-md flex-col items-center justify-center rounded-3xl border border-[#E8EEED] bg-white p-6 text-center shadow-xs sm:p-8">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
-            <CheckCircle2 className="h-8 w-8" />
-          </div>
-          <h2 className="mt-4 text-xl font-bold tracking-tight text-[#152A51]">
-            Consultation Concluded
-          </h2>
-          <p className="mt-2 text-sm leading-relaxed text-[#152A51]/75">
-            Your appointment has been finished by your provider. Redirecting to your dashboard…
-          </p>
-          <div className="mt-6 flex items-center justify-center gap-2 text-xs text-[#152A51]/60">
-            <Loader2 className="h-4 w-4 animate-spin text-[#152A51]" />
-            <span>Exiting consultation room…</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Consultation finished state is rendered inline in QuickbloxConsultationRoom so chat remains available
 
   // 4. Missing Config State
   if (!sdkConfig || !patientData) {
@@ -232,9 +208,9 @@ export default function OpenConsultationView({ subscriptionId }: OpenConsultatio
       subscriptionId={subscriptionId}
       sdkConfig={sdkConfig}
       patientData={patientData}
+      isFinished={isFinished}
       onFinish={() => {
         setIsFinished(true);
-        router.replace("/dashboard");
       }}
     />
   );
