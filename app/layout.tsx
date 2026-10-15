@@ -1,9 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import { DM_Sans } from "next/font/google";
 
 import { Providers } from "./providers";
-import { ServiceWorkerCleanup } from "./service-worker-cleanup";
+import { PwaRegister } from "./pwa-register";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -38,14 +38,27 @@ export const metadata: Metadata = {
     template: "%s · BodyInc Patient Portal",
   },
   description: "Access your BodyInc patient account, appointments, and care plan.",
+  applicationName: "BodyInc",
+  appleWebApp: {
+    capable: true,
+    title: "BodyInc",
+    statusBarStyle: "default",
+  },
   icons: {
     icon: [
-      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
       { url: "/fevicone.svg", type: "image/svg+xml" },
     ],
-    shortcut: "/fevicone.svg",
-    apple: "/fevicone.svg",
+    shortcut: "/icons/icon-192.png",
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#152A51",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -63,7 +76,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Script id="benign-error-guard" strategy="beforeInteractive">
           {benignErrorGuardScript}
         </Script>
-        <ServiceWorkerCleanup />
+        <PwaRegister />
         <Providers>{children}</Providers>
       </body>
     </html>
