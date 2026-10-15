@@ -44,10 +44,18 @@ import {
 
 const addressSchema = z
   .object({
-    streetAddress: z.string().trim().min(1, "Enter your address"),
-    apartment: z.string().trim().min(1, "Enter your apartment number"),
+    streetAddress: z
+      .string()
+      .trim()
+      .min(1, "Enter your address")
+      .max(255, "Enter a shorter address"),
+    apartment: z
+      .string()
+      .trim()
+      .min(1, "Enter your apartment number")
+      .max(60, "Enter a shorter apartment number"),
     postalCode: ZIP_CODE_SCHEMA,
-    city: z.string().trim().min(1, "Enter your city"),
+    city: z.string().trim().min(1, "Enter your city").max(120, "Enter a shorter city"),
     phone: z.string().trim(),
     phoneCountryCode: PHONE_COUNTRY_CODE_SCHEMA,
     billingSameAsShipping: z.boolean(),

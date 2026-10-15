@@ -22,10 +22,10 @@ import type { Tables } from "@/lib/supabase/types";
 // must stay in sync, and only the OTP-verified change flow (changeCheckoutEmail →
 // reconcileCheckoutEmail) may move it. Editing profiles.email directly would desync the two.
 const profileUpdateSchema = z.object({
-  fullName: z.string().trim().min(1).max(120),
+  fullName: z.string().trim().min(1, "Enter your full name").max(120, "Enter a shorter name"),
   phone: PHONE_SCHEMA,
   dob: OPTIONAL_DOB_SCHEMA,
-  sex: z.enum(["male", "female", "other"]).nullable(),
+  sex: z.enum(["male", "female", "other"], { error: "Select your sex" }).nullable(),
   stateCode: z.string().trim().max(2).optional().or(z.literal("")),
   streetAddress: z.string().trim().max(255).optional().or(z.literal("")),
   apartment: z.string().trim().max(60).optional().or(z.literal("")),
@@ -163,7 +163,7 @@ export async function updateMyProfile(
     return {
       ok: false,
       code: "invalid_input",
-      message: parsed.error.issues[0]?.message ?? "Invalid input.",
+      message: parsed.error.issues[0]?.message ?? "Please complete the required fields",
     };
   }
 

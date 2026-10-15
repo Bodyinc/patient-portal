@@ -1,6 +1,7 @@
 import "server-only";
 
 import nodemailer from "nodemailer";
+import { EMAIL_TRANSPORT_HINT } from "./transport";
 import type { Transporter } from "nodemailer";
 import type SMTPTransport from "nodemailer/lib/smtp-transport";
 
@@ -9,6 +10,13 @@ const BREVO_SMTP_PORT = 587;
 const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
 
 let transporter: Transporter | null = null;
+let transportWarningLogged = false;
+
+function warnTransportOnce(detail?: string) {
+  if (transportWarningLogged) return;
+  transportWarningLogged = true;
+  console.warn(`[email] ${detail ?? EMAIL_TRANSPORT_HINT}`);
+}
 // Cache key, so editing the SMTP credentials in .env rebuilds the transport instead of
 // reusing a connection pool still bound to the old (rejected) login.
 let transporterAuth: string | null = null;
@@ -62,8 +70,8 @@ function smtpAuth(): { user: string; pass: string } | null {
   if (!login || !pass) return null;
   // The host is hardcoded above. Using it as the username always 535s and can stall serverless.
   if (login === BREVO_SMTP_HOST || /smtp-relay\.brevo\.com/i.test(login)) {
-    console.error(
-      "[email] BREVO_SMTP_LOGIN is the relay host, not the SMTP login. Use the Login value from Brevo → SMTP & API → SMTP (looks like xxx@smtp-brevo.com).",
+    warnTransportOnce(
+      "BREVO_SMTP_LOGIN is the relay host, not the SMTP login. Use the Login value from Brevo → SMTP & API → SMTP (…@smtp-brevo.com).",
     );
     return null;
   }
@@ -110,13 +118,11 @@ export async function sendTransactionalEmail(params: {
   const smtp = smtpAuth();
 
   if (!from) {
-    console.warn(`[email] EMAIL_FROM not set — skipped "${params.subject}" to ${params.to}`);
+    warnTransportOnce("EMAIL_FROM not set — outgoing mail is skipped.");
     return false;
   }
   if (!apiKey && !smtp) {
-    console.warn(
-      `[email] set BREVO_API_KEY (preferred) or BREVO_SMTP_LOGIN + BREVO_SMTP_KEY — skipped "${params.subject}" to ${params.to}`,
-    );
+    warnTransportOnce();
     return false;
   }
 

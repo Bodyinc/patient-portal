@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 import { fieldControlClass } from "../../_lib/onboarding-theme";
 
 type OrderSummaryProps = {
@@ -17,6 +19,7 @@ type OrderSummaryProps = {
   promoError: string | null;
   applyingPromo: boolean;
   loading?: boolean;
+  consultationFeeCents?: number;
   renewalShippingCents?: number;
   onPromoCodeChange: (value: string) => void;
   onApplyPromo: () => void;
@@ -26,29 +29,23 @@ function formatMoney(amount: number) {
   return `$${amount.toFixed(2)}`;
 }
 
-function PricePair({
-  original,
-  final,
-  finalClassName,
-}: {
-  original: number;
-  final: number;
-  finalClassName?: string;
-}) {
-  if (original <= final) {
-    return <span className={finalClassName}>{formatMoney(final)}</span>;
-  }
-
+function SummaryRow({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <span className="flex items-end gap-3">
-      <span className="flex flex-col items-end gap-0.5">
-        <span className="text-[12px] font-bold leading-none text-[#152A51]/70">Original price</span>
-        <span className="text-[16px] font-bold leading-none text-[#152A51]/70 line-through sm:text-[17px]">
-          {formatMoney(original)}
-        </span>
-      </span>
-      <span className={finalClassName}>{formatMoney(final)}</span>
-    </span>
+    <div className="flex items-center justify-between gap-3">
+      <span>{label}</span>
+      <span className="flex items-center gap-2">{children}</span>
+    </div>
+  );
+}
+
+function WaivedFee({ cents }: { cents: number }) {
+  return (
+    <>
+      {cents > 0 ? (
+        <span className="text-[#152A51]/45 line-through">{formatMoney(cents / 100)}</span>
+      ) : null}
+      <span className="font-medium text-[#34845F]">FREE</span>
+    </>
   );
 }
 
@@ -57,75 +54,61 @@ export default function OrderSummary({
   planLabel,
   medicationTotal,
   medicationOriginalTotal,
-  subtotal,
   discount,
   discountLabel,
   total,
-  totalSavings,
   promoCode,
   promoMessage,
   promoError,
   applyingPromo,
   loading = false,
+  consultationFeeCents = 0,
   renewalShippingCents = 0,
   onPromoCodeChange,
   onApplyPromo,
 }: OrderSummaryProps) {
+  const planSavings = Math.max(0, medicationOriginalTotal - medicationTotal);
+  const showOriginal = planSavings > 0 || discount > 0;
+  const youSave = planSavings + discount + (consultationFeeCents + renewalShippingCents) / 100;
+
   return (
     <div className="h-fit w-full rounded-[14px] border border-[#E8E8E8] bg-white p-4 onboarding-font sm:p-5">
-      <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[#E8E8E8] pb-3">
-        <h2 className="text-[16px] font-medium text-[#152A51] sm:text-[18px]">Order Summary</h2>
-        {!loading ? (
-          <PricePair
-            original={medicationOriginalTotal}
-            final={medicationTotal}
-            finalClassName="text-[18px] font-medium tracking-[-0.5px] text-[#152A51] sm:text-[20px]"
-          />
-        ) : (
-          <span className="text-[18px] font-medium text-[#152A51]">—</span>
-        )}
-      </div>
+      <h2 className="border-b border-[#E8E8E8] pb-3 text-[16px] font-medium text-[#152A51] sm:text-[18px]">
+        Order Summary
+      </h2>
 
       <div className="py-3">
-        <div className="flex justify-between gap-3">
-          <div className="min-w-0">
-            <p className="truncate text-[14px] font-medium text-[#152A51]">{medicationName}</p>
-            <p className="truncate text-[12px] text-[#152A51]/70">{planLabel}</p>
-          </div>
-          <div className="shrink-0 text-right">
-            {loading ? (
-              <p className="text-[14px] font-medium text-[#152A51]">—</p>
-            ) : (
-              <p className="text-[14px] font-medium text-[#152A51]">
-                {formatMoney(medicationTotal)}
-              </p>
-            )}
-          </div>
+        <div className="min-w-0">
+          <p className="truncate text-[14px] font-medium text-[#152A51]">{medicationName}</p>
+          <p className="truncate text-[12px] text-[#152A51]/70">{planLabel}</p>
         </div>
 
         <div className="mt-4 space-y-2 border-t border-[#E8E8E8] pt-4 text-[14px] text-[#152A51]">
-          <div className="flex justify-between">
-            <span>Subtotal</span>
-            <span>{loading ? "—" : formatMoney(subtotal)}</span>
-          </div>
-          {discount > 0 && (
-            <div className="flex justify-between text-[#34845F]">
-              <span>Discount ({discountLabel ?? "Promo"})</span>
-              <span>-{formatMoney(discount)}</span>
-            </div>
-          )}
-          <div className="flex justify-between">
-            <span>Consultation fee</span>
-            <span className="font-medium text-[#34845F]">FREE</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Shipping</span>
-            <span className="font-medium text-[#34845F]">FREE</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Tax</span>
-            <span>$0.00</span>
-          </div>
+          {loading ? (
+            <SummaryRow label="Original price">—</SummaryRow>
+          ) : showOriginal ? (
+            <SummaryRow label="Original price">{formatMoney(medicationOriginalTotal)}</SummaryRow>
+          ) : null}
+
+          {!loading && planSavings > 0 ? (
+            <SummaryRow label="Discount">
+              <span className="font-medium text-[#34845F]">-{formatMoney(planSavings)}</span>
+            </SummaryRow>
+          ) : null}
+
+          {!loading && discount > 0 ? (
+            <SummaryRow label={discountLabel ? `Promo (${discountLabel})` : "Promo"}>
+              <span className="font-medium text-[#34845F]">-{formatMoney(discount)}</span>
+            </SummaryRow>
+          ) : null}
+
+          <SummaryRow label="Consultation fee">
+            <WaivedFee cents={consultationFeeCents} />
+          </SummaryRow>
+          <SummaryRow label="Shipping">
+            <WaivedFee cents={renewalShippingCents} />
+          </SummaryRow>
+          <SummaryRow label="Tax">$0.00</SummaryRow>
         </div>
 
         {renewalShippingCents > 0 && (
@@ -139,23 +122,15 @@ export default function OrderSummary({
         <div className="mt-5 flex items-end justify-between border-t border-[#E8E8E8] pt-4">
           <div>
             <p className="text-[15px] font-medium text-[#152A51]">Total Due Today</p>
-            {!loading && totalSavings > 0 ? (
+            {!loading && youSave > 0 ? (
               <p className="mt-1 text-[12px] font-medium text-[#34845F]">
-                Total savings {formatMoney(totalSavings)}
+                You save {formatMoney(youSave)}
               </p>
             ) : null}
           </div>
-          <div className="text-right">
-            {loading ? (
-              <p className="text-[22px] font-medium tracking-[-0.5px] text-[#152A51] sm:text-[24px]">
-                —
-              </p>
-            ) : (
-              <p className="text-[22px] font-medium tracking-[-0.5px] text-[#152A51] sm:text-[24px]">
-                {formatMoney(total)}
-              </p>
-            )}
-          </div>
+          <p className="text-[22px] font-medium tracking-[-0.5px] text-[#152A51] sm:text-[24px]">
+            {loading ? "—" : formatMoney(total)}
+          </p>
         </div>
 
         <div className="mt-5">

@@ -246,28 +246,45 @@ async function enrichBillingPayments(
   const packageIds = [
     ...new Set(payments.map((payment) => payment.plan_id).filter(Boolean)),
   ] as string[];
+  const paymentIds = payments.map((payment) => payment.id);
 
-  const [{ data: subscriptions }, { data: packages }, { data: additionalPays }] = await Promise.all(
-    [
-      subscriptionIds.length
-        ? supabaseAdmin
-            .from("subscriptions")
-            .select("stripe_subscription_id, medicine_id, package_id, medicines(name)")
-            .in("stripe_subscription_id", subscriptionIds)
-        : Promise.resolve({ data: [] }),
-      packageIds.length
-        ? supabaseAdmin
-            .from("packages")
-            .select("id, name, duration_months, medicine_variants(name)")
-            .in("id", packageIds)
-        : Promise.resolve({ data: [] }),
-      supabaseAdmin
-        .from("additional_payments")
-        .select("stripe_payment_intent_id, reason, to_package_id, request_id, amount_cents")
-        .eq("user_id", userId)
-        .in("status", ["paid", "pending"]),
-    ],
-  );
+  const [
+    { data: subscriptions },
+    { data: packages },
+    { data: additionalPays },
+    { data: linkedRequests },
+  ] = await Promise.all([
+    subscriptionIds.length
+      ? supabaseAdmin
+          .from("subscriptions")
+          .select("stripe_subscription_id, medicine_id, package_id, medicines(name)")
+          .in("stripe_subscription_id", subscriptionIds)
+      : Promise.resolve({ data: [] }),
+    packageIds.length
+      ? supabaseAdmin
+          .from("packages")
+          .select("id, name, duration_months, medicine_variants(name)")
+          .in("id", packageIds)
+      : Promise.resolve({ data: [] }),
+    supabaseAdmin
+      .from("additional_payments")
+      .select("stripe_payment_intent_id, reason, to_package_id, request_id, amount_cents")
+      .eq("user_id", userId)
+      .in("status", ["paid", "pending"]),
+    paymentIds.length
+      ? supabaseAdmin
+          .from("medication_requests")
+          .select("id, payment_id")
+          .in("payment_id", paymentIds)
+      : Promise.resolve({ data: [] as { id: string; payment_id: string | null }[] }),
+  ]);
+
+  const requestIdByPaymentId = new Map<string, string>();
+  for (const row of linkedRequests ?? []) {
+    if (row.payment_id && !requestIdByPaymentId.has(row.payment_id)) {
+      requestIdByPaymentId.set(row.payment_id, row.id);
+    }
+  }
 
   const addPays = (additionalPays ?? []) as AdditionalPayLookup[];
   const addPayByIntent = new Map(
@@ -445,9 +462,11 @@ async function enrichBillingPayments(
           : "—";
     const { invoiceUrl, invoicePdfUrl } = parseInvoiceUrls(payment.raw_event);
 
+    const requestId = addPay?.request_id ?? requestIdByPaymentId.get(payment.id);
+
     return {
       id: payment.id,
-      orderNumber: formatOrderId(payment.id),
+      orderNumber: formatOrderId(requestId ?? payment.id),
       date: payment.created_at,
       description,
       subscriptionName,

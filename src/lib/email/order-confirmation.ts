@@ -7,6 +7,7 @@ import { sendOnce, wasEmailSent, markEmailSent } from "./idempotency";
 import { orderConfirmedEmail } from "./order-confirmation-emails";
 import { appUrl, patientEmailByUserId } from "./recipients";
 import { sendTransactionalEmail } from "./send";
+import { sendPushToUser } from "@/lib/push/send";
 
 const REMINDER_TYPE = "order_confirmation";
 
@@ -196,9 +197,17 @@ export async function sendOrderConfirmationEmail(paymentId: string): Promise<boo
     await markEmailSent(REMINDER_TYPE, payment.id);
     return false;
   }
-  return sendOnce(REMINDER_TYPE, payment.id, () =>
+  const sent = await sendOnce(REMINDER_TYPE, payment.id, () =>
     sendTransactionalEmail({ to: recipient.email, subject, html }),
   );
+  if (sent && order.user_id) {
+    await sendPushToUser(order.user_id, {
+      title: "Order confirmed",
+      body: `${labels.medicineName} · ${formatOrderId(order.id)}`,
+      url: order.requires_consultation ? "/consultations" : "/my-meds",
+    }).catch((error) => console.error("[push] order confirmation failed:", error));
+  }
+  return sent;
 }
 
 /** Retry confirmations that were skipped because the order row was not ready yet. */

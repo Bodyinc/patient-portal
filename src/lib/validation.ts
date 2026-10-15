@@ -55,6 +55,10 @@ export function isValidDob(dob: string): boolean {
 // same problem as being under 18 ("at least 18"), so an age like 226 (year 1800) no longer
 // reports "You must be at least 18 years old".
 function refineDob(v: string, ctx: z.RefinementCtx) {
+  if (!v.trim()) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Enter your date of birth" });
+    return;
+  }
   const age = ageFromDob(v);
   // null = malformed; <0 = future date; >max = implausibly old. All are "not a valid DOB",
   // distinct from a real-but-under-18 date.

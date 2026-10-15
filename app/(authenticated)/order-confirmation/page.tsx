@@ -5,7 +5,11 @@ import { requirePatientSession } from "@/lib/auth/require-patient";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { reconcileLatestSubscriptionForUser } from "@/lib/stripe/reconcile";
 import { calculateCheckoutPricing } from "../../onboarding/_lib/intake-pricing";
-import { getPlatformSettings, effectiveShippingCents } from "@/lib/settings/platform-settings";
+import {
+  getPlatformSettings,
+  effectiveConsultationCents,
+  effectiveShippingCents,
+} from "@/lib/settings/platform-settings";
 
 export default async function OrderConfirmationPage() {
   const { user } = await requirePatientSession();
@@ -20,7 +24,7 @@ export default async function OrderConfirmationPage() {
     supabaseAdmin
       .from("subscriptions")
       .select(
-        "id, package_id, medicine_id, created_at, packages(name, price, duration_months), medicines(name)",
+        "id, package_id, medicine_id, created_at, packages(name, price, original_price, duration_months), medicines(name)",
       )
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
@@ -38,7 +42,9 @@ export default async function OrderConfirmationPage() {
   ]);
 
   const pkg = (
-    sub as { packages?: { name: string; price: number; duration_months: number } } | null
+    sub as {
+      packages?: { name: string; price: number; original_price: number; duration_months: number };
+    } | null
   )?.packages;
   const med = (sub as { medicines?: { name: string } } | null)?.medicines;
 
@@ -81,10 +87,20 @@ export default async function OrderConfirmationPage() {
   const planPrice = planPriceCents > 0 ? planPriceCents / 100 : pkg ? Number(pkg.price) : null;
   const shipping = shippingCents / 100;
   const consultation = consultationCents / 100;
+  const listPrice =
+    pkg?.original_price != null && planPrice != null && Number(pkg.original_price) > planPrice
+      ? Number(pkg.original_price)
+      : planPrice;
+  const planSavings =
+    listPrice != null && planPrice != null ? Math.max(0, listPrice - planPrice) : 0;
+  const discountTotal =
+    discounts.reduce((sum, item) => sum + item.amount, 0) + (walletUsed > 0 ? walletUsed : 0);
 
-  // First onboarding order never carries shipping; surface the renewal shipping fee so the
-  // patient knows it applies from the next automatic payment onward.
+  const consultationListCents = effectiveConsultationCents(settings);
   const renewalShipping = effectiveShippingCents(settings) / 100;
+  const waivedConsultation = consultation === 0 ? consultationListCents / 100 : 0;
+  const waivedShipping = shipping === 0 ? renewalShipping : 0;
+  const youSave = planSavings + discountTotal + waivedConsultation + waivedShipping;
   const showRenewalNote = shipping === 0 && renewalShipping > 0;
 
   const email = profile?.email ?? user.email ?? "";
@@ -127,60 +143,86 @@ export default async function OrderConfirmationPage() {
                 </Link>
               </span>
             </div>
-            {planPrice != null ? (
+            {planSavings > 0 && listPrice != null ? (
               <div className="flex justify-between border-t border-[#152A51]/10 pt-4">
-                <span className="text-[#152A51]/80">Plan price</span>
-                <span className="font-medium text-[#152A51]">${planPrice.toFixed(2)}</span>
+                <span className="text-[#152A51]/80">Original price</span>
+                <span className="font-medium text-[#152A51]">${listPrice.toFixed(2)}</span>
+              </div>
+            ) : null}
+            {planSavings > 0 ? (
+              <div className="flex justify-between">
+                <span className="text-[#152A51]/80">Discount</span>
+                <span className="font-medium text-[#34845F]">-${planSavings.toFixed(2)}</span>
               </div>
             ) : null}
             {planPrice != null ? (
-              <div className="flex justify-between">
+              <div
+                className={`flex items-center justify-between gap-3 ${
+                  planSavings > 0 ? "" : "border-t border-[#152A51]/10 pt-4"
+                }`}
+              >
                 <span className="text-[#152A51]/80">Consultation fee</span>
-                <span
-                  className={
-                    consultation > 0
-                      ? "font-medium text-[#152A51]"
-                      : "font-semibold text-emerald-700"
-                  }
-                >
-                  {consultation > 0 ? `$${consultation.toFixed(2)}` : "FREE"}
-                </span>
+                {consultation > 0 ? (
+                  <span className="font-medium text-[#152A51]">${consultation.toFixed(2)}</span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    {consultationListCents > 0 ? (
+                      <span className="text-[#152A51]/45 line-through">
+                        ${(consultationListCents / 100).toFixed(2)}
+                      </span>
+                    ) : null}
+                    <span className="font-semibold text-[#34845F]">FREE</span>
+                  </span>
+                )}
               </div>
             ) : null}
             {planPrice != null ? (
-              <div className="flex justify-between">
+              <div className="flex items-center justify-between gap-3">
                 <span className="text-[#152A51]/80">Shipping</span>
-                <span
-                  className={
-                    shipping > 0 ? "font-medium text-[#152A51]" : "font-semibold text-emerald-700"
-                  }
-                >
-                  {shipping > 0 ? `$${shipping.toFixed(2)}` : "FREE"}
-                </span>
+                {shipping > 0 ? (
+                  <span className="font-medium text-[#152A51]">${shipping.toFixed(2)}</span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    {renewalShipping > 0 ? (
+                      <span className="text-[#152A51]/45 line-through">
+                        ${renewalShipping.toFixed(2)}
+                      </span>
+                    ) : null}
+                    <span className="font-semibold text-[#34845F]">FREE</span>
+                  </span>
+                )}
               </div>
             ) : null}
             {discounts.map((d) => (
-              <div key={d.label} className="flex justify-between text-emerald-700">
+              <div key={d.label} className="flex justify-between text-[#34845F]">
                 <span>{d.label}</span>
                 <span className="font-medium">-${d.amount.toFixed(2)}</span>
               </div>
             ))}
             {walletUsed > 0 ? (
-              <div className="flex justify-between text-emerald-700">
+              <div className="flex justify-between text-[#34845F]">
                 <span>Wallet credit applied</span>
                 <span className="font-medium">-${walletUsed.toFixed(2)}</span>
               </div>
             ) : null}
             <div className="flex items-center justify-between border-t border-[#152A51]/10 pt-4">
-              <span className="text-base font-medium text-[#152A51]">Total Paid</span>
+              <div>
+                <span className="text-base font-medium text-[#152A51]">Total Paid</span>
+                {youSave > 0 ? (
+                  <p className="mt-1 text-xs font-medium text-[#34845F]">
+                    You save ${youSave.toFixed(2)}
+                  </p>
+                ) : null}
+              </div>
               <span className="text-3xl font-semibold text-[#152A51]">
                 {totalPaid != null ? `$${totalPaid.toFixed(2)}` : "—"}
               </span>
             </div>
             {showRenewalNote ? (
               <p className="rounded-lg bg-[#152A51]/5 px-3 py-2 text-xs leading-relaxed text-[#152A51]/80">
-                This payment covers medication only. Starting with your next renewal, a $
-                {renewalShipping.toFixed(2)} shipping fee will be added to each automatic payment.
+                This payment covers medication only — consultation and shipping are free. Starting
+                with your next renewal, a ${renewalShipping.toFixed(2)} shipping fee will be added
+                to each automatic payment.
               </p>
             ) : null}
           </div>

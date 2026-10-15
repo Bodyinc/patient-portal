@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 
 type PricingCardProps = {
   pkg: PackageDto | null;
+  keywords?: string[];
 };
 
 const DEFAULT_FEATURES = [
@@ -20,12 +21,18 @@ const DEFAULT_FEATURES = [
 ];
 
 /** Figma-style accordion — expands to show plan features. */
-export default function PricingCard({ pkg }: PricingCardProps) {
+export default function PricingCard({ pkg, keywords = [] }: PricingCardProps) {
   const [open, setOpen] = useState(false);
 
   if (!pkg) return null;
 
-  const features = pkg.features.length > 0 ? pkg.features : DEFAULT_FEATURES;
+  const medicineKeywords = keywords.map((item) => item.trim()).filter(Boolean);
+  const features =
+    pkg.features.length > 0
+      ? pkg.features
+      : medicineKeywords.length > 0
+        ? medicineKeywords
+        : DEFAULT_FEATURES;
 
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="w-full onboarding-font">

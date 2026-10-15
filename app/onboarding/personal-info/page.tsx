@@ -22,9 +22,9 @@ import { useOnboarding } from "../_lib/onboarding-store";
 
 const personalInfoSchema = z
   .object({
-    fullName: z.string().trim().min(1, "Enter your full name").max(120),
-    email: z.string().trim().email("Enter a valid email").max(255),
-    confirmEmail: z.string().trim().email("Confirm your email").max(255),
+    fullName: z.string().trim().min(1, "Enter your full name").max(120, "Enter a shorter name"),
+    email: z.string().trim().email("Enter a valid email").max(255, "Enter a valid email"),
+    confirmEmail: z.string().trim().email("Confirm your email").max(255, "Enter a valid email"),
   })
   .refine((data) => data.email.toLowerCase() === data.confirmEmail.toLowerCase(), {
     message: "Emails do not match",
@@ -62,7 +62,7 @@ export default function PersonalInfoPage() {
     setEmailError(null);
     const parsed = personalInfoSchema.safeParse(form);
     if (!parsed.success) {
-      toast.error(parsed.error.issues[0]?.message ?? "Invalid input");
+      toast.error(parsed.error.issues[0]?.message ?? "Please complete the required fields");
       return;
     }
 

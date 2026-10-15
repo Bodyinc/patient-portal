@@ -29,7 +29,7 @@ import { useOnboarding } from "../_lib/onboarding-store";
 
 const demographicsSchema = z.object({
   state: z.string().min(1, "Select your state"),
-  sex: z.enum(["male", "female", "other"]),
+  sex: z.enum(["male", "female", "other"], { error: "Select your sex" }),
   dob: DOB_SCHEMA,
 });
 
@@ -63,7 +63,7 @@ export default function DemographicsPage() {
   async function handleContinue() {
     const parsed = demographicsSchema.safeParse(form);
     if (!parsed.success) {
-      toast.error(parsed.error.issues[0]?.message ?? "Invalid input");
+      toast.error(parsed.error.issues[0]?.message ?? "Please complete the required fields");
       return;
     }
 
@@ -99,8 +99,8 @@ export default function DemographicsPage() {
         toast.error(result.message);
         pushOnboardingRoute(router, "/onboarding/demographics");
       }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to save demographics.");
+    } catch {
+      toast.error("Unable to save your details. Please try again.");
       pushOnboardingRoute(router, "/onboarding/demographics");
     }
   }

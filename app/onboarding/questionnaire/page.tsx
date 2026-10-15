@@ -247,7 +247,11 @@ export default function QuestionnairePage() {
 
   return (
     <OnboardingStepLayout
-      title={questionnaire.title}
+      title={
+        state.goalName?.trim()
+          ? `${state.goalName.trim()} Medication Eligibility`
+          : questionnaire.title
+      }
       description="A short screening is required for your selected health goal. Answer each question below."
       backHref={getPrevStepPath("/onboarding/questionnaire", state)}
       onContinue={handleContinue}

@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Lock } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -61,6 +60,8 @@ export default function BillingCheckoutPage() {
   const { state, updateState } = useOnboarding();
   const { data: summary } = useIntakeSummary();
   const [consentAccepted, setConsentAccepted] = useState(false);
+  const [termsHighlighted, setTermsHighlighted] = useState(false);
+  const [paymentOpen, setPaymentOpen] = useState(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentLoading, setPaymentLoading] = useState(true);
   const [paymentError, setPaymentError] = useState<string | null>(null);
@@ -71,9 +72,12 @@ export default function BillingCheckoutPage() {
   const [promoError, setPromoError] = useState<string | null>(null);
   const [discountAmount, setDiscountAmount] = useState(0);
   const [discountLabel, setDiscountLabel] = useState<string | null>(null);
+  const [consultationFeeCents, setConsultationFeeCents] = useState(0);
   const [renewalShippingCents, setRenewalShippingCents] = useState(0);
   const [retryToken, setRetryToken] = useState(0);
   const paymentInitSeq = useRef(0);
+  const termsRef = useRef<HTMLDivElement>(null);
+  const paymentRef = useRef<HTMLDivElement>(null);
 
   // Warm Stripe.js as soon as the checkout page mounts.
   useEffect(() => {
@@ -83,7 +87,9 @@ export default function BillingCheckoutPage() {
   useEffect(() => {
     let active = true;
     void getPublicFees().then((f) => {
-      if (active) setRenewalShippingCents(f.shippingFeeCents);
+      if (!active) return;
+      setRenewalShippingCents(f.shippingFeeCents);
+      setConsultationFeeCents(f.consultationFeeCents);
     });
     return () => {
       active = false;
@@ -198,9 +204,32 @@ export default function BillingCheckoutPage() {
   }
 
   const paymentReady = Boolean(clientSecret) && !paymentLoading && !paymentError;
-  const showSkeleton = consentAccepted && !paymentError && !paymentReady;
-  const showCollapsedCard = !consentAccepted && !paymentError;
+  const showPayment = paymentOpen && consentAccepted;
+  const showSkeleton = showPayment && !paymentError && !paymentReady;
   const skeletonHint = paymentLoading || !packageId ? "Loading payment form…" : "Updating payment…";
+
+  function handleConsentChange(accepted: boolean) {
+    setConsentAccepted(accepted);
+    if (accepted) {
+      setTermsHighlighted(false);
+      return;
+    }
+    setPaymentOpen(false);
+  }
+
+  function handleProceedToPayment() {
+    if (!consentAccepted) {
+      setTermsHighlighted(true);
+      termsRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      termsRef.current?.querySelector<HTMLInputElement>("input")?.focus();
+      return;
+    }
+    setTermsHighlighted(false);
+    setPaymentOpen(true);
+    requestAnimationFrame(() => {
+      paymentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
 
   const returnUrl = `${
     typeof window !== "undefined" ? window.location.origin : ""
@@ -263,24 +292,25 @@ export default function BillingCheckoutPage() {
               />
             </div>
 
-            <TermsCheckbox checked={consentAccepted} onChange={setConsentAccepted} />
+            <div ref={termsRef}>
+              <TermsCheckbox
+                checked={consentAccepted}
+                invalid={termsHighlighted && !consentAccepted}
+                onChange={handleConsentChange}
+              />
+              {showPayment ? null : (
+                <button
+                  type="button"
+                  onClick={handleProceedToPayment}
+                  className="mt-3 h-[46px] w-full rounded-full bg-[#E3E084] text-[14px] font-medium text-[#152A51] transition hover:bg-[#D9D674]"
+                >
+                  Proceed to payment
+                </button>
+              )}
+            </div>
 
-            <div className="relative shrink-0">
-              {showCollapsedCard ? (
-                <div className="rounded-[14px] border border-[#E8E8E8] bg-white p-4 onboarding-font">
-                  <div className="mb-2 flex items-center justify-between border-b border-[#E8E8E8] pb-2">
-                    <h2 className="text-[15px] font-medium text-[#152A51] sm:text-[16px]">
-                      Payment Details
-                    </h2>
-                    <Lock size={16} className="text-[#152A51]/50" aria-hidden />
-                  </div>
-                  <p className="text-[12px] text-[#152A51]/70">
-                    Check the terms box above to expand and enter your payment details.
-                  </p>
-                </div>
-              ) : null}
-
-              {paymentError ? (
+            <div ref={paymentRef} className="relative shrink-0">
+              {paymentError && showPayment ? (
                 <div className="rounded-[14px] border border-[#E8E8E8] bg-white p-4 onboarding-font">
                   <h2 className="mb-2 text-[15px] font-medium text-[#152A51] sm:text-[16px]">
                     Payment Details
@@ -298,8 +328,8 @@ export default function BillingCheckoutPage() {
                 </div>
               ) : null}
 
-              {/* Mount as soon as clientSecret exists so Stripe iframes warm under the skeleton. */}
-              {clientSecret && consentAccepted && !paymentError ? (
+              {/* Mount as soon as the patient proceeds so Stripe iframes can finish warming. */}
+              {clientSecret && showPayment && !paymentError ? (
                 <div>
                   <OnboardingPaymentForm
                     key={clientSecret}
@@ -311,7 +341,6 @@ export default function BillingCheckoutPage() {
                 </div>
               ) : null}
 
-              {/* Skeleton covers the warming form until consent + ready; stands alone while loading. */}
               {showSkeleton ? (
                 <div
                   className={
@@ -345,6 +374,7 @@ export default function BillingCheckoutPage() {
               promoError={promoError}
               applyingPromo={applyingPromo}
               loading={summary?.packagePrice == null}
+              consultationFeeCents={consultationFeeCents}
               renewalShippingCents={renewalShippingCents}
               onPromoCodeChange={(value) => {
                 setPromoCode(value);

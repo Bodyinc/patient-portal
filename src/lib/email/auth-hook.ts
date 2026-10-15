@@ -11,6 +11,8 @@ import {
   verificationCodeEmail,
   type VerificationEmailPurpose,
 } from "./auth-emails";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+
 import { sendOnce } from "./idempotency";
 import { sendTransactionalEmail } from "./send";
 
@@ -18,6 +20,7 @@ type AuthHookPayload = {
   user?: {
     id?: string;
     email?: string;
+    app_metadata?: { password_set?: boolean };
     user_metadata?: { full_name?: string | null };
   };
   email_data?: {
@@ -46,6 +49,16 @@ function shouldSkipCheckoutEmail(redirectTo: string | undefined): boolean {
 
 function passwordChangedPeriod(): string {
   return new Date().toISOString().slice(0, 16);
+}
+
+/** First password setup still has password_set false. A later reset already has it true. */
+async function passwordWasAlreadySet(payload: AuthHookPayload, userId: string): Promise<boolean> {
+  if (payload.user?.app_metadata?.password_set === true) return true;
+  if (payload.user?.app_metadata && "password_set" in payload.user.app_metadata) return false;
+
+  const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId);
+  if (error || !data.user) return false;
+  return data.user.app_metadata?.password_set === true;
 }
 
 /**
@@ -113,6 +126,10 @@ export async function deliverSupabaseAuthEmail(payload: AuthHookPayload): Promis
   }
 
   if (action === "password_changed_notification") {
+    if (!(await passwordWasAlreadySet(payload, userId))) {
+      console.info("[auth-hook] skipped first password setup for", email);
+      return;
+    }
     const { subject, html } = passwordChangedEmail({ fullName });
     await sendOnce(
       AUTH_PASSWORD_CHANGED_CLAIM,

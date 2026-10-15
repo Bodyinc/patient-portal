@@ -27,6 +27,8 @@ npm run dev
 - `CRON_SECRET` (Bearer token for `/api/cron/reminders`)
 - `ADMIN_NOTIFY_EMAIL` (ops inbox for refund requests and failed payment alerts)
 - `ADMIN_APP_URL` (optional; deep links in provider case-assigned emails)
+- `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` (Web Push; generate with `npx web-push generate-vapid-keys`)
+- `VAPID_SUBJECT` (optional; `mailto:` contact for push, defaults to `mailto:ithelp@bodyinc.com`)
 - `QUICKBLOX_API_URL` (default `https://api-bodyinc.quickblox.com`)
 - `QUICKBLOX_CLIENT_APP_URL` (default `https://client-bodyinc.quickblox.com`)
 - `QUICKBLOX_PROVIDER_EMAIL` / `QUICKBLOX_PROVIDER_PASSWORD` (provider admin used to place the patient with a clinician)

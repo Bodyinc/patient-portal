@@ -52,8 +52,7 @@ export default function SelectPlanPage() {
 
   const selectedPackage = packages.find((p) => p.id === selectedPackageId) ?? null;
   const clinicalNote =
-    selectedPackage?.clinicalNote?.trim() ||
-    "*Clinical data suggests patients on 3+ month programs see 24% better outcomes on average compared to shorter duration.";
+    selectedPackage?.clinicalNote?.trim() || selectedMedicine?.notice?.trim() || "";
 
   async function handleContinue() {
     if (!selectedPackageId) {
@@ -116,11 +115,13 @@ export default function SelectPlanPage() {
             onChange={setSelectedPackageId}
           />
 
-          <PricingCard pkg={selectedPackage} />
+          <PricingCard pkg={selectedPackage} keywords={selectedMedicine?.importantInfo} />
 
-          <p className="text-center text-[12px] font-normal italic leading-snug text-[#152A51]/70 onboarding-font sm:text-[13px]">
-            {clinicalNote}
-          </p>
+          {clinicalNote ? (
+            <p className="text-center text-[12px] font-normal italic leading-snug text-[#152A51]/70 onboarding-font sm:text-[13px]">
+              {clinicalNote}
+            </p>
+          ) : null}
         </div>
       </div>
     </OnboardingFrame>

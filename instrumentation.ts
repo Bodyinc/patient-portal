@@ -1,3 +1,5 @@
+import { EMAIL_TRANSPORT_HINT, isEmailTransportConfigured } from "@/lib/email/transport";
+
 const INTERVAL_MS = 15_000;
 
 type GlobalPoll = typeof globalThis & {
@@ -17,6 +19,10 @@ export async function register() {
     console.warn(
       "[email] local dispatcher skipped — set CRON_SECRET so order emails can send on localhost",
     );
+    return;
+  }
+  if (!isEmailTransportConfigured()) {
+    console.warn(`[email] local dispatcher skipped — ${EMAIL_TRANSPORT_HINT}`);
     return;
   }
 

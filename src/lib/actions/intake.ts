@@ -528,8 +528,8 @@ export async function saveIntakeCategory(
 }
 
 const demographicsSchema = z.object({
-  stateCode: z.string().trim().min(2).max(2),
-  sex: z.enum(["male", "female", "other"]),
+  stateCode: z.string().trim().min(2, "Select your state").max(2, "Select your state"),
+  sex: z.enum(["male", "female", "other"], { error: "Select your sex" }),
   dob: DOB_SCHEMA,
 });
 
@@ -546,7 +546,7 @@ export async function saveIntakeDemographics(
     return {
       ok: false,
       code: "invalid_input",
-      message: parsed.error.issues[0]?.message ?? "Invalid input.",
+      message: parsed.error.issues[0]?.message ?? "Please complete the required fields",
     };
   }
   const data = parsed.data;
@@ -568,9 +568,15 @@ export async function saveIntakeDemographics(
 }
 
 const bmiSchema = z.object({
-  heightFeet: z.number().min(1).max(8),
-  heightInches: z.number().min(0).max(11),
-  weightLbs: z.number().positive().max(1500),
+  heightFeet: z
+    .number()
+    .min(1, "Enter a valid height in feet")
+    .max(8, "Enter a valid height in feet"),
+  heightInches: z
+    .number()
+    .min(0, "Enter inches between 0 and 11")
+    .max(11, "Enter inches between 0 and 11"),
+  weightLbs: z.number().positive("Enter a valid weight").max(1500, "Enter a valid weight"),
 });
 
 export async function saveIntakeBmi(
@@ -704,8 +710,8 @@ export async function saveIntakeMedicine(
 }
 
 const contactSchema = z.object({
-  fullName: z.string().trim().min(1).max(120),
-  email: z.string().trim().email().max(255),
+  fullName: z.string().trim().min(1, "Enter your full name").max(120, "Enter a shorter name"),
+  email: z.string().trim().email("Enter a valid email").max(255, "Enter a valid email"),
   // Phone is collected on delivery-address; omit it from this step entirely.
   phone: OPTIONAL_PHONE_SCHEMA.optional(),
 });
@@ -723,7 +729,7 @@ export async function saveIntakeContact(
     return {
       ok: false,
       code: "invalid_input",
-      message: parsed.error.issues[0]?.message ?? "Invalid input.",
+      message: parsed.error.issues[0]?.message ?? "Please complete the required fields",
     };
   }
   const data = parsed.data;
@@ -769,17 +775,40 @@ export async function saveIntakeContact(
 
 const addressSchema = z
   .object({
-    streetAddress: z.string().trim().min(1, "Enter your address").max(255),
-    apartment: z.string().trim().min(1, "Enter your apartment number").max(60),
-    city: z.string().trim().min(1, "Enter your city").max(120),
+    streetAddress: z
+      .string()
+      .trim()
+      .min(1, "Enter your address")
+      .max(255, "Enter a shorter address"),
+    apartment: z
+      .string()
+      .trim()
+      .min(1, "Enter your apartment number")
+      .max(60, "Enter a shorter apartment number"),
+    city: z.string().trim().min(1, "Enter your city").max(120, "Enter a shorter city"),
     postalCode: ZIP_CODE_SCHEMA,
     phone: z.string().trim(),
     phoneCountryCode: PHONE_COUNTRY_CODE_SCHEMA,
     billingSameAsShipping: z.boolean(),
-    billingStreetAddress: z.string().trim().max(255).optional().or(z.literal("")),
-    billingApartment: z.string().trim().max(60).optional().or(z.literal("")),
-    billingCity: z.string().trim().max(120).optional().or(z.literal("")),
-    billingStateCode: z.string().trim().max(2).optional().or(z.literal("")),
+    billingStreetAddress: z
+      .string()
+      .trim()
+      .max(255, "Enter a shorter billing address")
+      .optional()
+      .or(z.literal("")),
+    billingApartment: z
+      .string()
+      .trim()
+      .max(60, "Enter a shorter apartment number")
+      .optional()
+      .or(z.literal("")),
+    billingCity: z.string().trim().max(120, "Enter a shorter city").optional().or(z.literal("")),
+    billingStateCode: z
+      .string()
+      .trim()
+      .max(2, "Select your billing state")
+      .optional()
+      .or(z.literal("")),
     billingPostalCode: OPTIONAL_ZIP_CODE_SCHEMA,
     smsConsent: z.boolean(),
     marketingConsent: z.boolean(),
@@ -796,7 +825,7 @@ const addressSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["smsConsent"],
-        message: "SMS consent is required to continue.",
+        message: "Please consent to SMS communications to continue",
       });
     }
     if (data.billingSameAsShipping) return;
@@ -826,7 +855,7 @@ export async function saveIntakeAddress(
     return {
       ok: false,
       code: "invalid_input",
-      message: parsed.error.issues[0]?.message ?? "Invalid input.",
+      message: parsed.error.issues[0]?.message ?? "Please complete the required fields",
     };
   }
   const data = parsed.data;
@@ -863,7 +892,7 @@ export async function getQuestionnaireForCategory(
 ): Promise<IntakeActionResult<QuestionnaireDto | null>> {
   const { data: category, error: categoryError } = await supabaseAdmin
     .from("medication_categories")
-    .select("id")
+    .select("id, name")
     .eq("slug", categorySlug)
     .eq("is_active", true)
     .maybeSingle();
@@ -889,7 +918,17 @@ export async function getQuestionnaireForCategory(
     return { ok: true, data: null };
   }
 
-  return loadQuestionnaireDto(questionnaireIds);
+  const loaded = await loadQuestionnaireDto(questionnaireIds);
+  if (!loaded.ok || !loaded.data) return loaded;
+
+  const categoryName = category.name.trim();
+  return {
+    ok: true,
+    data: {
+      ...loaded.data,
+      title: categoryName ? `${categoryName} Medication Eligibility` : loaded.data.title,
+    },
+  };
 }
 
 export async function getCategoryRequiresQuestionnaire(
@@ -1191,8 +1230,10 @@ export async function getOnboardingConfirmationData(): Promise<
     variantName: string | null;
     packageName: string | null;
     packagePrice: number | null;
+    packageOriginalPrice: number | null;
     totalPaid: number | null;
     email: string | null;
+    consultationFeeCents: number;
     renewalShippingCents: number;
     passwordSet: boolean;
   }>
@@ -1256,21 +1297,19 @@ export async function getOnboardingConfirmationData(): Promise<
         ? Number(summary.packagePrice)
         : null;
 
-  const orderSource = payment ?? request;
-
   return {
     ok: true,
     data: {
-      orderNumber: formatOrderId(orderSource?.id ?? session.id),
-      orderDate: formatOrderDate(
-        orderSource?.created_at ?? session.updated_at ?? session.created_at,
-      ),
+      orderNumber: formatOrderId(request?.id ?? session.id),
+      orderDate: formatOrderDate(request?.created_at ?? session.updated_at ?? session.created_at),
       medicineName: summary.medicineName,
       variantName: summary.variantName,
       packageName: summary.packageName,
       packagePrice: summary.packagePrice,
+      packageOriginalPrice: summary.packageOriginalPrice,
       totalPaid,
       email: summary.email?.trim() || null,
+      consultationFeeCents: fees.consultationFeeCents,
       renewalShippingCents: fees.shippingFeeCents,
       passwordSet,
     },

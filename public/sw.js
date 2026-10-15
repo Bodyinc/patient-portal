@@ -36,6 +36,60 @@ function isHashedStatic(url) {
   );
 }
 
+self.addEventListener("push", (event) => {
+  let payload = {
+    title: "BodyInc",
+    body: "You have a new update.",
+    url: "/dashboard",
+  };
+  try {
+    if (event.data) {
+      const data = event.data.json();
+      if (data && typeof data.title === "string") payload.title = data.title;
+      if (data && typeof data.body === "string") payload.body = data.body;
+      if (data && typeof data.url === "string" && data.url.startsWith("/")) payload.url = data.url;
+    }
+  } catch {
+    /* keep the generic alert */
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(payload.title, {
+      body: payload.body,
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      data: { url: payload.url },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const raw = event.notification.data && event.notification.data.url;
+  const path = typeof raw === "string" && raw.startsWith("/") ? raw : "/dashboard";
+  const target = new URL(path, self.location.origin).href;
+
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then(async (windowClients) => {
+        for (const client of windowClients) {
+          if (!client.url.startsWith(self.location.origin) || !("focus" in client)) continue;
+          await client.focus();
+          if ("navigate" in client) {
+            try {
+              await client.navigate(target);
+            } catch {
+              /* the focused tab stays where it is */
+            }
+          }
+          return;
+        }
+        await self.clients.openWindow(target);
+      }),
+  );
+});
+
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET") return;

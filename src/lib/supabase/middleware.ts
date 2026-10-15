@@ -55,9 +55,16 @@ export async function updateSession(request: NextRequest) {
   // is missing/near expiry (which also refreshes the cookie).
   const {
     data: { session },
+    error: sessionError,
   } = await supabase.auth.getSession();
 
-  let user = session?.user ?? null;
+  // A deleted or expired refresh cookie makes the auth client log a stack on every
+  // request. Drop it so the visitor is simply signed out.
+  if (sessionError?.code === "refresh_token_not_found") {
+    await supabase.auth.signOut({ scope: "local" });
+  }
+
+  let user = sessionError ? null : (session?.user ?? null);
   const expiresAtMs = (session?.expires_at ?? 0) * 1000;
   if (session && expiresAtMs - Date.now() < 60_000) {
     const { data } = await supabase.auth.getUser();

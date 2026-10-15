@@ -19,7 +19,7 @@ const nextConfig: NextConfig = {
   // truncates app-path-routes-manifest.json and collect-page-data fails with ENOENT.
   distDir: process.env.NEXT_DIST_DIR || (isDevCommand ? ".next-dev" : ".next"),
   reactStrictMode: true,
-  serverExternalPackages: ["nodemailer"],
+  serverExternalPackages: ["nodemailer", "web-push"],
   // nodemailer is in serverExternalPackages so Turbopack never bundles it
   // on the client. An empty turbopack config silences the webpack-conflict error.
   turbopack: {},

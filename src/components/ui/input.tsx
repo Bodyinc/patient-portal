@@ -10,6 +10,9 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
       <input
         ref={ref}
         type={type}
+        // Password managers rewrite autocomplete and inject a chrome-extension
+        // background before hydration. Those attribute edits are not app state.
+        suppressHydrationWarning
         className={cn(
           "flex h-[52px] w-full appearance-none rounded-[14px] border border-[#E8EEED] bg-white px-4 text-[15px] font-normal text-[#152A51] shadow-none transition-colors",
           "placeholder:text-[#152A51]/40",

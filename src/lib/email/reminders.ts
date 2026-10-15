@@ -2,6 +2,9 @@ import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { formatOrderId } from "@/lib/orders/order-id";
+import { patientStatusLabel } from "@/lib/orders/status";
+import { formatPortalDate } from "@/lib/date-format";
+import { sendPushToUser } from "@/lib/push/send";
 import { sendTransactionalEmail } from "./send";
 import { incompleteOrderEmail, refillReminderEmail } from "./reminder-emails";
 import { orderStatusEmail, providerCaseAssignedEmail } from "./order-status-emails";
@@ -166,6 +169,17 @@ export async function sendRefillReminders(now = new Date()): Promise<ReminderRun
     if (await sendTransactionalEmail({ to: profile.email, subject, html })) {
       await markEmailSent("refill", sub.id, periodKey);
       sent += 1;
+      if (sub.user_id) {
+        const medicineName =
+          (sub.medicine_id ? medicineById.get(sub.medicine_id)?.name : null) ??
+          "Treatment Subscription";
+        const renewal = formatPortalDate(sub.current_period_end);
+        await sendPushToUser(sub.user_id, {
+          title: "Upcoming refill",
+          body: `Your ${medicineName} refill renews on ${renewal}.`,
+          url: "/billing",
+        }).catch((error) => console.error("[push] refill reminder failed:", error));
+      }
     }
   }
 
@@ -326,6 +340,23 @@ export async function sendUnsentOrderStatusEmails(opts?: {
           }
           sentKeys.add(`${event.id}|`);
           sent += 1;
+          if (request?.user_id) {
+            const pushUrl =
+              event.status === "awaiting_additional_payment"
+                ? `/orders/${request.id}/pay`
+                : event.status === "provider_assigned"
+                  ? "/consultations"
+                  : "/my-meds";
+            const pushTitle =
+              event.status === "provider_assigned"
+                ? "Practitioner assigned"
+                : patientStatusLabel(event.status);
+            await sendPushToUser(request.user_id, {
+              title: pushTitle,
+              body: `${medicineName} · ${orderNumber}`,
+              url: pushUrl,
+            }).catch((error) => console.error("[push] order status failed:", error));
+          }
         }
       }
     }

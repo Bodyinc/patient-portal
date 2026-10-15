@@ -5,8 +5,10 @@ export type ConfirmationData = {
   variantName: string | null;
   packageName: string | null;
   packagePrice: number | null;
+  packageOriginalPrice: number | null;
   totalPaid: number | null;
   email: string | null;
+  consultationFeeCents: number;
   renewalShippingCents: number;
   passwordSet: boolean;
 };

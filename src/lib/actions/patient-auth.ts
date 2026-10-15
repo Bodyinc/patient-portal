@@ -12,9 +12,7 @@ import { requireIntakeSession } from "@/lib/intake/session";
 import {
   AUTH_EMAIL_SKIP_QUERY,
   AUTH_MAGICLINK_CLAIM,
-  AUTH_PASSWORD_CHANGED_CLAIM,
   AUTH_RECOVERY_CLAIM,
-  passwordChangedEmail,
   passwordResetEmail,
   patientPasswordResetUrl,
   verificationCodeEmail,
@@ -178,32 +176,14 @@ export async function setInitialPassword(rawPassword: string): Promise<SetInitia
     app_metadata: { ...user.app_metadata, password_set: true },
   });
 
-  await sendPasswordChangedNotice(user.id, user.email, user.user_metadata?.full_name);
-
   return { ok: true };
 }
 
-/** Current Body Inc template. Skipped when the Send Email hook already sent this minute. */
-async function sendPasswordChangedNotice(
-  userId: string,
-  email: string | undefined,
-  fullName: unknown,
-): Promise<void> {
-  const to = email?.trim();
-  if (!to) return;
-  const period = new Date().toISOString().slice(0, 16);
-  if (await wasEmailSent(AUTH_PASSWORD_CHANGED_CLAIM, userId, period)) return;
-  const name = typeof fullName === "string" ? fullName : null;
-  const { subject, html } = passwordChangedEmail({ fullName: name });
-  await sendOnce(
-    AUTH_PASSWORD_CHANGED_CLAIM,
-    userId,
-    () => sendTransactionalEmail({ to, subject, html }),
-    period,
-  );
-}
-
-const changeEmailSchema = z.string().trim().email().max(255);
+const changeEmailSchema = z
+  .string()
+  .trim()
+  .email("Enter a valid email")
+  .max(255, "Enter a valid email");
 
 export type ChangeCheckoutEmailResult =
   { ok: true; email: string } | { ok: false; message: string };
