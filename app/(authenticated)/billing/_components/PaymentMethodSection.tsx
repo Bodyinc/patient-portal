@@ -89,7 +89,12 @@ function UpdateCardForm({ onDone }: { onDone: () => void }) {
   );
 }
 
-export default function PaymentMethodSection() {
+type PaymentMethodSectionProps = {
+  cardLabel: string | null;
+  cardExpiry: string | null;
+};
+
+export default function PaymentMethodSection({ cardLabel, cardExpiry }: PaymentMethodSectionProps) {
   const [open, setOpen] = useState(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -125,7 +130,17 @@ export default function PaymentMethodSection() {
           </span>
           <div>
             <h2 className="text-base font-semibold text-[#152A51]">Payment Method</h2>
-            <p className="text-sm text-[#152A51]/70">
+            {cardLabel ? (
+              <div className="mt-1 space-y-0.5">
+                <p className="text-sm font-medium text-[#152A51]">{cardLabel}</p>
+                {cardExpiry ? (
+                  <p className="text-xs text-[#152A51]/60">Expires {cardExpiry}</p>
+                ) : null}
+              </div>
+            ) : (
+              <p className="mt-1 text-sm text-[#152A51]/70">No card on file yet.</p>
+            )}
+            <p className="mt-1 text-sm text-[#152A51]/70">
               Update the card used for your subscription renewals.
             </p>
           </div>

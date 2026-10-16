@@ -44,9 +44,10 @@ export default function JotformIntakeStep({
   const completedRef = useRef(false);
   const iframeLoadedOnceRef = useRef(false);
 
-  // Construct Jotform URL with pre-filled parameters
+  // Construct Jotform URL with pre-filled parameters (HIPAA host by default)
   const jotformUrl = (() => {
-    const base = `https://form.jotform.com/${sdkConfig.intakeFormId}`;
+    const formBase = (sdkConfig.intakeFormBase || "https://hipaa.jotform.com").replace(/\/+$/, "");
+    const base = `${formBase}/${sdkConfig.intakeFormId}`;
     const params = new URLSearchParams();
     if (sdkConfig.userId) params.set("client_id", String(sdkConfig.userId));
     if (patientData.email) params.set("email", patientData.email);

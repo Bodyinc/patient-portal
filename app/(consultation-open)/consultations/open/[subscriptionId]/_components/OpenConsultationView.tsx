@@ -70,13 +70,13 @@ export default function OpenConsultationView({ subscriptionId }: OpenConsultatio
     } finally {
       setLoading(false);
     }
-  }, [subscriptionId, router]);
+  }, [subscriptionId]);
 
   useEffect(() => {
     void initConsultation();
   }, [initConsultation]);
 
-  // Periodic check if doctor finished the consultation
+  // Periodic check: consultation finished, case assigned, or chat dialog ready
   useEffect(() => {
     if (isFinished || loading || error) return;
 
@@ -84,12 +84,31 @@ export default function OpenConsultationView({ subscriptionId }: OpenConsultatio
       try {
         if (isFinishedRef.current) return;
         const res = await startConsultation(subscriptionId);
-        if (res.ok && res.isFinished) {
+        if (!res.ok) return;
+
+        if (res.isFinished) {
           isFinishedRef.current = true;
           setIsFinished(true);
           void recordConsultationFinished({
             subscriptionId,
             appointmentId: res.appointmentId,
+          });
+        }
+
+        if (res.sdkConfig) {
+          setSdkConfig((prev) => {
+            if (!prev) return res.sdkConfig ?? null;
+            const next = res.sdkConfig!;
+            if (
+              prev.caseAssigned === next.caseAssigned &&
+              prev.dialogId === next.dialogId &&
+              (prev.dialogJid ?? null) === (next.dialogJid ?? null) &&
+              prev.providerId === next.providerId &&
+              (prev.providerName ?? null) === (next.providerName ?? null)
+            ) {
+              return prev;
+            }
+            return { ...prev, ...next, token: next.token || prev.token };
           });
         }
       } catch (e) {
@@ -98,7 +117,7 @@ export default function OpenConsultationView({ subscriptionId }: OpenConsultatio
     }, 8000);
 
     return () => clearInterval(interval);
-  }, [isFinished, loading, error, subscriptionId, router]);
+  }, [isFinished, loading, error, subscriptionId]);
 
   // Handle completion of Jotform intake step
   const handleIntakeComplete = useCallback(

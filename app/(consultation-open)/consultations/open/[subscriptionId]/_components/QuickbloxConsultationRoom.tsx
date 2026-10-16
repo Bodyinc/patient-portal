@@ -466,8 +466,12 @@ export default function QuickbloxConsultationRoom({
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isConnectingRef = useRef(false);
   const hasConnectedRef = useRef(false);
+  const joinedDialogIdRef = useRef<string | null>(null);
   const sdkConfigRef = useRef(sdkConfig);
   sdkConfigRef.current = sdkConfig;
+
+  const providerReady = Boolean(sdkConfig.caseAssigned && sdkConfig.dialogId);
+  const canMessage = providerReady && connected;
   const resolveUserNamesRef = useRef(resolveUserNames);
   resolveUserNamesRef.current = resolveUserNames;
   const isJoinedMessageRef = useRef(isJoinedMessage);
@@ -637,12 +641,10 @@ export default function QuickbloxConsultationRoom({
     }
   }, [activeCall, isVideoDisabled]);
 
-  // Setup Chat Listeners and Dialog History once connected
+  // Setup Chat Listeners once connected (dialog join is handled separately)
   const setupChatListeners = useCallback((currentUserId: number) => {
     const QB = window.QB;
     if (!QB?.chat) return;
-
-    const config = sdkConfigRef.current;
 
     // Listen for incoming messages
     QB.chat.onMessageListener = (userId, msg) => {
@@ -733,113 +735,116 @@ export default function QuickbloxConsultationRoom({
         }
       };
     }
+  }, []);
 
-    // Step 4: Load Dialog details & Join MUC room if group chat
-    const targetDialogId = config.dialogId;
-    if (targetDialogId) {
-      QB.chat.dialog.list({ _id: targetDialogId }, (dErr, dRes) => {
-        if (!dErr && dRes?.items?.length) {
-          const dialog = dRes.items[0];
-          if (dialog.occupants_ids?.length) {
-            resolveUserNamesRef.current(dialog.occupants_ids);
-          }
-          const roomJid = dialog.xmpp_room_jid;
-          if (roomJid) {
-            setActiveDialogJid(roomJid);
-            QB.chat.muc.join(roomJid, () => {
-              console.log("[QuickBlox] Joined MUC room:", roomJid);
+  // Join MUC / load history when dialog becomes available (including after provider claims)
+  useEffect(() => {
+    if (!connected) return;
+    const targetDialogId = sdkConfig.dialogId;
+    if (!targetDialogId) return;
+    if (joinedDialogIdRef.current === targetDialogId) return;
 
-              // Broadcast joined notification stanza into the room
-              try {
-                QB.chat.send(roomJid, {
-                  type: "groupchat",
-                  body: "",
-                  extension: {
-                    save_to_history: 1,
-                    dialog_id: targetDialogId,
-                    type: "joined",
-                  },
-                });
-              } catch (jErr) {
-                console.warn("[QuickBlox] Send joined stanza notice:", jErr);
-              }
+    const QB = window.QB;
+    if (!QB?.chat?.isConnected) return;
 
-              // Ensure local "You have joined the chat" pill is added if not yet present
-              setMessages((prev) => {
-                if (prev.some((m) => m.type === "joined" && m.isSelf)) return prev;
-                return [
-                  ...prev,
-                  {
-                    id: `join_self_${Date.now()}`,
-                    senderId: currentUserId,
-                    body: "",
-                    dateSent: Date.now(),
-                    isSelf: true,
-                    type: "joined",
-                  },
-                ];
-              });
+    joinedDialogIdRef.current = targetDialogId;
+    const currentUserId = sdkConfig.userId;
+
+    QB.chat.dialog.list({ _id: targetDialogId }, (dErr, dRes) => {
+      if (dErr || !dRes?.items?.length) {
+        joinedDialogIdRef.current = null;
+        return;
+      }
+      const dialog = dRes.items[0];
+      if (dialog.occupants_ids?.length) {
+        resolveUserNamesRef.current(dialog.occupants_ids);
+      }
+      const roomJid = dialog.xmpp_room_jid;
+      if (roomJid) {
+        setActiveDialogJid(roomJid);
+        QB.chat.muc.join(roomJid, () => {
+          console.log("[QuickBlox] Joined MUC room:", roomJid);
+          try {
+            QB.chat.send(roomJid, {
+              type: "groupchat",
+              body: "",
+              extension: {
+                save_to_history: 1,
+                dialog_id: targetDialogId,
+                type: "joined",
+              },
             });
+          } catch (jErr) {
+            console.warn("[QuickBlox] Send joined stanza notice:", jErr);
           }
-        }
-      });
+          setMessages((prev) => {
+            if (prev.some((m) => m.type === "joined" && m.isSelf)) return prev;
+            return [
+              ...prev,
+              {
+                id: `join_self_${Date.now()}`,
+                senderId: currentUserId,
+                body: "",
+                dateSent: Date.now(),
+                isSelf: true,
+                type: "joined",
+              },
+            ];
+          });
+        });
+      }
+    });
 
-      // Step 5: Fetch message history
-      QB.chat.message.list(
-        { chat_dialog_id: targetDialogId, sort_desc: "date_sent", limit: 50 },
-        (mErr, mRes) => {
-          if (!mErr && mRes?.items?.length) {
-            const historical: ChatMessageItem[] = mRes.items
-              .map((item) => {
-                const rawItem = item as unknown as {
-                  _id: string;
-                  sender_id: number;
-                  message?: string;
-                  date_sent: number;
+    QB.chat.message.list(
+      { chat_dialog_id: targetDialogId, sort_desc: "date_sent", limit: 50 },
+      (mErr, mRes) => {
+        if (!mErr && mRes?.items?.length) {
+          const historical: ChatMessageItem[] = mRes.items
+            .map((item) => {
+              const rawItem = item as unknown as {
+                _id: string;
+                sender_id: number;
+                message?: string;
+                date_sent: number;
+                type?: string;
+                notification_type?: string;
+                extension?: {
                   type?: string;
                   notification_type?: string;
-                  extension?: {
-                    type?: string;
-                    notification_type?: string;
-                    attachments?: ChatAttachmentItem[];
-                  };
                   attachments?: ChatAttachmentItem[];
                 };
-                const isJoined = isJoinedMessageRef.current(rawItem);
-                return {
-                  id: rawItem._id,
-                  senderId: rawItem.sender_id,
-                  body: isJoined ? "" : rawItem.message || "",
-                  dateSent: rawItem.date_sent * 1000,
-                  isSelf: rawItem.sender_id === currentUserId,
-                  type: isJoined ? ("joined" as const) : ("message" as const),
-                  attachments: rawItem.attachments || rawItem.extension?.attachments || [],
-                };
-              })
-              .reverse();
+                attachments?: ChatAttachmentItem[];
+              };
+              const isJoined = isJoinedMessageRef.current(rawItem);
+              return {
+                id: rawItem._id,
+                senderId: rawItem.sender_id,
+                body: isJoined ? "" : rawItem.message || "",
+                dateSent: rawItem.date_sent * 1000,
+                isSelf: rawItem.sender_id === currentUserId,
+                type: isJoined ? ("joined" as const) : ("message" as const),
+                attachments: rawItem.attachments || rawItem.extension?.attachments || [],
+              };
+            })
+            .reverse();
 
-            setMessages((prev) => {
-              const existingIds = new Set(historical.map((m) => m.id));
-              const localJoins = prev.filter(
-                (m) => m.type === "joined" && m.isSelf && !existingIds.has(m.id),
-              );
-              if (
-                localJoins.length > 0 &&
-                !historical.some((m) => m.type === "joined" && m.isSelf)
-              ) {
-                return [...historical, ...localJoins];
-              }
-              return historical;
-            });
+          setMessages((prev) => {
+            const existingIds = new Set(historical.map((m) => m.id));
+            const localJoins = prev.filter(
+              (m) => m.type === "joined" && m.isSelf && !existingIds.has(m.id),
+            );
+            if (localJoins.length > 0 && !historical.some((m) => m.type === "joined" && m.isSelf)) {
+              return [...historical, ...localJoins];
+            }
+            return historical;
+          });
 
-            // Resolve all sender names from historical messages
-            const senders = historical.map((m) => m.senderId);
-            resolveUserNamesRef.current(senders);
-          }
-        },
-      );
-    }
-  }, []);
+          const senders = historical.map((m) => m.senderId);
+          resolveUserNamesRef.current(senders);
+        }
+      },
+    );
+  }, [connected, sdkConfig.dialogId, sdkConfig.userId]);
 
   // Initialize QuickBlox SDK & Connect to Chat
   const initQuickBlox = useCallback(() => {
@@ -992,12 +997,13 @@ export default function QuickbloxConsultationRoom({
   const handleSendMessage = (e?: React.FormEvent) => {
     e?.preventDefault();
     const text = inputText.trim();
-    if (!text || !connected) return;
+    if (!text || !canMessage) return;
+    if (!sdkConfig.caseAssigned || !sdkConfig.dialogId) return;
 
     const QB = window.QB;
     if (!QB || !QB.chat?.isConnected) return;
 
-    const targetRecipient = activeDialogJid || sdkConfig.providerId || sdkConfig.dialogId;
+    const targetRecipient = activeDialogJid || sdkConfig.dialogId;
     if (!targetRecipient) {
       console.warn("[QuickbloxConsultationRoom] No recipient to send message to.");
       return;
@@ -1042,8 +1048,16 @@ export default function QuickbloxConsultationRoom({
     e.target.value = ""; // Reset input so same file can be selected again
 
     const QB = window.QB;
-    if (!QB || !connected) {
-      setUploadError("Chat connection is not ready. Please wait.");
+    if (!QB || !canMessage) {
+      setUploadError(
+        providerReady
+          ? "Chat connection is not ready. Please wait."
+          : "Waiting for your provider to join before you can send messages.",
+      );
+      return;
+    }
+    if (!sdkConfig.caseAssigned || !sdkConfig.dialogId) {
+      setUploadError("Waiting for your provider to join before you can send messages.");
       return;
     }
 
@@ -1051,7 +1065,7 @@ export default function QuickbloxConsultationRoom({
     setUploadProgress(`Uploading ${file.name}…`);
     setUploadError(null);
 
-    const targetRecipient = activeDialogJid || sdkConfig.providerId || sdkConfig.dialogId;
+    const targetRecipient = activeDialogJid || sdkConfig.dialogId;
     if (!targetRecipient) {
       setUploadingFile(false);
       setUploadProgress(null);
@@ -1127,8 +1141,8 @@ export default function QuickbloxConsultationRoom({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputText(e.target.value);
     const QB = window.QB;
-    if (QB && connected) {
-      const targetRecipient = activeDialogJid || sdkConfig.providerId;
+    if (QB && canMessage) {
+      const targetRecipient = activeDialogJid || sdkConfig.dialogId;
       if (targetRecipient) {
         QB.chat.sendIsTypingStatus(targetRecipient);
       }
@@ -1347,15 +1361,20 @@ export default function QuickbloxConsultationRoom({
             </div>
           ) : null}
 
-          {/* Idle Call Informational Banner (Patient cannot start calls, clinician does) */}
+          {/* Idle status banner — wait until provider claimed + chat room ready */}
           {!activeCall ? (
             <div className="border-b border-[#E8EEED] bg-white px-4 py-2.5">
               <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 text-xs text-[#152A51]/80">
                 <div className="flex items-center gap-2">
-                  <span className="flex h-2 w-2 rounded-full bg-emerald-500" />
+                  <span
+                    className={`flex h-2 w-2 rounded-full ${
+                      providerReady ? "bg-emerald-500" : "bg-amber-500 animate-pulse"
+                    }`}
+                  />
                   <span>
-                    Clinician assigned. If your provider initiates an audio or video call, it will
-                    ring automatically here.
+                    {providerReady
+                      ? "Clinician assigned. If your provider initiates an audio or video call, it will ring automatically here."
+                      : "Waiting for your provider to join. Messaging unlocks once they claim your consultation."}
                   </span>
                 </div>
                 <button
@@ -1406,7 +1425,9 @@ export default function QuickbloxConsultationRoom({
             <div className="space-y-3">
               {messages.length === 0 ? (
                 <div className="py-8 text-center text-xs text-[#152A51]/50">
-                  No messages yet. Send a greeting to your provider below!
+                  {providerReady
+                    ? "No messages yet. Send a greeting to your provider below!"
+                    : "Waiting for your provider to join. Messaging unlocks once they claim your consultation."}
                 </div>
               ) : (
                 messages.map((msg, index) => {
@@ -1563,6 +1584,13 @@ export default function QuickbloxConsultationRoom({
               </div>
             ) : null}
 
+            {!providerReady ? (
+              <div className="mx-auto mb-3 max-w-4xl rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-xs font-medium leading-relaxed text-amber-900 sm:text-[13px]">
+                Waiting for your provider to join. Messaging unlocks once they claim your
+                consultation.
+              </div>
+            ) : null}
+
             <div className="mx-auto flex max-w-4xl items-center gap-2">
               {/* Hidden file input */}
               <input
@@ -1578,7 +1606,7 @@ export default function QuickbloxConsultationRoom({
                 type="button"
                 variant="ghost"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={!connected || uploadingFile}
+                disabled={!canMessage || uploadingFile}
                 className="h-11 w-11 shrink-0 rounded-full text-[#152A51]/70 transition hover:bg-[#152A51]/10 hover:text-[#152A51]"
                 title="Attach document or photo"
               >
@@ -1593,15 +1621,19 @@ export default function QuickbloxConsultationRoom({
                 type="text"
                 value={inputText}
                 onChange={handleInputChange}
-                disabled={!connected}
+                disabled={!canMessage}
                 placeholder={
-                  connected ? "Type your message or question here…" : "Connecting to secure chat…"
+                  !connected
+                    ? "Connecting to secure chat…"
+                    : !providerReady
+                      ? "Waiting for your provider to join…"
+                      : "Type your message or question here…"
                 }
-                className="h-11 flex-1 rounded-full border border-[#E8EEED] bg-[#F9FBFA] px-4 text-sm text-[#152A51] outline-none transition placeholder:text-[#152A51]/40 focus:border-[#152A51] focus:bg-white"
+                className="h-11 flex-1 rounded-full border border-[#E8EEED] bg-[#F9FBFA] px-4 text-sm text-[#152A51] outline-none transition placeholder:text-[#152A51]/40 focus:border-[#152A51] focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
               />
               <Button
                 type="submit"
-                disabled={!connected || !inputText.trim()}
+                disabled={!canMessage || !inputText.trim()}
                 className="h-11 w-11 shrink-0 rounded-full bg-[#152A51] p-0 text-white transition hover:bg-[#152A51]/90"
               >
                 <Send className="h-4 w-4" />
@@ -1703,7 +1735,39 @@ export default function QuickbloxConsultationRoom({
                             className="rounded-xl border border-[#E8EEED] bg-white p-3 text-xs shadow-xs"
                           >
                             <span className="font-medium text-[#152A51]/70">{item.label}</span>
-                            <p className="mt-1 font-semibold text-[#152A51]">{item.value}</p>
+                            {item.attachments && item.attachments.length > 0 ? (
+                              <div className="mt-2 space-y-2">
+                                {item.attachments.map((att, attIdx) => {
+                                  const proxyHref = `/api/consultations/jotform-file?url=${encodeURIComponent(att.url)}`;
+                                  return (
+                                    <a
+                                      key={`${att.url}-${attIdx}`}
+                                      href={proxyHref}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="block overflow-hidden rounded-lg border border-[#E8EEED] bg-[#F9FBFA] transition hover:border-[#152A51]/30 hover:bg-[#F3F6F6]"
+                                    >
+                                      {att.kind === "image" ? (
+                                        <img
+                                          src={proxyHref}
+                                          alt={att.name}
+                                          className="max-h-40 w-full object-contain bg-white"
+                                        />
+                                      ) : null}
+                                      <div className="flex items-center gap-2 px-3 py-2 text-[#152A51]">
+                                        <FileText className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                                        <span className="truncate font-semibold underline-offset-2 hover:underline">
+                                          {att.name}
+                                        </span>
+                                        <Download className="ml-auto h-3.5 w-3.5 shrink-0 opacity-70" />
+                                      </div>
+                                    </a>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <p className="mt-1 font-semibold text-[#152A51]">{item.value}</p>
+                            )}
                           </div>
                         ))}
                       </div>

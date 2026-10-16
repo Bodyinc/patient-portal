@@ -11,7 +11,32 @@ export type SavedPaymentMethodSummary = {
   id: string;
   brand: string | null;
   last4: string | null;
+  expMonth: number | null;
+  expYear: number | null;
 };
+
+function cardSummaryFromPaymentMethod(pm: {
+  id: string;
+  card?: Stripe.PaymentMethod.Card | null;
+}): SavedPaymentMethodSummary {
+  return {
+    id: pm.id,
+    brand: pm.card?.brand ?? null,
+    last4: pm.card?.last4 ?? null,
+    expMonth: pm.card?.exp_month ?? null,
+    expYear: pm.card?.exp_year ?? null,
+  };
+}
+
+/** Format expiry as MM/YY when both parts are present. */
+export function formatCardExpiry(
+  pm: Pick<SavedPaymentMethodSummary, "expMonth" | "expYear">,
+): string | null {
+  if (!pm.expMonth || !pm.expYear) return null;
+  const month = String(pm.expMonth).padStart(2, "0");
+  const year = String(pm.expYear).slice(-2);
+  return `${month}/${year}`;
+}
 
 export async function createSetupIntent(customerId: string): Promise<string> {
   const setupIntent = await stripe.setupIntents.create({
@@ -37,21 +62,13 @@ export async function getDefaultPaymentMethod(
     try {
       const pm = await stripe.paymentMethods.retrieve(defaultId);
       if (pm.type === "card") {
-        return {
-          id: pm.id,
-          brand: pm.card?.brand ?? null,
-          last4: pm.card?.last4 ?? null,
-        };
+        return cardSummaryFromPaymentMethod(pm);
       }
     } catch {
       // Fall through to list.
     }
   } else if (defaultId && typeof defaultId !== "string" && defaultId.type === "card") {
-    return {
-      id: defaultId.id,
-      brand: defaultId.card?.brand ?? null,
-      last4: defaultId.card?.last4 ?? null,
-    };
+    return cardSummaryFromPaymentMethod(defaultId);
   }
 
   const listed = await stripe.paymentMethods.list({
@@ -61,11 +78,7 @@ export async function getDefaultPaymentMethod(
   });
   const first = listed.data[0];
   if (!first) return null;
-  return {
-    id: first.id,
-    brand: first.card?.brand ?? null,
-    last4: first.card?.last4 ?? null,
-  };
+  return cardSummaryFromPaymentMethod(first);
 }
 
 // Sets the new card as the customer's default and repoints active subscriptions at it,
@@ -99,11 +112,7 @@ export async function setDefaultPaymentMethod(params: {
   }
 
   const pm = await stripe.paymentMethods.retrieve(paymentMethodId);
-  return {
-    id: pm.id,
-    brand: pm.card?.brand ?? null,
-    last4: pm.card?.last4 ?? null,
-  };
+  return cardSummaryFromPaymentMethod(pm);
 }
 
 export function formatSavedCardLabel(pm: SavedPaymentMethodSummary): string {

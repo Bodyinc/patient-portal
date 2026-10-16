@@ -30,17 +30,28 @@ export type QuickbloxSdkConfig = {
   token: string;
   dialogId: string | null;
   dialogJid?: string | null;
+  /** True when medication_requests.provider_id is set for this plan (not QB env provider). */
+  caseAssigned: boolean;
   providerId: number | null;
   providerName?: string | null;
   appointmentId: string;
   patientName: string;
   medicineName: string;
   intakeFormId: string;
+  /** Base URL for the intake form iframe (HIPAA host by default). */
+  intakeFormBase: string;
+};
+
+export type IntakeAnswerAttachment = {
+  name: string;
+  url: string;
+  kind: "image" | "file";
 };
 
 export type IntakeAnswerItem = {
   label: string;
   value: string;
+  attachments?: IntakeAnswerAttachment[];
 };
 
 export type PatientConsultationData = {

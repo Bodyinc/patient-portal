@@ -69,6 +69,7 @@ function buildSdkConfig(params: {
   client: QbClientSession;
   appointmentId: string;
   dialogId: string | null;
+  caseAssigned: boolean;
   providerId: number | null;
   providerName?: string | null;
   patientName: string;
@@ -87,12 +88,14 @@ function buildSdkConfig(params: {
     token: params.client.token,
     dialogId: params.dialogId,
     dialogJid: params.dialogId ? `${cfg.appId}_${params.dialogId}@muc.chat.quickblox.com` : null,
+    caseAssigned: params.caseAssigned,
     providerId: params.providerId,
     providerName: params.providerName ?? null,
     appointmentId: params.appointmentId,
     patientName: params.patientName,
     medicineName: params.medicineName,
     intakeFormId: jotformCfg.intakeFormId,
+    intakeFormBase: jotformCfg.formBase,
   };
 }
 
@@ -295,7 +298,7 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
     subscription.id,
   );
 
-  const [{ data: profile }, { data: intake }] = await Promise.all([
+  const [{ data: profile }, { data: intake }, { data: medicationRequest }] = await Promise.all([
     supabaseAdmin
       .from("profiles")
       .select("full_name, email, dob, sex, phone, state_code")
@@ -309,7 +312,17 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
       .order("updated_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    supabaseAdmin
+      .from("medication_requests")
+      .select("provider_id")
+      .eq("user_id", user.id)
+      .eq("subscription_id", subscription.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
+
+  const caseAssigned = Boolean(medicationRequest?.provider_id);
 
   const email = (profile?.email || user.email || "").trim().toLowerCase();
   if (!email) return { ok: false, message: "Your account is missing an email address." };
@@ -493,6 +506,16 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
       const isRoom = Boolean(isFinished || hasFormSubmission);
 
       const dialogId = forThisSub?.qb_dialog_id ?? activeVisit?.dialogId ?? null;
+      if (dialogId && forThisSub?.id && forThisSub.qb_dialog_id !== dialogId) {
+        void supabaseAdmin
+          .from("patient_consultations")
+          .update({
+            qb_dialog_id: dialogId,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", forThisSub.id);
+      }
+
       const providerId = activeVisit?.providerId ?? null;
       let providerName: string | null = null;
       if (providerId) {
@@ -537,6 +560,7 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
           client,
           appointmentId,
           dialogId,
+          caseAssigned,
           providerId,
           providerName,
           patientName: fullName,
@@ -613,6 +637,7 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
           client,
           appointmentId: appointment._id,
           dialogId: appointment.dialog_id ?? null,
+          caseAssigned,
           providerId: appointment.provider_id ?? null,
           patientName: fullName,
           medicineName,
@@ -654,6 +679,7 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
               client,
               appointmentId: raced.qb_appointment_id,
               dialogId: (raced as { qb_dialog_id?: string | null })?.qb_dialog_id ?? null,
+              caseAssigned,
               providerId: null,
               patientName: fullName,
               medicineName,
@@ -690,6 +716,7 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
         client,
         appointmentId: appointment._id,
         dialogId: appointment.dialog_id ?? null,
+        caseAssigned,
         providerId: appointment.provider_id ?? null,
         patientName: fullName,
         medicineName,

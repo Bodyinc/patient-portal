@@ -1,8 +1,11 @@
 import "server-only";
 
+import type { IntakeAnswerAttachment, IntakeAnswerItem } from "./types";
+
 const DEFAULT_JOTFORM_API_KEY = "983f5108959b618eea6284964e342464";
 const DEFAULT_JOTFORM_INTAKE_FORM_ID = "253156067633054";
 const JOTFORM_API_BASE = "https://hipaa-api.jotform.com";
+const DEFAULT_JOTFORM_FORM_BASE = "https://hipaa.jotform.com";
 
 export type JotformSubmissionResult = {
   submitted: boolean;
@@ -10,17 +13,126 @@ export type JotformSubmissionResult = {
   submittedAt: string | null;
 };
 
-export type IntakeAnswerItem = {
-  label: string;
-  value: string;
-};
-
 export function getJotformConfig() {
   const apiKey = (process.env.JOTFORM_API_KEY || DEFAULT_JOTFORM_API_KEY).trim();
   const intakeFormId = (
     process.env.JOTFORM_INTAKE_FORM_ID || DEFAULT_JOTFORM_INTAKE_FORM_ID
   ).trim();
-  return { apiKey, intakeFormId, apiBase: JOTFORM_API_BASE };
+  const formBase = (process.env.JOTFORM_FORM_BASE || DEFAULT_JOTFORM_FORM_BASE)
+    .trim()
+    .replace(/\/+$/, "");
+  return { apiKey, intakeFormId, apiBase: JOTFORM_API_BASE, formBase };
+}
+
+const IMAGE_EXT_RE = /\.(jpe?g|png|gif|webp|bmp|svg)(?:\?|#|$)/i;
+
+function fileNameFromUrl(url: string): string {
+  try {
+    const path = new URL(url).pathname;
+    const last = path.split("/").filter(Boolean).pop();
+    return last ? decodeURIComponent(last) : "Attachment";
+  } catch {
+    return "Attachment";
+  }
+}
+
+function attachmentKind(url: string, name?: string): "image" | "file" {
+  const probe = `${name ?? ""} ${url}`;
+  return IMAGE_EXT_RE.test(probe) ? "image" : "file";
+}
+
+/** True when URL is a Jotform upload/file host we may proxy. */
+export function isAllowedJotformUploadUrl(raw: string): boolean {
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== "https:") return false;
+    const host = parsed.hostname.toLowerCase();
+    const allowedHost =
+      host === "jotform.com" ||
+      host.endsWith(".jotform.com") ||
+      host === "jotformeu.com" ||
+      host.endsWith(".jotformeu.com");
+    if (!allowedHost) return false;
+    // Prefer upload/CDN paths; still allow known form asset hosts under jotform.com
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function extractAttachmentsFromAnswer(answer: unknown, type?: string): IntakeAnswerAttachment[] {
+  const attachments: IntakeAnswerAttachment[] = [];
+  const isFileControl = type === "control_fileupload" || type === "control_widget";
+
+  const pushUrl = (raw: unknown, nameHint?: string) => {
+    if (typeof raw !== "string") return;
+    const url = raw.trim();
+    if (!/^https?:\/\//i.test(url)) return;
+    if (!isAllowedJotformUploadUrl(url)) return;
+    const name = nameHint?.trim() || fileNameFromUrl(url);
+    attachments.push({ name, url, kind: attachmentKind(url, name) });
+  };
+
+  if (typeof answer === "string") {
+    if (isFileControl || /^https?:\/\//i.test(answer.trim())) {
+      pushUrl(answer);
+    }
+    return attachments;
+  }
+
+  if (Array.isArray(answer)) {
+    for (const item of answer) {
+      if (typeof item === "string") {
+        pushUrl(item);
+      } else if (item && typeof item === "object") {
+        const obj = item as Record<string, unknown>;
+        const url = (obj.url ?? obj.link ?? obj.href ?? obj.path) as unknown;
+        const name = typeof obj.name === "string" ? obj.name : undefined;
+        pushUrl(url, name);
+      }
+    }
+    return attachments;
+  }
+
+  if (answer && typeof answer === "object") {
+    const obj = answer as Record<string, unknown>;
+    if (obj.url || obj.link || obj.href) {
+      pushUrl(obj.url ?? obj.link ?? obj.href, typeof obj.name === "string" ? obj.name : undefined);
+    } else if (isFileControl) {
+      for (const value of Object.values(obj)) {
+        if (typeof value === "string" && /^https?:\/\//i.test(value)) {
+          pushUrl(value);
+        }
+      }
+    }
+  }
+
+  return attachments;
+}
+
+/** Fetch a Jotform upload with API auth for streaming to the patient. */
+export async function fetchJotformUpload(remoteUrl: string): Promise<Response> {
+  const { apiKey } = getJotformConfig();
+  if (!isAllowedJotformUploadUrl(remoteUrl)) {
+    throw new Error("URL is not an allowed Jotform host.");
+  }
+
+  const withKey = new URL(remoteUrl);
+  if (apiKey && !withKey.searchParams.has("apiKey")) {
+    withKey.searchParams.set("apiKey", apiKey);
+  }
+
+  const res = await fetch(withKey.toString(), {
+    method: "GET",
+    headers: {
+      Accept: "*/*",
+      ...(apiKey ? { APIKEY: apiKey } : {}),
+    },
+    cache: "no-store",
+    redirect: "follow",
+  });
+
+  return res;
 }
 
 type JotformAnswer = {
@@ -512,9 +624,12 @@ export async function fetchJotformSubmissionAnswers(
       }
 
       const label = item.text || item.name || `Question ${key}`;
+      const attachments = extractAttachmentsFromAnswer(item.answer, item.type);
       let val = item.answer;
 
-      if (typeof val === "object" && val !== null) {
+      if (attachments.length > 0) {
+        val = attachments.map((a) => a.name).join(", ");
+      } else if (typeof val === "object" && val !== null) {
         if (Array.isArray(val)) {
           val = val.join(", ");
         } else {
@@ -533,11 +648,12 @@ export async function fetchJotformSubmissionAnswers(
       }
 
       const valStr = String(val).trim();
-      if (!valStr) continue;
+      if (!valStr && attachments.length === 0) continue;
 
       items.push({
         label: label.trim(),
-        value: valStr,
+        value: valStr || attachments.map((a) => a.name).join(", "),
+        ...(attachments.length > 0 ? { attachments } : {}),
       });
     }
 

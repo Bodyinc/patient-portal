@@ -22,6 +22,8 @@ type BillingPageClientProps = {
   avatarUrl: string | null;
   referral: ReferralSummary | null;
   wallet: WalletSummary | null;
+  cardLabel: string | null;
+  cardExpiry: string | null;
 };
 
 export default function BillingPageClient({
@@ -31,6 +33,8 @@ export default function BillingPageClient({
   avatarUrl,
   referral,
   wallet,
+  cardLabel,
+  cardExpiry,
 }: BillingPageClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -90,7 +94,7 @@ export default function BillingPageClient({
 
       {wallet ? <WalletCard wallet={wallet} /> : null}
       <SubscriptionsSection subscriptions={data.subscriptions} onCancel={setCancelling} />
-      <PaymentMethodSection />
+      <PaymentMethodSection cardLabel={cardLabel} cardExpiry={cardExpiry} />
       <PaymentHistorySection
         payments={data.payments}
         isPending={isPending}
