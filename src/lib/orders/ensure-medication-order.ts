@@ -17,6 +17,7 @@ type SubscriptionRow = {
   session_id: string | null;
   package_id: string | null;
   medicine_id: string | null;
+  is_checkout_primary: boolean | null;
 };
 
 async function resolveProviderId(params: {
@@ -97,6 +98,9 @@ export async function ensureMedicationOrderForPayment(params: {
   const payment = await loadPayment(params);
   if (!payment) return;
   if (payment.status !== "succeeded" || !payment.stripe_subscription_id) return;
+  // Extra charges (a clinician changing the medicine) have no Stripe invoice.
+  // A new request for those is created by the clinical flow, not by this payment.
+  if (!payment.stripe_invoice_id) return;
 
   if (payment.stripe_invoice_id) {
     const { data: existing } = await supabaseAdmin
@@ -109,7 +113,7 @@ export async function ensureMedicationOrderForPayment(params: {
 
   const { data: sub } = await supabaseAdmin
     .from("subscriptions")
-    .select("id, user_id, session_id, package_id, medicine_id")
+    .select("id, user_id, session_id, package_id, medicine_id, is_checkout_primary")
     .eq("stripe_subscription_id", payment.stripe_subscription_id)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -133,10 +137,19 @@ export async function ensureMedicationOrderForPayment(params: {
     .maybeSingle();
 
   const kind = priorRequest ? "followup" : "initial";
-  const needsConsultation = priorRequest
-    ? Boolean(medicine.requires_followup)
-    : Boolean(medicine.requires_consultation);
-  let status = needsConsultation ? "pending_review" : "approved";
+  // Added medicines belong to the primary checkout's consultation.
+  const coveredByPrimaryConsultation =
+    kind === "initial" && subscription.is_checkout_primary === false;
+  const needsConsultation = coveredByPrimaryConsultation
+    ? false
+    : priorRequest
+      ? Boolean(medicine.requires_followup)
+      : Boolean(medicine.requires_consultation);
+  let status = coveredByPrimaryConsultation
+    ? "pending_review"
+    : needsConsultation
+      ? "pending_review"
+      : "approved";
 
   const providerId = await resolveProviderId({
     needsConsultation,

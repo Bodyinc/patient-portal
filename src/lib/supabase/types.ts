@@ -304,18 +304,27 @@ export type Database = {
           session_id: string;
           category_id: string;
           medicine_id: string;
+          package_id: string | null;
+          variant_id: string | null;
+          is_primary: boolean;
           created_at: string;
         };
         Insert: {
           session_id: string;
           category_id: string;
           medicine_id: string;
+          package_id?: string | null;
+          variant_id?: string | null;
+          is_primary?: boolean;
           created_at?: string;
         };
         Update: {
           session_id?: string;
           category_id?: string;
           medicine_id?: string;
+          package_id?: string | null;
+          variant_id?: string | null;
+          is_primary?: boolean;
           created_at?: string;
         };
         Relationships: [
@@ -920,6 +929,8 @@ export type Database = {
           status: string;
           current_period_end: string | null;
           cancel_at_period_end: boolean;
+          checkout_group_id: string | null;
+          is_checkout_primary: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -935,6 +946,8 @@ export type Database = {
           status?: string;
           current_period_end?: string | null;
           cancel_at_period_end?: boolean;
+          checkout_group_id?: string | null;
+          is_checkout_primary?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -950,6 +963,8 @@ export type Database = {
           status?: string;
           current_period_end?: string | null;
           cancel_at_period_end?: boolean;
+          checkout_group_id?: string | null;
+          is_checkout_primary?: boolean;
           created_at?: string;
           updated_at?: string;
         };

@@ -38,6 +38,16 @@ export async function createSubscriptionForPrice(params: {
     defaultPaymentMethodId = null,
   } = params;
 
+  // A recreated checkout must not inherit invoice items left behind by a canceled attempt.
+  const pendingItems = await stripe.invoiceItems.list({
+    customer: customerId,
+    pending: true,
+    limit: 100,
+  });
+  for (const item of pendingItems.data) {
+    if (!item.invoice) await stripe.invoiceItems.del(item.id);
+  }
+
   // Pending invoice items on the customer get pulled into the subscription's first
   // invoice, so the first charge equals the cart total (plan + one-time fees).
   for (const fee of oneTimeFees ?? []) {

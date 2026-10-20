@@ -41,7 +41,8 @@ export default function ConsultationsPageClient({ data }: ConsultationsPageClien
             Consultations
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[#152A51]/80 sm:text-base">
-            Talk with your provider by video or chat. Each active plan includes one consultation.
+            Talk with your provider by video or chat. Each checkout includes one consultation, even
+            when the order has more than one treatment.
           </p>
         </div>
 

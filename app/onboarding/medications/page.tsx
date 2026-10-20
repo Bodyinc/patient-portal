@@ -43,15 +43,34 @@ export default function MedicationsPage() {
     refetch,
   } = useMedicinesForCategory(state.goalId);
 
-  const medications = catalog?.medicines ?? [];
+  const medications = (catalog?.medicines ?? []).slice(0, 1);
+  const onlyMedication = medications[0] ?? null;
+
+  useEffect(() => {
+    if (!hydrated || !onlyMedication) return;
+    if (selected === onlyMedication.id) return;
+    const defaultVariant = onlyMedication.variants.length
+      ? [...onlyMedication.variants].sort(
+          (a, b) => (a.fromPriceCents ?? Infinity) - (b.fromPriceCents ?? Infinity),
+        )[0].id
+      : null;
+    const variantId =
+      state.medicationId === onlyMedication.id
+        ? (state.variantId ?? defaultVariant)
+        : defaultVariant;
+    setSelected(onlyMedication.id);
+    setSelectedVariantId(variantId);
+    void prefetchPackagesForMedicine(queryClient, onlyMedication.id, variantId);
+  }, [hydrated, onlyMedication, queryClient, selected, state.medicationId, state.variantId]);
   const categoryEligible = catalog?.categoryEligible ?? true;
   const ineligibleReason = catalog?.ineligibleReason ?? null;
   const detailsMedication = medications.find((m) => m.id === detailsMedicationId) ?? null;
 
   useEffect(() => {
-    if (!hydrated) return;
-    if (state.medicationId) setSelected(state.medicationId);
-  }, [hydrated, state.medicationId]);
+    if (!hydrated || !state.medicationId) return;
+    if (onlyMedication && state.medicationId !== onlyMedication.id) return;
+    setSelected(state.medicationId);
+  }, [hydrated, onlyMedication, state.medicationId]);
 
   async function handleContinue() {
     if (!selected) {
@@ -59,25 +78,13 @@ export default function MedicationsPage() {
       return;
     }
 
-    if (state.medicationId === selected) {
-      if (state.variantId !== selectedVariantId) {
-        updateState({ variantId: selectedVariantId });
-      }
-      const next = getNextStepPath("/onboarding/medications", {
-        ...state,
-        medicationId: selected,
-        variantId: selectedVariantId,
-      });
-      if (next) pushOnboardingRoute(router, next);
-      return;
-    }
-
     setSaving(true);
-    const savePromise = saveIntakeMedicine(selected, state.goalId);
+    const savePromise = saveIntakeMedicine(selected, state.goalId, selectedVariantId);
 
     const patch = {
       medicationId: selected,
       variantId: selectedVariantId,
+      additionalProductsReviewed: false,
       selectedPackageId: null,
       checkoutConfirmed: false,
     };
@@ -88,7 +95,15 @@ export default function MedicationsPage() {
     const result = await savePromise;
 
     if (!result.ok) {
+      setSaving(false);
       toast.error(result.message);
+      updateState({
+        medicationId: state.medicationId,
+        variantId: state.variantId,
+        additionalProductsReviewed: state.additionalProductsReviewed,
+        selectedPackageId: state.selectedPackageId,
+        checkoutConfirmed: state.checkoutConfirmed,
+      });
       pushOnboardingRoute(router, "/onboarding/medications");
     }
   }
@@ -108,16 +123,16 @@ export default function MedicationsPage() {
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden scrollbar-hide">
           <div className="mx-auto mb-4 w-full min-w-0 max-w-[1220px] shrink-0 px-4 text-center onboarding-font sm:mb-6 sm:px-6">
             <h1 className="pt-6 text-[28px] font-medium leading-none tracking-[-0.5px] text-[#152A51] sm:pt-8 sm:text-[32px]">
-              Choose your medication
+              Your medication
             </h1>
             <p className="mx-auto mt-3.5 max-w-2xl text-[14px] font-normal leading-snug text-[#152A51]/80">
               {state.goalName
-                ? `Recommended options for ${state.goalName}.`
-                : "Select the treatment that fits your goals."}
+                ? `This is the treatment for ${state.goalName}.`
+                : "This is the treatment for your selected goal."}
             </p>
           </div>
 
-          <div className="mx-auto grid w-full min-w-0 max-w-[1220px] grid-cols-1 items-stretch gap-5 px-4 pb-4 pt-2 sm:grid-cols-2 sm:gap-6 sm:px-6 xl:grid-cols-3">
+          <div className="mx-auto flex w-full min-w-0 max-w-[420px] justify-center px-4 pb-4 pt-2 sm:px-6">
             {isLoading ? (
               <p className="col-span-full text-center text-sm text-[#152A51]/70">
                 Loading medications…

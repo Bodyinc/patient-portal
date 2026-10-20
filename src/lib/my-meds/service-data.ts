@@ -1,5 +1,7 @@
 import "server-only";
 
+import { ensureCheckoutAddons } from "@/lib/checkout/provision-addons";
+import { sendOrderConfirmationEmail } from "@/lib/email/order-confirmation";
 import { resolveMedicineImageSrc } from "@/lib/intake/medicine-image";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { fetchPatientOrders } from "@/lib/orders/service-data";
@@ -19,7 +21,7 @@ import type {
 const ACTIVE_SUBSCRIPTION_STATUSES = ["active", "trialing", "past_due"];
 
 const SUBSCRIPTION_SELECT =
-  "id, medicine_id, package_id, status, current_period_end, cancel_at_period_end, created_at, updated_at, medicines(id, name, image_url, important_info), packages(id, name, duration_months, variant_id, medicine_variants(id, name))";
+  "id, medicine_id, package_id, status, is_checkout_primary, current_period_end, cancel_at_period_end, created_at, updated_at, medicines(id, name, image_url, important_info), packages(id, name, duration_months, variant_id, medicine_variants(id, name))";
 
 type EmbeddedMedicine = {
   name: string;
@@ -42,6 +44,7 @@ type SubscriptionRow = {
   status: string;
   current_period_end: string | null;
   cancel_at_period_end: boolean;
+  is_checkout_primary?: boolean | null;
   created_at: string;
   updated_at: string;
   medicines?: EmbeddedMedicine;
@@ -156,11 +159,22 @@ function mapPastMedication(subscription: SubscriptionRow): MyMedsPastMedicationD
   };
 }
 
+function byCheckoutRole(a: SubscriptionRow, b: SubscriptionRow) {
+  const rank = (row: SubscriptionRow) => (row.is_checkout_primary === false ? 1 : 0);
+  const role = rank(a) - rank(b);
+  if (role !== 0) return role;
+  return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+}
+
 /** Newest active subscriptions — used by Dashboard treatment block. */
 export async function fetchActiveMedications(
   userId: string,
   options: { reconcile?: boolean } = {},
 ): Promise<MyMedsCurrentMedicationDto[]> {
+  await ensureCheckoutAddons(userId).catch((err) => {
+    console.error("[checkout] addon ensure failed:", err);
+  });
+
   if (options.reconcile !== false) {
     await maybeReconcileIncompleteSubscription(userId);
   }
@@ -175,7 +189,7 @@ export async function fetchActiveMedications(
   if (error) throw new Error(error.message);
   if (!subscriptions?.length) return [];
 
-  const rows = subscriptions as SubscriptionRow[];
+  const rows = (subscriptions as SubscriptionRow[]).sort(byCheckoutRole);
   const orderStatusBySubscription = await latestOrderStatusBySubscription(
     userId,
     rows.map((row) => row.id),
@@ -286,6 +300,35 @@ export async function fetchMyMedsPageData(
   userId: string,
   options: { page?: number; pageSize?: number; query?: string } = {},
 ): Promise<MyMedsPageDataDto> {
+  await ensureCheckoutAddons(userId).catch((err) => {
+    console.error("[checkout] addon ensure failed:", err);
+  });
+  const { data: primarySub } = await supabaseAdmin
+    .from("subscriptions")
+    .select("stripe_subscription_id")
+    .eq("user_id", userId)
+    .eq("is_checkout_primary", true)
+    .in("status", ["active", "trialing", "past_due"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (primarySub?.stripe_subscription_id) {
+    const { data: checkoutPayment } = await supabaseAdmin
+      .from("payments")
+      .select("id")
+      .eq("stripe_subscription_id", primarySub.stripe_subscription_id)
+      .eq("status", "succeeded")
+      .gt("amount_cents", 0)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (checkoutPayment?.id) {
+      await sendOrderConfirmationEmail(checkoutPayment.id).catch((err) => {
+        console.error("[email] order confirmation on my meds failed:", err);
+      });
+    }
+  }
+
   const [didReconcile, pendingPayments, initialSubs, requests] = await Promise.all([
     maybeReconcileIncompleteSubscription(userId),
     healAndFetchPendingAdditionalPayments(userId).catch((err) => {
@@ -314,7 +357,7 @@ export async function fetchMyMedsPageData(
 
   if (subscriptionsResult.error) throw new Error(subscriptionsResult.error.message);
 
-  const rows = (subscriptionsResult.data ?? []) as SubscriptionRow[];
+  const rows = ((subscriptionsResult.data ?? []) as SubscriptionRow[]).sort(byCheckoutRole);
   const activeStatusSet = new Set(ACTIVE_SUBSCRIPTION_STATUSES);
 
   const activeRows = rows.filter((row) => activeStatusSet.has(row.status));

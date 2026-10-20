@@ -1,5 +1,8 @@
 import { requirePatientSession } from "@/lib/auth/require-patient";
-import { fulfillAdditionalPaymentByIntentId } from "@/lib/orders/additional-payment";
+import {
+  dispatchUnsentPaidUpgrades,
+  fulfillAdditionalPaymentByIntentId,
+} from "@/lib/orders/additional-payment";
 import { fetchMyMedsPageData } from "@/lib/my-meds/service-data";
 import { fetchActivePortalOffer } from "@/lib/offers/service-data";
 import { getPatientDisplayIdentity } from "@/lib/profile/identity";
@@ -35,6 +38,7 @@ export default async function MyMedsPage({
   if (resolvedSearchParams.payment_intent) {
     await fulfillAdditionalPaymentByIntentId(resolvedSearchParams.payment_intent);
   }
+  await dispatchUnsentPaidUpgrades(user.id);
 
   try {
     const [data, referral, offer, identity] = await Promise.all([

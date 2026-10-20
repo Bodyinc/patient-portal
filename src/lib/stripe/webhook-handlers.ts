@@ -3,6 +3,7 @@ import "server-only";
 import type Stripe from "stripe";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { fulfillAdditionalPayment } from "@/lib/orders/additional-payment";
+import { provisionAddonSubscriptions } from "@/lib/checkout/provision-addons";
 import { recordPayment } from "./record-payment";
 import { stripe } from "./server";
 import { sendTransactionalEmail } from "@/lib/email/send";
@@ -258,10 +259,12 @@ async function handleInvoicePaid(
     await redeemPromoFromSubscription(subId);
   }
 
-  await supabaseAdmin
-    .from("subscriptions")
-    .update({ status: "active" })
-    .eq("stripe_subscription_id", subId);
+  if ((invoice.amount_paid ?? 0) > 0) {
+    await supabaseAdmin
+      .from("subscriptions")
+      .update({ status: "active" })
+      .eq("stripe_subscription_id", subId);
+  }
 
   if (subRow?.user_id) {
     try {
@@ -300,6 +303,13 @@ async function handleInvoicePaid(
 
   // Order creation is handled by the DB trigger trg_create_medication_order on payments insert
   // (see migration 20260725110000 / 20260725120000), so it is not duplicated here.
+
+  if (options?.notifyCustomer && invoice.billing_reason === "subscription_create") {
+    await provisionAddonSubscriptions({
+      stripeSubscriptionId: subId,
+      stripeInvoiceId: invoice.id,
+    });
+  }
 }
 
 async function notifyPaymentFailed(invoice: Stripe.Invoice, userId: string | null): Promise<void> {

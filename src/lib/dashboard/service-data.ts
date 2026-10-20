@@ -8,6 +8,7 @@ import { getPatientDisplayIdentity } from "@/lib/profile/identity";
 import { maybeReconcileIncompleteSubscription } from "@/lib/stripe/reconcile";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
+import { consultationAnchorId } from "@/lib/checkout/group";
 import { isQuickbloxConfigured } from "@/lib/consultations/config";
 import { fetchAppointmentStatuses, getCachedClientSession } from "@/lib/consultations/quickblox";
 import { readQbClientSession } from "@/lib/consultations/session-cookie";
@@ -199,7 +200,10 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
 
   const currentMed = visibleMeds[0] ?? null;
   let consultationStatus: DashboardTreatmentDto["consultationStatus"] = "none";
-  if (currentMed?.subscriptionId) {
+  const consultationSubscriptionId = currentMed?.subscriptionId
+    ? await consultationAnchorId(currentMed.subscriptionId)
+    : null;
+  if (consultationSubscriptionId) {
     let visit: {
       qb_appointment_id: string;
       ended_at?: string | null;
@@ -208,14 +212,14 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
       .from("patient_consultations")
       .select("qb_appointment_id, ended_at")
       .eq("user_id", userId)
-      .eq("subscription_id", currentMed.subscriptionId)
+      .eq("subscription_id", consultationSubscriptionId)
       .maybeSingle();
     if (first.error && /ended_at/i.test(first.error.message)) {
       const retried = await supabaseAdmin
         .from("patient_consultations")
         .select("qb_appointment_id")
         .eq("user_id", userId)
-        .eq("subscription_id", currentMed.subscriptionId)
+        .eq("subscription_id", consultationSubscriptionId)
         .maybeSingle();
       visit = retried.data;
     } else if (first.error && !/patient_consultations/i.test(first.error.message)) {
@@ -228,8 +232,8 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
       consultationStatus = visit.ended_at ? "closed" : "open";
       if (isQuickbloxConfigured()) {
         const clientToken =
-          getCachedClientSession(userId, currentMed.subscriptionId)?.token ??
-          (await readQbClientSession(userId, currentMed.subscriptionId))?.token;
+          getCachedClientSession(userId, consultationSubscriptionId)?.token ??
+          (await readQbClientSession(userId, consultationSubscriptionId))?.token;
         const live = (
           await fetchAppointmentStatuses([visit.qb_appointment_id], { clientToken })
         ).get(visit.qb_appointment_id);
@@ -238,8 +242,8 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
     }
 
     // Also check if provider/doctor completed the visit via medication_request_events
-    if (consultationStatus !== "closed" && currentMed.subscriptionId) {
-      const matchingReq = requests.find((r) => r.subscription_id === currentMed.subscriptionId);
+    if (consultationStatus !== "closed") {
+      const matchingReq = requests.find((r) => r.subscription_id === consultationSubscriptionId);
       if (matchingReq?.id) {
         const { data: events } = await supabaseAdmin
           .from("medication_request_events")
