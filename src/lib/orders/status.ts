@@ -19,6 +19,19 @@ export function patientStatusLabel(status: string): string {
   return PATIENT_STATUS_LABELS[status] ?? status;
 }
 
+const CONSULTATION_APPROVED_STATUSES = new Set([
+  "approved",
+  "prescribed",
+  "sent_to_pharmacy",
+  "dispatched",
+  "delivered",
+]);
+
+/** Provider approved a consultation order. Stays true as the order moves toward delivery. */
+export function isConsultationApproved(status: string, requiresConsultation: boolean): boolean {
+  return requiresConsultation && CONSULTATION_APPROVED_STATUSES.has(status);
+}
+
 const STATUS_ORDER: Record<string, number> = {
   payment_completed: 0,
   provider_assigned: 1,

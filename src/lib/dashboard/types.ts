@@ -17,6 +17,8 @@ export type DashboardTreatmentDto = {
   consultationStatus: "none" | "open" | "closed";
   /** Manual refill is open: order delivered, last week of the plan, and not auto-pay. */
   canRequestRefill: boolean;
+  trackingNumber: string | null;
+  consultationApproved: boolean;
 };
 
 export type DashboardPendingPaymentDto = {

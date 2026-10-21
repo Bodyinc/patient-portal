@@ -14,6 +14,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { MyMedsMedicationRequestDto, MyMedsMedicationRequestsListDto } from "./types";
 import { formatPortalDate } from "@/lib/date-format";
+import TrackingIdValue from "../../_components/TrackingIdValue";
 
 type MedicationRequestsSectionProps = {
   requests: MyMedsMedicationRequestsListDto;
@@ -108,6 +109,7 @@ export default function MedicationRequestsSection({
                 <TableHead className="min-w-[160px] text-[#152A51]/70">Medicine</TableHead>
                 <TableHead className="min-w-[140px] text-[#152A51]/70">Plan</TableHead>
                 <TableHead className="min-w-[130px] text-[#152A51]/70">Status</TableHead>
+                <TableHead className="min-w-[160px] text-[#152A51]/70">Tracking ID</TableHead>
                 <TableHead className="min-w-[120px] text-right text-[#152A51]/70">
                   Actions
                 </TableHead>
@@ -126,13 +128,27 @@ export default function MedicationRequestsSection({
                     {request.planName ?? "—"}
                   </TableCell>
                   <TableCell>
-                    <span
-                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusBadgeClass(
-                        request.status,
-                      )}`}
-                    >
-                      {request.statusLabel}
-                    </span>
+                    <div className="flex flex-col items-start gap-1">
+                      <span
+                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusBadgeClass(
+                          request.status,
+                        )}`}
+                      >
+                        {request.statusLabel}
+                      </span>
+                      {request.consultationApproved ? (
+                        <span className="text-[11px] font-medium text-[#34845F]">
+                          Consultation approved
+                        </span>
+                      ) : null}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-sm text-[#152A51]">
+                    {request.trackingNumber ? (
+                      <TrackingIdValue trackingNumber={request.trackingNumber} labeled={false} />
+                    ) : (
+                      "—"
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-3">
@@ -282,10 +298,14 @@ export default function MedicationRequestsSection({
                   })}
                 </ol>
 
+                {active.consultationApproved ? (
+                  <p className="mt-1 text-sm font-medium text-[#34845F]">Consultation approved</p>
+                ) : null}
+
                 {active.trackingNumber ? (
-                  <p className="mt-1 text-sm text-[#152A51]">
-                    <span className="text-[#152A51]/60">Tracking #:</span> {active.trackingNumber}
-                  </p>
+                  <div className="mt-1">
+                    <TrackingIdValue trackingNumber={active.trackingNumber} />
+                  </div>
                 ) : null}
 
                 {active.prescription ? (

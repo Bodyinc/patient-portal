@@ -8,6 +8,7 @@ import { fetchPatientOrders } from "@/lib/orders/service-data";
 import { healAndFetchPendingAdditionalPayments } from "@/lib/orders/additional-payment";
 import { maybeReconcileIncompleteSubscription } from "@/lib/stripe/reconcile";
 import { canRequestManualRefill } from "@/lib/orders/refill-eligibility";
+import { isConsultationApproved } from "@/lib/orders/status";
 import { maybeSyncSubscriptionPeriodEnds } from "@/lib/stripe/sync-period-end";
 import type { Json } from "@/lib/supabase/types";
 import type {
@@ -113,9 +114,15 @@ function statusLabelForPast(status: string): string {
   return "Ended";
 }
 
+type LatestOrderSnapshot = {
+  status: string;
+  trackingNumber: string | null;
+  requiresConsultation: boolean;
+};
+
 function mapActiveMedication(
   subscription: SubscriptionRow,
-  orderStatus: string | null,
+  order: LatestOrderSnapshot | null,
 ): MyMedsCurrentMedicationDto {
   const medicine = subscription.medicines ?? null;
   const pkg = subscription.packages ?? null;
@@ -134,9 +141,13 @@ function mapActiveMedication(
     imageSrc: resolveMedicineImageSrc(medicine?.image_url ?? null),
     canRequestRefill: canRequestManualRefill({
       autoPay: !subscription.cancel_at_period_end,
-      orderStatus,
+      orderStatus: order?.status ?? null,
       tenureEndsAt: subscription.current_period_end,
     }),
+    trackingNumber: order?.trackingNumber?.trim() || null,
+    consultationApproved: order
+      ? isConsultationApproved(order.status, order.requiresConsultation)
+      : false,
   };
 }
 
@@ -201,23 +212,27 @@ export async function fetchActiveMedications(
 async function latestOrderStatusBySubscription(
   userId: string,
   subscriptionIds: string[],
-): Promise<Map<string, string>> {
+): Promise<Map<string, LatestOrderSnapshot>> {
   const ids = subscriptionIds.filter(Boolean);
   if (!ids.length) return new Map();
 
   const { data, error } = await supabaseAdmin
     .from("medication_requests")
-    .select("subscription_id, status, created_at")
+    .select("subscription_id, status, tracking_number, requires_consultation, created_at")
     .eq("user_id", userId)
     .in("subscription_id", ids)
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(error.message);
 
-  const latest = new Map<string, string>();
+  const latest = new Map<string, LatestOrderSnapshot>();
   for (const row of data ?? []) {
     if (!row.subscription_id || latest.has(row.subscription_id)) continue;
-    latest.set(row.subscription_id, row.status);
+    latest.set(row.subscription_id, {
+      status: row.status,
+      trackingNumber: row.tracking_number,
+      requiresConsultation: row.requires_consultation,
+    });
   }
   return latest;
 }
@@ -235,6 +250,7 @@ function mapOrderToRequestDto(
     isRejected: o.isRejected,
     requestDate: o.createdAt,
     trackingNumber: o.trackingNumber,
+    consultationApproved: isConsultationApproved(o.status, o.requiresConsultation),
     pendingPaymentCents: o.pendingPayment?.amountCents ?? null,
     prescription: o.prescription
       ? {
