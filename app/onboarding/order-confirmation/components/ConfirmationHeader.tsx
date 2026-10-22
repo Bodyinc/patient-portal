@@ -7,7 +7,7 @@ type ConfirmationHeaderProps = {
 
 export default function ConfirmationHeader({ orderNumber, orderDate }: ConfirmationHeaderProps) {
   return (
-    <div className="flex w-full max-w-xl flex-col items-center gap-4">
+    <div className="flex w-full max-w-xl flex-col items-start gap-4 text-left">
       <h1 className="text-[28px] font-semibold tracking-[-0.5px] text-[#152A51] sm:text-[32px]">
         Order Confirmed
       </h1>
@@ -18,7 +18,7 @@ export default function ConfirmationHeader({ orderNumber, orderDate }: Confirmat
         progresses.
       </p>
 
-      <div className="flex flex-col items-center justify-center gap-2.5 sm:flex-row sm:gap-3">
+      <div className="flex flex-col items-start justify-start gap-2.5 sm:flex-row sm:gap-3">
         <div className="rounded-xl border border-[#152A51]/20 bg-white px-4 py-2 text-sm font-medium text-[#152A51]">
           Order Number: {orderNumber ?? "…"}
         </div>

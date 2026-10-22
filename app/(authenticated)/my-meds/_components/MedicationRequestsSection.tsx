@@ -66,7 +66,7 @@ export default function MedicationRequestsSection({
   return (
     <section className="rounded-[16px] border border-[#E8EEED] bg-white p-4 sm:p-5">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-lg font-medium tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
+        <h2 className="text-[26px] font-medium tracking-[-0.3px] text-[#152A51]">
           Medication Requests
         </h2>
         <form

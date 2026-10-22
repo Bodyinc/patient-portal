@@ -1330,11 +1330,10 @@ export async function getOnboardingConfirmationData(): Promise<
     buildIntakeSummary(session.id, session),
     supabaseAdmin
       .from("payments")
-      .select("id, amount_cents, created_at")
+      .select("id, amount_cents, created_at, status")
       .eq("session_id", session.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+      .eq("status", "succeeded")
+      .order("created_at", { ascending: true }),
     supabaseAdmin
       .from("medication_requests")
       .select("id, created_at")
@@ -1353,9 +1352,12 @@ export async function getOnboardingConfirmationData(): Promise<
     return { ok: false, code: "not_found", message: "Order summary unavailable" };
   }
 
-  const payment = paymentResult.data;
+  const payments = paymentResult.data ?? [];
+  // Add-on plans are trialing subscriptions. Their first invoice is $0 and is recorded
+  // after the real charge, so the newest payment is not the amount the patient paid.
+  const charged = payments.find((row) => (row.amount_cents ?? 0) > 0);
   const request = requestResult.data;
-  const paidCents = payment?.amount_cents;
+  const paidCents = charged ? charged.amount_cents : payments.length > 0 ? 0 : null;
   const items = (summary.cartItems ?? [])
     .filter((item) => item.packagePrice != null || item.isPrimary)
     .map((item) => ({

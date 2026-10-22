@@ -50,7 +50,7 @@ export default function ReferralCard({
     <section className="rounded-[24px] border border-[#E8EEED] bg-white p-4 sm:p-5">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h3 className="text-xl font-medium tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
+          <h3 className="text-[26px] font-medium tracking-[-0.3px] text-[#152A51]">
             Share Wellness, Earn Rewards
           </h3>
           <p className="text-sm text-[#152A51]/70">{referralHint}</p>

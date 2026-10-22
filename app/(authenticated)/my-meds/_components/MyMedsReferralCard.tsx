@@ -35,7 +35,7 @@ export default function MyMedsReferralCard({
     <section className="rounded-[16px] border border-[#E8EEED] bg-white p-4 sm:p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
         <div className="min-w-0">
-          <p className="text-lg font-medium tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
+          <p className="text-[26px] font-medium tracking-[-0.3px] text-[#152A51]">
             Referral Program
           </p>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[#152A51]/80 sm:text-[15px]">

@@ -20,6 +20,12 @@ type OnboardingStepLayoutProps = {
   maxWidth?: "md" | "lg" | "xl" | "2xl" | "4xl" | "7xl" | "form";
   /** Center compact steps vertically; use "fill" for taller content that fills middle zone. */
   layout?: "centered" | "fill";
+  /**
+   * Keep the title, body, and footer together and center that whole block.
+   * The page scrolls only when the block is taller than the screen, so the
+   * footer never sits on top of the last field.
+   */
+  centerBlock?: boolean;
   /** Card chrome vs bare Figma-style form surface. */
   variant?: "card" | "bare";
   /** Title / description alignment. */
@@ -52,6 +58,7 @@ export default function OnboardingStepLayout({
   showProgress = true,
   maxWidth = "4xl",
   layout = "centered",
+  centerBlock = false,
   variant = "card",
   align = "left",
   titleClassName,
@@ -92,6 +99,61 @@ export default function OnboardingStepLayout({
     />
   ) : undefined;
 
+  const heading = (
+    <div className={cn("shrink-0 onboarding-font pt-1", textAlign)}>
+      <h1
+        className={cn(
+          isBare
+            ? "text-[28px] font-medium leading-tight tracking-[-0.5px] text-[#152A51] sm:text-[32px] sm:leading-snug pt-1"
+            : "text-lg font-semibold text-[#152A51] sm:text-xl lg:text-2xl",
+          titleClassName,
+        )}
+      >
+        {title}
+      </h1>
+      {description ? (
+        <p
+          className={cn(
+            isBare
+              ? "mt-3.5 text-[14px] font-normal leading-snug text-[#152A51]/80"
+              : "mt-1 text-sm text-[#152A51]/80 sm:text-base",
+            descriptionClassName,
+          )}
+        >
+          {description}
+        </p>
+      ) : null}
+    </div>
+  );
+
+  const card = (
+    <Card className={`mx-auto w-full ${maxWidthClass[maxWidth]} ${cardClass}`}>
+      {heading}
+      <div className={cn(contentClass, "onboarding-font")}>{children}</div>
+    </Card>
+  );
+
+  if (centerBlock) {
+    return (
+      <OnboardingFrame showProgress={showProgress}>
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto scrollbar-hide">
+          <div className={cn("m-auto w-full py-2", maxWidthClass[maxWidth])}>
+            <Card
+              className={cn(
+                "w-full",
+                isBare ? "rounded-none border-0 bg-transparent p-0 shadow-none" : cardClass,
+              )}
+            >
+              {heading}
+              <div className="mt-4 onboarding-font sm:mt-5">{children}</div>
+            </Card>
+            {footer ? <div className="mt-5 sm:mt-6">{footer}</div> : null}
+          </div>
+        </div>
+      </OnboardingFrame>
+    );
+  }
+
   return (
     <OnboardingFrame showProgress={showProgress} footer={footer}>
       <div
@@ -100,34 +162,7 @@ export default function OnboardingStepLayout({
           isCentered ? "justify-center -translate-y-4 sm:-translate-y-4" : "overflow-hidden",
         )}
       >
-        <Card className={`mx-auto w-full ${maxWidthClass[maxWidth]} ${cardClass}`}>
-          <div className={cn("shrink-0 onboarding-font pt-1", textAlign)}>
-            <h1
-              className={cn(
-                isBare
-                  ? "text-[28px] font-medium leading-tight sm:leading-snug tracking-[-0.5px] text-[#152A51] sm:text-[32px] pt-1"
-                  : "text-lg font-semibold text-[#152A51] sm:text-xl lg:text-2xl",
-                titleClassName,
-              )}
-            >
-              {title}
-            </h1>
-            {description ? (
-              <p
-                className={cn(
-                  isBare
-                    ? "mt-3.5 text-[14px] font-normal leading-snug text-[#152A51]/80"
-                    : "mt-1 text-sm text-[#152A51]/80 sm:text-base",
-                  descriptionClassName,
-                )}
-              >
-                {description}
-              </p>
-            ) : null}
-          </div>
-
-          <div className={cn(contentClass, "onboarding-font")}>{children}</div>
-        </Card>
+        {card}
       </div>
     </OnboardingFrame>
   );

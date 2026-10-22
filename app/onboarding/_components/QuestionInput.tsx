@@ -57,7 +57,7 @@ export default function QuestionInput({ question, value, onChange }: QuestionInp
 
     case "boolean":
       return (
-        <div className="grid max-w-md grid-cols-2 gap-2">
+        <div className="grid w-full grid-cols-2 gap-2">
           {[
             { label: "Yes", val: true },
             { label: "No", val: false },
@@ -66,7 +66,10 @@ export default function QuestionInput({ question, value, onChange }: QuestionInp
               key={option.label}
               type="button"
               onClick={() => onChange({ boolean: option.val })}
-              className={optionButtonClass(value?.boolean === option.val)}
+              className={cn(
+                optionButtonClass(value?.boolean === option.val),
+                "justify-center py-2.5",
+              )}
             >
               <span className="text-[14px] font-medium text-[#152A51]">{option.label}</span>
             </button>

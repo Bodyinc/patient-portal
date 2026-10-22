@@ -96,7 +96,7 @@ export default function MyMedsPageClient({
         <ActiveMedicationsEmptyState />
       ) : (
         <section className="space-y-3">
-          <h2 className="px-1 text-lg font-medium tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
+          <h2 className="px-1 text-[26px] font-medium tracking-[-0.3px] text-[#152A51]">
             Active Treatments
             {data.activeMedications.length > 1 ? (
               <span className="ml-2 text-sm font-normal text-[#152A51]/60">

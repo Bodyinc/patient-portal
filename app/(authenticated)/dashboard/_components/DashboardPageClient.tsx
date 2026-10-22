@@ -44,7 +44,7 @@ function HealthGoalHeroCard({ name, imageSrc }: { name: string; imageSrc: string
         <p className="text-xs font-normal leading-none text-white/90 sm:text-[13px]">
           Your health goals
         </p>
-        <p className="mt-3.5 text-lg font-medium leading-snug tracking-[-0.25px] text-white sm:text-[22px]">
+        <p className="mt-3.5 text-[26px] font-medium leading-snug tracking-[-0.25px] text-white">
           {name}
         </p>
       </div>
@@ -86,7 +86,7 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
   }
 
   return (
-    <main className="mx-auto w-full max-w-[1680px] flex-1 px-2 py-4 sm:px-4 lg:px-6 xl:px-8">
+    <main className="mx-auto w-full max-w-full flex-1 px-2 py-4 sm:px-4 lg:px-6 xl:px-8">
       <DashboardHeader
         fullName={data.fullName}
         patientId={data.patientId}
@@ -101,7 +101,7 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
           </div>
           {duePayment ? (
             <>
-              <h3 className="text-lg font-medium leading-snug tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
+              <h3 className="text-[26px] font-medium leading-snug tracking-[-0.3px] text-[#152A51]">
                 Additional payment required
               </h3>
               <p className="mt-3 max-w-xl text-sm leading-relaxed text-[#152A51]/80 sm:text-[15px] sm:leading-7">
@@ -131,7 +131,7 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
             </>
           ) : (
             <>
-              <h3 className="text-lg font-medium leading-snug tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
+              <h3 className="text-[26px] font-medium leading-snug tracking-[-0.3px] text-[#152A51]">
                 Ready to begin your treatment journey?
               </h3>
               <p className="mt-3 max-w-xl text-sm leading-relaxed text-[#152A51]/80 sm:text-[15px] sm:leading-7">

@@ -61,7 +61,7 @@ export default async function ShopPage({
     ]);
 
     return (
-      <main className="mx-auto w-full max-w-[1440px] flex-1 overflow-x-hidden px-4 py-4 sm:px-4 lg:px-4">
+      <main className="mx-auto w-full max-w-full flex-1 overflow-x-hidden px-4 py-4 sm:px-4 lg:px-4">
         <div className="space-y-4">
           <ShopCatalogClient
             categories={categories}

@@ -17,7 +17,7 @@ export default function ShopCategoryTabs({
   onSelectCategory,
 }: ShopCategoryTabsProps) {
   const baseClass =
-    "rounded-full border px-4 py-2 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm";
+    "cursor-pointer rounded-full border px-4 py-2 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm";
 
   const activeClass = "border-[#E3E084] bg-[#E3E084] text-[#152A51]";
   const inactiveClass = "border-[#E8EEED] bg-white text-[#152A51] hover:bg-[#F3F6F6]";

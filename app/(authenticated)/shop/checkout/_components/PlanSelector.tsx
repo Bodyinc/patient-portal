@@ -10,7 +10,7 @@ export default function PlanSelector({ plans, selectedPlan, onChange }: PlanSele
   return (
     <section className="space-y-4 rounded-[24px] border border-[#E8EEED] bg-white p-4 sm:p-5">
       <div className="space-y-1">
-        <h2 className="text-xl font-medium tracking-[-0.4px] text-[#152A51] sm:text-[22px]">
+        <h2 className="text-[26px] font-medium tracking-[-0.4px] text-[#152A51]">
           Choose Your Plan
         </h2>
         <p className="text-sm text-[#152A51]/70">
@@ -56,7 +56,7 @@ export default function PlanSelector({ plans, selectedPlan, onChange }: PlanSele
                   <p className="text-sm text-[#152A51]/70">{plan.subtitle}</p>
                 </div>
               </div>
-              <p className="shrink-0 text-xl font-medium tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
+              <p className="shrink-0 text-[20px] font-medium tracking-[-0.3px] text-[#152A51]">
                 {plan.priceLabel}
               </p>
             </div>
