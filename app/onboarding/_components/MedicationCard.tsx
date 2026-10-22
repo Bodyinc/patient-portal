@@ -102,7 +102,7 @@ export default function MedicationCard({
           </p>
         ) : null}
 
-        <p className="text-[18px] font-medium leading-none tracking-[-0.3px] text-[#152A51] sm:text-[20px]">
+        <p className="text-[26px] font-medium leading-none tracking-[-0.3px] whitespace-nowrap text-[#152A51]">
           {formatFromPrice(displayFromPriceCents)}
         </p>
 
@@ -166,17 +166,17 @@ export default function MedicationCard({
         <div className="mt-auto pt-2">
           <span
             className={cn(
-              "inline-flex h-[46px] w-[121px] items-center justify-center gap-2 rounded-full text-[14px] font-medium leading-none text-[#152A51] transition",
+              "inline-flex h-[46px] w-[132px] shrink-0 items-center justify-center gap-2 rounded-full text-[14px] font-medium leading-none text-[#152A51] transition",
               selected ? "bg-[#E3E084]" : "border border-[#152A51]/15 bg-white",
             )}
             aria-hidden
           >
             {selected ? (
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#152A51]/10">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white">
                 <Check className="h-3.5 w-3.5 stroke-[2.5]" />
               </span>
             ) : (
-              <span className="h-6 w-6 rounded-full border-2 border-[#152A51]/15" />
+              <span className="h-6 w-6 shrink-0 rounded-full border-2 border-[#152A51]/20 bg-white" />
             )}
             Select
           </span>

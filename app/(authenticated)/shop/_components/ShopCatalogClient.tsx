@@ -135,9 +135,7 @@ export default function ShopCatalogClient({
       />
 
       <section className="space-y-4 rounded-[24px] border border-[#E8EEED] bg-white p-4 sm:p-6">
-        <h2 className="text-lg font-medium tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
-          Shop Catalog
-        </h2>
+        <h2 className="text-[26px] font-medium tracking-[-0.3px] text-[#152A51]">Shop Catalog</h2>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <ShopCategoryTabs
             categories={categories}

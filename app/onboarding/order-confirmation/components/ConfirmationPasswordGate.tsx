@@ -26,10 +26,10 @@ function DashboardActions({ email }: { email: string | null }) {
   const router = useRouter();
 
   return (
-    <div className="flex w-full max-w-xl flex-col items-center gap-5">
+    <div className="flex w-full max-w-xl flex-col items-start gap-5">
       {email ? <EmailSentBadge email={email} /> : null}
 
-      <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-center">
+      <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-start">
         <Button
           type="button"
           onClick={() => router.push("/dashboard")}

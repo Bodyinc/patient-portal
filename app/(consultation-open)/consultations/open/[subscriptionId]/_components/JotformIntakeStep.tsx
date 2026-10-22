@@ -261,7 +261,7 @@ export default function JotformIntakeStep({
     <div className="flex min-h-full w-full flex-1 flex-col bg-[#F9FBFA] text-[#152A51]">
       {/* Top Navigation & Stepper Header */}
       <header className="sticky top-0 z-20 border-b border-[#E8EEED] bg-white/95 px-4 py-3 backdrop-blur-md sm:px-6">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
+        <div className="mx-auto flex w-full max-w-full items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -296,7 +296,7 @@ export default function JotformIntakeStep({
       </header>
 
       {/* Main Content Area */}
-      <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-6 sm:px-6">
+      <main className="mx-auto flex w-full max-w-full flex-1 flex-col px-4 py-6 sm:px-6">
         {/* Informational Guidance Banner */}
         <div className="mb-5 overflow-hidden rounded-2xl border border-[#E8EEED] bg-white p-5 shadow-xs">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

@@ -257,16 +257,17 @@ export default function QuestionnairePage() {
       onContinue={handleContinue}
       continueLabel="Continue"
       continueDisabled={saving}
-      maxWidth="2xl"
+      maxWidth="xl"
       variant="bare"
       align="center"
-      layout="fill"
-      titleClassName="pt-10 sm:pt-10"
+      centerBlock
+      titleClassName="pt-0 text-[24px] sm:text-[28px]"
+      descriptionClassName="mt-2 text-[13px] sm:text-[14px]"
     >
-      <div className="space-y-6 pb-6 text-left sm:space-y-7">
+      <div className="space-y-4 text-left sm:space-y-5">
         {questionnaire.questions.map((question, index) => (
-          <div key={question.id} className="space-y-4">
-            <p className="text-[15px] font-medium leading-snug text-[#152A51] sm:text-[16px]">
+          <div key={question.id} className="space-y-2.5">
+            <p className="text-[14px] font-medium leading-snug text-[#152A51] sm:text-[15px]">
               {index + 1}. {question.text}
               {question.isRequired ? <span className="text-red-500"> *</span> : null}
             </p>
