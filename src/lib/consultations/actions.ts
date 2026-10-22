@@ -1,5 +1,6 @@
 "use server";
 
+import { checkoutCoverageLabel, consultationAnchorId } from "@/lib/checkout/group";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -238,9 +239,11 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
     return { ok: false, message: "Please sign in to start a consultation." };
   }
 
+  subscriptionId = await consultationAnchorId(subscriptionId);
+
   const { data: subscription, error: subError } = await supabaseAdmin
     .from("subscriptions")
-    .select("id, status, medicine_id, medicines(name)")
+    .select("id, status, session_id, medicine_id, medicines(name)")
     .eq("id", subscriptionId)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -352,8 +355,13 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
     null;
   const heightCm = (intake as { height_cm?: number | null })?.height_cm || null;
   const weightKg = (intake as { weight_kg?: number | null })?.weight_kg || null;
-  const medicineName =
+  const planMedicineName =
     (subscription as { medicines?: { name?: string } | null }).medicines?.name ?? "treatment";
+  const coverage = await checkoutCoverageLabel(
+    (subscription as { session_id?: string | null }).session_id,
+    planMedicineName,
+  );
+  const medicineName = coverage.count > 1 ? coverage.label : planMedicineName;
 
   try {
     const client = await clientSessionForUser({
@@ -573,7 +581,10 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
     const appointment = await createQuickbloxAppointment({
       clientId: client.userId,
       clientToken: client.token,
-      description: `${medicineName} consultation`,
+      description:
+        coverage.count > 1
+          ? `Consultation covering ${coverage.label}`
+          : `${medicineName} consultation`,
       reuseOpenVisit: false,
     });
 

@@ -37,6 +37,7 @@ import type {
   QuestionnaireResponseInput,
 } from "@/lib/intake/types";
 import { fetchActiveCategories } from "@/lib/intake/categories";
+import { loadCheckoutCart } from "@/lib/intake/session-cart";
 import { normalizeQuestionType, parseDisqualifyRules } from "@/lib/intake/questionnaire";
 import { resolveMedicineImageSrc } from "@/lib/intake/medicine-image";
 import { formatPortalDate } from "@/lib/date-format";
@@ -88,16 +89,31 @@ function isMedicineCatalogVisible(medicine: { is_active: boolean; status: string
 }
 
 async function getSessionCategory(sessionId: string) {
-  // Embedded select: link + category in one round trip (was two sequential queries).
-  const { data: link } = await supabaseAdmin
-    .from("intake_session_categories")
-    .select("category_id, medication_categories(id, slug, name, eligibility_rules)")
+  const { data: primaryMed } = await supabaseAdmin
+    .from("intake_session_medicines")
+    .select("category_id")
     .eq("session_id", sessionId)
-    .order("created_at", { ascending: false })
-    .limit(1)
+    .eq("is_primary", true)
     .maybeSingle();
 
-  const category = link?.medication_categories ?? null;
+  let categoryId = primaryMed?.category_id ?? null;
+  if (!categoryId) {
+    const { data: link } = await supabaseAdmin
+      .from("intake_session_categories")
+      .select("category_id")
+      .eq("session_id", sessionId)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    categoryId = link?.category_id ?? null;
+  }
+  if (!categoryId) return null;
+
+  const { data: category } = await supabaseAdmin
+    .from("medication_categories")
+    .select("id, slug, name, eligibility_rules")
+    .eq("id", categoryId)
+    .maybeSingle();
   if (!category) return null;
 
   return {
@@ -107,11 +123,19 @@ async function getSessionCategory(sessionId: string) {
 }
 
 async function getSessionMedicineLink(sessionId: string) {
+  const { data: primary } = await supabaseAdmin
+    .from("intake_session_medicines")
+    .select("medicine_id")
+    .eq("session_id", sessionId)
+    .eq("is_primary", true)
+    .maybeSingle();
+  if (primary?.medicine_id) return primary;
+
   const { data: link } = await supabaseAdmin
     .from("intake_session_medicines")
     .select("medicine_id")
     .eq("session_id", sessionId)
-    .order("created_at", { ascending: false })
+    .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
 
@@ -231,45 +255,51 @@ async function buildIntakeSummary(
   // link query as an embedded select, and eligibility is fetched per-session then
   // matched to the current medicine in JS.
   const categoryPromise = getSessionCategory(sessionId);
-  const [
-    categoryLink,
-    medicineLinkResult,
-    packageResult,
-    eligibilityResult,
-    requiresQuestionnaire,
-  ] = await Promise.all([
-    categoryPromise,
-    supabaseAdmin
-      .from("intake_session_medicines")
-      .select("medicine_id, medicines(id, name)")
-      .eq("session_id", sessionId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    session.selected_plan_id
-      ? supabaseAdmin
-          .from("packages")
-          .select("id, name, duration_months, price, original_price, medicine_variants(name)")
-          .eq("id", session.selected_plan_id)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-    supabaseAdmin
-      .from("intake_session_eligibility_results")
-      .select("result, medicine_id")
-      .eq("session_id", sessionId)
-      .order("evaluated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    categoryPromise.then((link) =>
-      link?.category_id ? categoryHasActiveQuestionnaire(link.category_id) : false,
-    ),
-  ]);
+  const [categoryLink, cartLines, packageResult, eligibilityResult, requiresQuestionnaire] =
+    await Promise.all([
+      categoryPromise,
+      loadCheckoutCart(sessionId),
+      session.selected_plan_id
+        ? supabaseAdmin
+            .from("packages")
+            .select("id, name, duration_months, price, original_price, medicine_variants(name)")
+            .eq("id", session.selected_plan_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      supabaseAdmin
+        .from("intake_session_eligibility_results")
+        .select("result, medicine_id")
+        .eq("session_id", sessionId)
+        .order("evaluated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      categoryPromise.then((link) =>
+        link?.category_id ? categoryHasActiveQuestionnaire(link.category_id) : false,
+      ),
+    ]);
 
-  const medicineId = medicineLinkResult.data?.medicine_id ?? null;
-  const medicine =
-    (medicineLinkResult.data as { medicines?: { id: string; name: string } | null } | null)
-      ?.medicines ?? null;
   const packageData = packageResult.data;
+  const primaryLine = cartLines.find((line) => line.isPrimary) ?? cartLines[0] ?? null;
+  const medicineId = primaryLine?.medicineId ?? null;
+  const packageVariantName =
+    (packageData as { medicine_variants?: { name: string } | null } | null)?.medicine_variants
+      ?.name ?? null;
+  const cartItems = cartLines.map((line) => {
+    const isPrimaryLine =
+      primaryLine != null &&
+      line.medicineId === primaryLine.medicineId &&
+      line.categoryId === primaryLine.categoryId;
+    const { stripePriceId: _stripePriceId, durationMonths: _durationMonths, ...item } = line;
+    if (!isPrimaryLine || !packageData) return item;
+    return {
+      ...item,
+      packageId: packageData.id,
+      packageName: packageData.name,
+      packagePrice: Number(packageData.price),
+      packageOriginalPrice: Number(packageData.original_price),
+      variantName: packageVariantName ?? line.variantName,
+    };
+  });
   // Prefer medicine-scoped eligibility; fall back to goal-level (null medicine_id) results
   // recorded when the questionnaire ran before medicine selection.
   const eligibilityRaw = eligibilityResult.data;
@@ -312,20 +342,19 @@ async function buildIntakeSummary(
     billingPostalCode: digitsOnlyZip(session.billing_postal_code ?? ""),
     smsConsent: session.sms_consent,
     marketingConsent: session.marketing_consent,
-    medicineId: medicine?.id ?? null,
-    medicineName: medicine?.name ?? null,
+    medicineId,
+    medicineName: primaryLine?.medicineName ?? null,
     requiresQuestionnaire,
     selectedPackageId: session.selected_plan_id,
     packageName: packageData?.name ?? null,
-    variantName:
-      (packageData as { medicine_variants?: { name: string } | null } | null)?.medicine_variants
-        ?.name ?? null,
+    variantName: packageVariantName,
     packageDurationMonths: packageData?.duration_months ?? null,
     packagePrice: packageData?.price !== undefined ? Number(packageData.price) : null,
     packageOriginalPrice:
       packageData?.original_price !== undefined ? Number(packageData.original_price) : null,
     eligibilityResult: eligibility?.result ?? null,
     status: session.status,
+    cartItems,
   };
 }
 
@@ -628,6 +657,7 @@ export async function saveIntakeBmi(
 export async function saveIntakeMedicine(
   medicineId: string,
   categorySlug?: string | null,
+  variantId?: string | null,
 ): Promise<IntakeActionResult<{ medicineId: string }>> {
   const sessionResult = await requireIntakeSession();
   if ("error" in sessionResult) {
@@ -663,28 +693,19 @@ export async function saveIntakeMedicine(
     .update({ selected_plan_id: null })
     .eq("id", sessionResult.session.id);
 
-  const { data: existingLinks } = await supabaseAdmin
+  await supabaseAdmin
     .from("intake_session_medicines")
-    .select("category_id")
-    .eq("session_id", sessionResult.session.id);
-
-  const otherCategoryIds = (existingLinks ?? [])
-    .map((l) => l.category_id)
-    .filter((id) => id !== categoryLink.category_id);
-
-  if (otherCategoryIds.length > 0) {
-    await supabaseAdmin
-      .from("intake_session_medicines")
-      .delete()
-      .eq("session_id", sessionResult.session.id)
-      .in("category_id", otherCategoryIds);
-  }
+    .update({ is_primary: false })
+    .eq("session_id", sessionResult.session.id)
+    .neq("category_id", categoryLink.category_id);
 
   const { error } = await supabaseAdmin.from("intake_session_medicines").upsert(
     {
       session_id: sessionResult.session.id,
       category_id: categoryLink.category_id,
       medicine_id: medicineId,
+      is_primary: true,
+      ...(variantId !== undefined ? { variant_id: variantId } : {}),
     },
     { onConflict: "session_id,category_id" },
   );
@@ -1106,7 +1127,7 @@ export async function getPackagesForMedicine(
   let query = supabaseAdmin
     .from("packages")
     .select(
-      "id, name, duration_months, original_price, price, is_most_popular, features, clinical_note",
+      "id, name, duration_months, original_price, price, is_most_popular, features, clinical_note, variant_id",
     )
     .eq("medicine_id", medicineId)
     .eq("is_active", true)
@@ -1114,7 +1135,45 @@ export async function getPackagesForMedicine(
     .order("duration_months", { ascending: true });
   // Packages belong to a variant when one is chosen, otherwise to the medicine directly.
   query = variantId ? query.eq("variant_id", variantId) : query.is("variant_id", null);
-  const { data, error } = await query;
+  let { data, error } = await query;
+
+  // Tirzepatide and similar medicines only have variant plans. A null variant
+  // would otherwise leave Select Your Plan with nothing to choose and Continue disabled.
+  if (!error && (data ?? []).length === 0) {
+    const { data: variantPlans, error: variantError } = await supabaseAdmin
+      .from("packages")
+      .select(
+        "id, name, duration_months, original_price, price, is_most_popular, features, clinical_note, variant_id",
+      )
+      .eq("medicine_id", medicineId)
+      .eq("is_active", true)
+      .not("stripe_price_id", "is", null)
+      .order("duration_months", { ascending: true });
+
+    if (variantError) {
+      error = variantError;
+    } else if (variantPlans?.length) {
+      const { data: variants } = await supabaseAdmin
+        .from("medicine_variants")
+        .select("id, from_price_cents")
+        .eq("medicine_id", medicineId)
+        .eq("is_active", true)
+        .order("from_price_cents", { ascending: true });
+
+      const preferredId =
+        [...(variants ?? [])]
+          .sort(
+            (a, b) =>
+              (a.from_price_cents ?? Number.POSITIVE_INFINITY) -
+              (b.from_price_cents ?? Number.POSITIVE_INFINITY),
+          )
+          .find((variant) => variantPlans.some((pkg) => pkg.variant_id === variant.id))?.id ??
+        variantPlans.find((pkg) => pkg.variant_id)?.variant_id;
+      data = preferredId
+        ? variantPlans.filter((pkg) => pkg.variant_id === preferredId)
+        : variantPlans;
+    }
+  }
 
   if (error) {
     return { ok: false, code: "fetch_error", message: error.message };
@@ -1188,6 +1247,12 @@ export async function saveSelectedPlan(
     return { ok: false, code: "save_error", message: error.message };
   }
 
+  await supabaseAdmin
+    .from("intake_session_medicines")
+    .update({ package_id: packageId, is_primary: true })
+    .eq("session_id", sessionResult.session.id)
+    .eq("medicine_id", medicineLink.medicine_id);
+
   return { ok: true, data: { sessionId: sessionResult.session.id } };
 }
 
@@ -1236,6 +1301,7 @@ export async function getOnboardingConfirmationData(): Promise<
     consultationFeeCents: number;
     renewalShippingCents: number;
     passwordSet: boolean;
+    items: Array<{ name: string; planLabel: string; price: number | null }>;
   }>
 > {
   const token = await getSessionTokenFromCookie();
@@ -1290,23 +1356,44 @@ export async function getOnboardingConfirmationData(): Promise<
   const payment = paymentResult.data;
   const request = requestResult.data;
   const paidCents = payment?.amount_cents;
+  const items = (summary.cartItems ?? [])
+    .filter((item) => item.packagePrice != null || item.isPrimary)
+    .map((item) => ({
+      name: item.variantName ? `${item.medicineName} — ${item.variantName}` : item.medicineName,
+      planLabel: item.packageName ?? item.categoryName,
+      price: item.packagePrice,
+    }));
+  const pricedItems = items.filter((item) => item.price != null);
+  const cartTotal =
+    pricedItems.length > 0
+      ? pricedItems.reduce((sum, item) => sum + (item.price ?? 0), 0)
+      : summary.packagePrice;
+  const cartOriginal =
+    (summary.cartItems ?? []).length > 0
+      ? (summary.cartItems ?? []).reduce(
+          (sum, item) => sum + (item.packageOriginalPrice ?? item.packagePrice ?? 0),
+          0,
+        )
+      : summary.packageOriginalPrice;
   const totalPaid =
-    paidCents != null
-      ? Number(paidCents) / 100
-      : summary.packagePrice != null
-        ? Number(summary.packagePrice)
-        : null;
+    paidCents != null ? Number(paidCents) / 100 : cartTotal != null ? Number(cartTotal) : null;
+  const joinedName = items
+    .map((item) => item.name)
+    .filter(Boolean)
+    .join(", ");
 
   return {
     ok: true,
     data: {
       orderNumber: formatOrderId(request?.id ?? session.id),
       orderDate: formatOrderDate(request?.created_at ?? session.updated_at ?? session.created_at),
-      medicineName: summary.medicineName,
-      variantName: summary.variantName,
-      packageName: summary.packageName,
-      packagePrice: summary.packagePrice,
-      packageOriginalPrice: summary.packageOriginalPrice,
+      medicineName: joinedName || summary.medicineName,
+      variantName: items.length > 1 ? null : summary.variantName,
+      packageName: items.length > 1 ? "One checkout" : summary.packageName,
+      packagePrice: cartTotal != null ? Number(cartTotal) : summary.packagePrice,
+      packageOriginalPrice:
+        cartOriginal != null ? Number(cartOriginal) : summary.packageOriginalPrice,
+      items,
       totalPaid,
       email: summary.email?.trim() || null,
       consultationFeeCents: fees.consultationFeeCents,

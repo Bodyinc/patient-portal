@@ -41,7 +41,9 @@ export async function fetchConsultationsPageData(userId: string): Promise<Consul
       hasCompletedOnboarding(userId),
       supabaseAdmin
         .from("subscriptions")
-        .select("id, status, created_at, medicines(name, image_url), packages(duration_months)")
+        .select(
+          "id, status, created_at, session_id, is_checkout_primary, checkout_group_id, medicines(name, image_url), packages(duration_months)",
+        )
         .eq("user_id", userId)
         .in("status", [...ELIGIBLE_SUBSCRIPTION_STATUSES])
         .order("created_at", { ascending: false }),
@@ -196,9 +198,31 @@ export async function fetchConsultationsPageData(userId: string): Promise<Consul
     }),
   );
 
-  const plans: ConsultationPlanState[] = (subsResult.data ?? []).map((subscription) => {
+  const subscriptionRows = (subsResult.data ?? []) as Array<
+    (typeof subsResult.data)[number] & {
+      is_checkout_primary?: boolean | null;
+      checkout_group_id?: string | null;
+    }
+  >;
+  const visibleSubscriptions = subscriptionRows.filter(
+    (subscription) => subscription.is_checkout_primary !== false,
+  );
+
+  const plans: ConsultationPlanState[] = visibleSubscriptions.map((subscription) => {
     const medicine = (subscription as { medicines?: EmbeddedMedicine }).medicines ?? null;
     const pkg = (subscription as { packages?: EmbeddedPackage }).packages ?? null;
+    const groupId = subscription.checkout_group_id;
+    const group = groupId
+      ? subscriptionRows
+          .filter((row) => row.checkout_group_id === groupId)
+          .sort(
+            (a, b) =>
+              (a.is_checkout_primary === false ? 1 : 0) - (b.is_checkout_primary === false ? 1 : 0),
+          )
+      : [subscription];
+    const groupNames = group
+      .map((row) => (row as { medicines?: EmbeddedMedicine }).medicines?.name)
+      .filter((name): name is string => Boolean(name));
     const started = startedBySub.get(subscription.id);
     const eventCompletedAt = completedEventsBySub.get(subscription.id) ?? null;
     const isFinished =
@@ -211,8 +235,14 @@ export async function fetchConsultationsPageData(userId: string): Promise<Consul
 
     return {
       subscriptionId: subscription.id,
-      medicineName: medicine?.name ?? "Treatment plan",
-      planLabel: pkg ? planTitleFromDuration(pkg.duration_months) : null,
+      medicineName:
+        groupNames.length > 1 ? groupNames.join(", ") : (medicine?.name ?? "Treatment plan"),
+      planLabel:
+        groupNames.length > 1
+          ? "One consultation for this order"
+          : pkg
+            ? planTitleFromDuration(pkg.duration_months)
+            : null,
       imageSrc: resolveMedicineImageSrc(medicine?.image_url ?? null),
       startedAt: started?.startedAt ?? null,
       endedAt,

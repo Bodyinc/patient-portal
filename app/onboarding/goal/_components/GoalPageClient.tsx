@@ -91,6 +91,7 @@ export default function GoalPageClient({ initialCategories, initialError }: Goal
       goalId: selected,
       goalName: category?.name ?? state.goalName,
       medicationId: null,
+      additionalProductsReviewed: false,
       requiresQuestionnaire,
       questionnaireAnswers: {},
       questionnaireComplete: false,

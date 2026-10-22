@@ -12,6 +12,9 @@ export type MyMedsCurrentMedicationDto = {
   imageSrc: string;
   /** Manual refill is open: order delivered, last week of the plan, and not auto-pay. */
   canRequestRefill: boolean;
+  trackingNumber: string | null;
+  /** Consultation was required and the provider has approved it. */
+  consultationApproved: boolean;
 };
 
 export type MyMedsPastMedicationDto = {
@@ -45,6 +48,7 @@ export type MyMedsMedicationRequestDto = {
   isRejected: boolean;
   requestDate: string;
   trackingNumber: string | null;
+  consultationApproved: boolean;
   pendingPaymentCents: number | null;
   prescription: {
     id: string;

@@ -24,21 +24,32 @@ const STATUS_BODY: Record<string, (medicineName: string) => string> = {
   cancelled: (m) => `Your <strong>${m}</strong> medication request was cancelled.`,
 };
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function trackingLine(trackingNumber: string): string {
+  const trackingValue = trackingNumber.trim();
+  const trackingUrl = /^https?:\/\//i.test(trackingValue) ? trackingValue : null;
+  const safeValue = escapeHtml(trackingValue);
+  if (trackingUrl) {
+    return `<p style="margin:0;"><strong>Tracking ID:</strong> <a href="${escapeHtml(trackingUrl)}" target="_blank" rel="noopener noreferrer">${safeValue}</a></p>`;
+  }
+  return `<p style="margin:0;"><strong>Tracking ID:</strong> ${safeValue}</p>`;
+}
+
 function dispatchedDetailsBlock(orderNumber: string, trackingNumber?: string | null): string {
   const trackingValue = trackingNumber?.trim();
-  const trackingUrl = trackingValue && /^https?:\/\//i.test(trackingValue) ? trackingValue : null;
 
-  const lines = [`<p style="margin:0 0 8px;"><strong>Order ID:</strong> ${orderNumber}</p>`];
+  const lines = [
+    `<p style="margin:0 0 8px;"><strong>Order ID:</strong> ${escapeHtml(orderNumber)}</p>`,
+  ];
 
-  if (trackingValue) {
-    if (trackingUrl) {
-      lines.push(
-        `<p style="margin:0;"><strong>Tracking:</strong> <a href="${trackingUrl}" target="_blank" rel="noopener noreferrer">Track your shipment</a></p>`,
-      );
-    } else {
-      lines.push(`<p style="margin:0;"><strong>Tracking:</strong> ${trackingValue}</p>`);
-    }
-  }
+  if (trackingValue) lines.push(trackingLine(trackingValue));
 
   return emailSoftPanel(lines.join(""));
 }
@@ -52,6 +63,7 @@ export function orderStatusEmail(params: {
   trackingNumber?: string | null;
   amountCents?: number | null;
   currency?: string | null;
+  consultationApproved?: boolean;
 }): { subject: string; html: string } | null {
   const bodyFn = STATUS_BODY[params.status];
   if (!bodyFn) return null;
@@ -74,6 +86,9 @@ export function orderStatusEmail(params: {
       : emailChip(`Order ${params.orderNumber}`);
 
   let statusBody = bodyFn(params.medicineName);
+  if (params.status === "approved" && params.consultationApproved) {
+    statusBody = `Your <strong>${params.medicineName}</strong> consultation is approved, and your prescription has been approved.`;
+  }
   if (
     params.status === "awaiting_additional_payment" &&
     params.amountCents != null &&
@@ -93,6 +108,31 @@ export function orderStatusEmail(params: {
   return {
     subject: `${label} — ${params.medicineName}`,
     html: emailLayout(label, body),
+  };
+}
+
+export function trackingIdEmail(params: {
+  fullName: string | null;
+  medicineName: string;
+  orderNumber: string;
+  trackingNumber: string;
+  ctaUrl: string;
+}): { subject: string; html: string } {
+  const body = [
+    `<p>Hi ${firstName(params.fullName)},</p>`,
+    `<p>A tracking ID is ready for your <strong>${params.medicineName}</strong> order.</p>`,
+    emailSoftPanel(
+      [
+        `<p style="margin:0 0 8px;"><strong>Order ID:</strong> ${escapeHtml(params.orderNumber)}</p>`,
+        trackingLine(params.trackingNumber),
+      ].join(""),
+    ),
+    emailButton("View my meds", params.ctaUrl),
+  ].join("");
+
+  return {
+    subject: `Tracking ID for your ${params.medicineName} order`,
+    html: emailLayout("Your tracking ID", body),
   };
 }
 

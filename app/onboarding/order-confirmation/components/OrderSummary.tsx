@@ -63,10 +63,26 @@ export default function OrderSummary({ data, loaded }: OrderSummaryProps) {
 
       <div className="p-5">
         <div className="pb-3">
-          <p className="text-sm font-medium text-[#152A51]">{medicationName}</p>
-          <p className="mt-0.5 text-sm text-[#152A51]/70">
-            {variantName ? `${variantName} · ${planLabel}` : planLabel}
-          </p>
+          {(data?.items?.length ?? 0) > 1 ? (
+            <ul className="space-y-3">
+              {data?.items.map((item) => (
+                <li key={`${item.name}-${item.planLabel}`}>
+                  <p className="text-sm font-medium text-[#152A51]">{item.name}</p>
+                  <p className="mt-0.5 text-sm text-[#152A51]/70">
+                    {item.planLabel}
+                    {item.price != null ? ` · ${formatMoney(item.price)}` : ""}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <>
+              <p className="text-sm font-medium text-[#152A51]">{medicationName}</p>
+              <p className="mt-0.5 text-sm text-[#152A51]/70">
+                {variantName ? `${variantName} · ${planLabel}` : planLabel}
+              </p>
+            </>
+          )}
         </div>
 
         <div className="border-t border-[#152A51]/10">

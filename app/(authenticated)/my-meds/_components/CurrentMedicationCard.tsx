@@ -10,6 +10,7 @@ import { formatPortalDate } from "@/lib/date-format";
 import { cn } from "@/lib/utils";
 
 import MedicineProductImage from "../../../onboarding/_components/MedicineProductImage";
+import TrackingIdValue from "../../_components/TrackingIdValue";
 
 import type { MyMedsCurrentMedicationDto } from "./types";
 
@@ -138,6 +139,19 @@ export default function CurrentMedicationCard({
           ) : null}
         </div>
       </div>
+
+      {medication.consultationApproved || medication.trackingNumber ? (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-[#E8EEED] px-4 py-3">
+          {medication.consultationApproved ? (
+            <span className="inline-flex rounded-full bg-[#E0FAE8] px-2.5 py-1 text-xs font-medium text-[#34845F]">
+              Consultation approved
+            </span>
+          ) : null}
+          {medication.trackingNumber ? (
+            <TrackingIdValue trackingNumber={medication.trackingNumber} />
+          ) : null}
+        </div>
+      ) : null}
     </article>
   );
 }

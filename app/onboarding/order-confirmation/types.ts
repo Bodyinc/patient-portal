@@ -11,4 +11,5 @@ export type ConfirmationData = {
   consultationFeeCents: number;
   renewalShippingCents: number;
   passwordSet: boolean;
+  items: Array<{ name: string; planLabel: string; price: number | null }>;
 };

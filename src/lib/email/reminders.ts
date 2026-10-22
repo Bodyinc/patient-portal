@@ -7,7 +7,11 @@ import { formatPortalDate } from "@/lib/date-format";
 import { sendPushToUser } from "@/lib/push/send";
 import { sendTransactionalEmail } from "./send";
 import { incompleteOrderEmail, refillReminderEmail } from "./reminder-emails";
-import { orderStatusEmail, providerCaseAssignedEmail } from "./order-status-emails";
+import {
+  orderStatusEmail,
+  providerCaseAssignedEmail,
+  trackingIdEmail,
+} from "./order-status-emails";
 import { alreadySentKeys, markEmailSent, sendOnce } from "./idempotency";
 import {
   adminAppUrl,
@@ -219,7 +223,9 @@ export async function sendUnsentOrderStatusEmails(opts?: {
     requestIds.length
       ? supabaseAdmin
           .from("medication_requests")
-          .select("id, user_id, session_id, medicine_id, provider_id, tracking_number")
+          .select(
+            "id, user_id, session_id, medicine_id, provider_id, tracking_number, requires_consultation",
+          )
           .in("id", requestIds)
       : Promise.resolve({ data: [] }),
   ]);
@@ -310,6 +316,7 @@ export async function sendUnsentOrderStatusEmails(opts?: {
           trackingNumber: request?.tracking_number,
           amountCents: extraPay?.amount_cents,
           currency: extraPay?.currency,
+          consultationApproved: Boolean(request?.requires_consultation),
         });
 
         const claim = patientStatusClaimTarget(event.status, event.id, request?.id);
@@ -427,4 +434,93 @@ export async function sendOrderStatusEmails(now = new Date()): Promise<ReminderR
   return sendUnsentOrderStatusEmails({
     since: new Date(now.getTime() - ORDER_EVENT_LOOKBACK_HOURS * 60 * 60 * 1000),
   });
+}
+
+const TRACKING_EMAIL_REMINDER = "tracking_id";
+
+/** Mail the patient when a tracking ID is saved on their order, including if it arrives after dispatch. */
+export async function sendTrackingIdEmails(now = new Date()): Promise<ReminderRunResult> {
+  const since = new Date(now.getTime() - ORDER_EVENT_LOOKBACK_HOURS * 60 * 60 * 1000);
+  const { data, error } = await supabaseAdmin
+    .from("medication_requests")
+    .select("id, user_id, session_id, medicine_id, tracking_number")
+    .not("tracking_number", "is", null)
+    .gte("updated_at", since.toISOString());
+  if (error) throw new Error(error.message);
+
+  const candidates = (data ?? []).filter((row) => Boolean(row.tracking_number?.trim()));
+  const sentKeys = await alreadySentKeys(
+    TRACKING_EMAIL_REMINDER,
+    candidates.map((row) => row.id),
+  );
+
+  const medicineIds = [
+    ...new Set(candidates.map((row) => row.medicine_id).filter(Boolean)),
+  ] as string[];
+  const userIds = [...new Set(candidates.map((row) => row.user_id).filter(Boolean))] as string[];
+  const sessionIds = [
+    ...new Set(candidates.map((row) => row.session_id).filter(Boolean)),
+  ] as string[];
+
+  const [{ data: medicines }, profileById, sessionById] = await Promise.all([
+    medicineIds.length
+      ? supabaseAdmin.from("medicines").select("id, name").in("id", medicineIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; name: string }> }),
+    patientEmailsByUserIds(userIds),
+    patientEmailsByIntakeSessionIds(sessionIds),
+  ]);
+  const medicineById = new Map((medicines ?? []).map((medicine) => [medicine.id, medicine.name]));
+
+  let sent = 0;
+  for (const request of candidates) {
+    const trackingNumber = request.tracking_number?.trim();
+    if (!trackingNumber) continue;
+    const periodKey = trackingNumber.slice(0, 180);
+    if (sentKeys.has(`${request.id}|${periodKey}`)) continue;
+
+    const patient =
+      (request.user_id ? profileById.get(request.user_id) : undefined) ??
+      (request.session_id ? sessionById.get(request.session_id) : undefined) ??
+      null;
+    if (!patient?.email) {
+      console.warn("[email] tracking id skipped: no recipient yet", request.id);
+      continue;
+    }
+
+    const medicineName =
+      (request.medicine_id ? medicineById.get(request.medicine_id) : null) ?? "your treatment";
+    const mail = trackingIdEmail({
+      fullName: patient.fullName,
+      medicineName,
+      orderNumber: formatOrderId(request.id),
+      trackingNumber,
+      ctaUrl: `${appUrl()}/my-meds`,
+    });
+
+    if (
+      await sendOnce(
+        TRACKING_EMAIL_REMINDER,
+        request.id,
+        () =>
+          sendTransactionalEmail({
+            to: patient.email,
+            subject: mail.subject,
+            html: mail.html,
+          }),
+        periodKey,
+      )
+    ) {
+      sentKeys.add(`${request.id}|${periodKey}`);
+      sent += 1;
+      if (request.user_id) {
+        await sendPushToUser(request.user_id, {
+          title: "Tracking ID ready",
+          body: `${medicineName} · ${trackingNumber.slice(0, 80)}`,
+          url: "/my-meds",
+        }).catch((pushError) => console.error("[push] tracking id failed:", pushError));
+      }
+    }
+  }
+
+  return { candidates: candidates.length, sent };
 }

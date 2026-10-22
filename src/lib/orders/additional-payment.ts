@@ -174,26 +174,18 @@ async function recordAdditionalCharge(row: AddPayRow, pi: Stripe.PaymentIntent):
 
   const { data: req } = await supabaseAdmin
     .from("medication_requests")
-    .select("package_id, subscription_id")
+    .select("package_id")
     .eq("id", row.request_id)
     .maybeSingle();
-
-  let stripeSubscriptionId: string | null = null;
-  if (req?.subscription_id) {
-    const { data: sub } = await supabaseAdmin
-      .from("subscriptions")
-      .select("stripe_subscription_id")
-      .eq("id", req.subscription_id)
-      .maybeSingle();
-    stripeSubscriptionId = sub?.stripe_subscription_id ?? null;
-  }
 
   const description = row.reason ?? "Additional payment";
   await recordPayment(
     {
       user_id: row.user_id,
       plan_id: row.to_package_id ?? req?.package_id ?? null,
-      stripe_subscription_id: stripeSubscriptionId,
+      // Leave the subscription off this row. The payment trigger opens a medication
+      // request for every succeeded payment that carries a subscription id, which
+      // duplicated the same medicine after this extra charge.
       stripe_payment_intent_id: pi.id,
       stripe_customer_id: stripeCustomerId(pi),
       amount_cents: row.amount_cents,
@@ -243,6 +235,44 @@ async function advanceRequestAfterAdditionalPayment(requestId: string): Promise<
   });
 }
 
+/** Ask the provider/admin app to submit the updated order to the pharmacy. */
+async function requestPharmacyDispatch(row: AddPayRow): Promise<void> {
+  const base = (process.env.PHARMACY_DISPATCH_URL || process.env.ADMIN_APP_URL || "")
+    .trim()
+    .replace(/\/$/, "");
+  const secret = process.env.INTERNAL_API_SECRET?.trim();
+  if (!base || !secret) {
+    console.error(
+      "[additional-payment] pharmacy dispatch skipped: set PHARMACY_DISPATCH_URL (or ADMIN_APP_URL) and INTERNAL_API_SECRET to the same secret as the provider app.",
+    );
+    return;
+  }
+
+  try {
+    const response = await fetch(`${base}/api/internal/additional-payment-paid`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${secret}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        additionalPaymentId: row.id,
+        requestId: row.request_id,
+      }),
+    });
+    if (!response.ok) {
+      const detail = await response.text();
+      console.error(
+        "[additional-payment] pharmacy dispatch failed:",
+        response.status,
+        detail.slice(0, 500),
+      );
+    }
+  } catch (error) {
+    console.error("[additional-payment] pharmacy dispatch request failed:", error);
+  }
+}
+
 async function notifyAdditionalPaymentReceived(row: AddPayRow): Promise<void> {
   try {
     const patient = await patientEmailByUserId(row.user_id);
@@ -289,6 +319,9 @@ export async function fulfillAdditionalPayment(pi: Stripe.PaymentIntent): Promis
     console.error("[payments] additional payment record failed:", error);
   }
 
+  // The provider app owns LifeFile. Payment success here must ask it to send the
+  // updated order. If that call fails, the order still moves to approved below.
+  await requestPharmacyDispatch(row);
   await advanceRequestAfterAdditionalPayment(row.request_id);
 
   if (becamePaid) {
@@ -302,6 +335,40 @@ export async function fulfillAdditionalPayment(pi: Stripe.PaymentIntent): Promis
   }
 
   return true;
+}
+
+/** Send paid medicine-change orders that never reached the pharmacy (for example the webhook ran before dispatch was wired). */
+export async function dispatchUnsentPaidUpgrades(userId: string): Promise<void> {
+  const { data: pays, error } = await supabaseAdmin
+    .from("additional_payments")
+    .select(ADD_PAY_COLS)
+    .eq("user_id", userId)
+    .eq("status", "paid")
+    .order("paid_at", { ascending: false })
+    .limit(10);
+  if (error || !pays?.length) return;
+
+  const requestIds = [...new Set(pays.map((row) => row.request_id))];
+  const { data: requests } = await supabaseAdmin
+    .from("medication_requests")
+    .select("id, status")
+    .in("id", requestIds);
+  const unsent = new Set(
+    (requests ?? [])
+      .filter(
+        (row) =>
+          !["sent_to_pharmacy", "dispatched", "delivered", "rejected", "cancelled"].includes(
+            row.status,
+          ),
+      )
+      .map((row) => row.id),
+  );
+
+  for (const row of pays) {
+    if (!unsent.has(row.request_id)) continue;
+    unsent.delete(row.request_id);
+    await requestPharmacyDispatch(row as AddPayRow);
+  }
 }
 
 export async function fulfillAdditionalPaymentByIntentId(

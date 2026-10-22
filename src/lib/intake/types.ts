@@ -87,6 +87,39 @@ export type MedicinesForCategoryDto = {
   ineligibleReason: string | null;
 };
 
+export type IntakeCartItemDto = {
+  categoryId: string;
+  categorySlug: string;
+  categoryName: string;
+  medicineId: string;
+  medicineName: string;
+  variantId: string | null;
+  variantName: string | null;
+  packageId: string | null;
+  packageName: string | null;
+  packagePrice: number | null;
+  packageOriginalPrice: number | null;
+  isPrimary: boolean;
+};
+
+export type AddonProductDto = {
+  medicineId: string;
+  medicineName: string;
+  description: string;
+  imageSrc: string | null;
+  fromPriceCents: number | null;
+  variantId: string | null;
+  packages: PackageDto[];
+};
+
+export type AddonGoalDto = {
+  categorySlug: string;
+  categoryName: string;
+  tagline: string | null;
+  imageSrc: string | null;
+  products: AddonProductDto[];
+};
+
 export type IntakeSummaryDto = {
   sessionId: string;
   goalSlug: string | null;
@@ -124,6 +157,7 @@ export type IntakeSummaryDto = {
   packageOriginalPrice: number | null;
   eligibilityResult: string | null;
   status: string;
+  cartItems: IntakeCartItemDto[];
 };
 
 export type QuestionnaireAnswerValue = {

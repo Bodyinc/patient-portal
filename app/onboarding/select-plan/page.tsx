@@ -13,7 +13,11 @@ import PageHeader from "./components/PageHeader";
 import PlanToggle from "./components/PlanToggle";
 import PricingCard from "./components/PricingCard";
 import TreatmentSummary from "./components/TreatmentSummary";
-import { useMedicinesForCategory, usePackages } from "../_hooks/use-intake-catalog";
+import {
+  useIntakeSummary,
+  useMedicinesForCategory,
+  usePackages,
+} from "../_hooks/use-intake-catalog";
 import { invalidateIntakeSummary } from "../_lib/intake-query";
 import {
   getNextStepPath,
@@ -28,6 +32,8 @@ export default function SelectPlanPage() {
   const { state, updateState, hydrated } = useOnboarding();
   const { data: packages = [], isLoading } = usePackages(state.medicationId, state.variantId);
   const { data: catalog } = useMedicinesForCategory(state.goalId);
+  const { data: summary } = useIntakeSummary();
+  const addedProducts = (summary?.cartItems ?? []).filter((item) => !item.isPrimary);
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(
     state.selectedPackageId,
   );
@@ -108,6 +114,34 @@ export default function SelectPlanPage() {
             goalName={state.goalName}
             requiresQuestionnaire={state.requiresQuestionnaire}
           />
+
+          {addedProducts.length > 0 ? (
+            <div className="flex flex-col gap-3 onboarding-font">
+              <h2 className="text-left text-[16px] font-medium text-[#152A51]">
+                Also in this order
+              </h2>
+              {addedProducts.map((item) => (
+                <div
+                  key={`${item.categoryId}-${item.medicineId}`}
+                  className="rounded-[16px] border border-[#E8EEED] bg-white px-4 py-3"
+                >
+                  <p className="text-[12px] font-medium uppercase tracking-wide text-[#6A9B9C]">
+                    {item.categoryName}
+                  </p>
+                  <p className="mt-1 text-[15px] font-medium text-[#152A51]">{item.medicineName}</p>
+                  {item.packageName ? (
+                    <p className="mt-1 text-[13px] text-[#152A51]/70">
+                      {item.packageName}
+                      {item.packagePrice != null ? ` · $${item.packagePrice.toFixed(2)}` : ""}
+                    </p>
+                  ) : null}
+                </div>
+              ))}
+              <p className="text-[13px] leading-snug text-[#152A51]/70">
+                One consultation covers every treatment.
+              </p>
+            </div>
+          ) : null}
 
           <PlanToggle
             packages={packages}

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { provisionAddonSubscriptions } from "@/lib/checkout/provision-addons";
 import { ensureMedicationOrderForPayment } from "@/lib/orders/ensure-medication-order";
 import { sendOrderConfirmationEmail } from "@/lib/email/order-confirmation";
 import { sendAdminNewRequestEmail } from "@/lib/email/admin-request-email";
@@ -13,6 +14,23 @@ type PaymentInsert = Database["public"]["Tables"]["payments"]["Insert"];
 // Patient mail at checkout is only the combined payment + order confirmation.
 async function settleOrder(paymentId: string, opts?: { sendPatientMail?: boolean }): Promise<void> {
   await ensureMedicationOrderForPayment({ paymentId });
+
+  const { data: payment } = await supabaseAdmin
+    .from("payments")
+    .select("stripe_subscription_id, stripe_invoice_id")
+    .eq("id", paymentId)
+    .maybeSingle();
+  if (payment?.stripe_subscription_id && payment.stripe_invoice_id) {
+    try {
+      await provisionAddonSubscriptions({
+        stripeSubscriptionId: payment.stripe_subscription_id,
+        stripeInvoiceId: payment.stripe_invoice_id,
+      });
+    } catch (error) {
+      console.error("[checkout] addon provision failed:", error);
+    }
+  }
+
   if (opts?.sendPatientMail !== false) {
     try {
       await sendOrderConfirmationEmail(paymentId);

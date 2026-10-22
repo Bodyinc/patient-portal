@@ -2,6 +2,8 @@ import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
+import { AUTOPAY_REFILL_MESSAGE } from "./refill-copy";
+
 /** Patients may request a manual refill starting this long before the plan ends. */
 const REFILL_LEAD_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -62,10 +64,28 @@ export async function getManualRefillBlock(
   if (canRequestManualRefill({ autoPay, orderStatus, tenureEndsAt, now })) return null;
 
   if (autoPay) {
-    return "This treatment renews automatically, so a refill request isn't needed.";
+    return AUTOPAY_REFILL_MESSAGE;
   }
   if (orderStatus !== "delivered") {
     return "You can request a refill after this order is delivered.";
   }
   return "You can request a refill one week before your plan ends.";
+}
+
+/** Medicines on an active plan that Stripe will renew without a new checkout. */
+export async function listAutopayMedicineIds(userId: string): Promise<string[]> {
+  const { data, error } = await supabaseAdmin
+    .from("subscriptions")
+    .select("medicine_id")
+    .eq("user_id", userId)
+    .in("status", ACTIVE_SUBSCRIPTION_STATUSES)
+    .eq("cancel_at_period_end", false);
+
+  if (error) throw new Error(error.message);
+
+  return [
+    ...new Set(
+      (data ?? []).map((row) => row.medicine_id).filter((id): id is string => Boolean(id)),
+    ),
+  ];
 }

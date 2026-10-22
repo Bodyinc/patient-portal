@@ -40,8 +40,9 @@ function getPaymentInitPromise(
   packageId: string,
   promoCode: string | null,
   retryToken: number,
+  cartKey: string,
 ): Promise<OnboardingSubscriptionResult> {
-  const key = `${packageId}::${promoCode ?? ""}::${retryToken}`;
+  const key = `${packageId}::${cartKey}::${promoCode ?? ""}::${retryToken}`;
   let pending = paymentInitCache.get(key);
   if (!pending) {
     pending = createOnboardingSubscription(promoCode);
@@ -97,25 +98,50 @@ export default function BillingCheckoutPage() {
   }, []);
 
   const packageId = summary?.selectedPackageId ?? null;
+  const cartItems = summary?.cartItems ?? [];
+  const pricedCart = cartItems.filter((item) => item.packagePrice != null);
+  const cartKey = pricedCart
+    .filter((item) => !item.isPrimary && item.packageId)
+    .map((item) => item.packageId)
+    .sort()
+    .join(",");
+  const cartSubtotal =
+    pricedCart.length > 0
+      ? pricedCart.reduce((sum, item) => sum + (item.packagePrice ?? 0), 0)
+      : summary?.packagePrice;
+  const cartOriginal =
+    pricedCart.length > 0
+      ? pricedCart.reduce(
+          (sum, item) => sum + (item.packageOriginalPrice ?? item.packagePrice ?? 0),
+          0,
+        )
+      : summary?.packageOriginalPrice;
+  const summaryLines = pricedCart.map((item) => ({
+    name: item.variantName ? `${item.medicineName} — ${item.variantName}` : item.medicineName,
+    planLabel: item.packageName ?? item.categoryName,
+    amount: item.packagePrice ?? 0,
+  }));
   const medicationName =
-    (summary?.medicineName ?? "Selected Medication") +
-    (summary?.variantName ? ` — ${summary.variantName}` : "");
-  const planLabel = summary?.packageName ?? "Treatment Plan";
+    summaryLines.length > 1
+      ? summaryLines.map((line) => line.name).join(", ")
+      : (summary?.medicineName ?? "Selected Medication") +
+        (summary?.variantName ? ` — ${summary.variantName}` : "");
+  const planLabel =
+    summaryLines.length > 1 ? "One checkout" : (summary?.packageName ?? "Treatment Plan");
   const pricing = useMemo(
-    () =>
-      calculateCheckoutPricing(
-        summary?.packagePrice,
-        discountAmount,
-        discountLabel,
-        summary?.packageOriginalPrice,
-      ),
-    [summary?.packagePrice, summary?.packageOriginalPrice, discountAmount, discountLabel],
+    () => calculateCheckoutPricing(cartSubtotal, discountAmount, discountLabel, cartOriginal),
+    [cartSubtotal, cartOriginal, discountAmount, discountLabel],
   );
 
   useEffect(() => {
     if (!packageId) return;
     let active = true;
-    void getCheckoutDiscount({ packageId, code: appliedPromoCode, allowAuto: true }).then((d) => {
+    void getCheckoutDiscount({
+      packageId,
+      code: appliedPromoCode,
+      allowAuto: true,
+      subtotalCents: cartSubtotal != null ? Math.round(cartSubtotal * 100) : undefined,
+    }).then((d) => {
       if (!active) return;
       setDiscountAmount(d ? d.discountCents / 100 : 0);
       setDiscountLabel(d?.label ?? null);
@@ -123,7 +149,7 @@ export default function BillingCheckoutPage() {
     return () => {
       active = false;
     };
-  }, [packageId, appliedPromoCode]);
+  }, [packageId, appliedPromoCode, cartSubtotal]);
 
   // Preload Stripe Payment Element as soon as the package is known.
   useEffect(() => {
@@ -136,7 +162,7 @@ export default function BillingCheckoutPage() {
     setPaymentError(null);
     setClientSecret(null);
 
-    void getPaymentInitPromise(packageId, appliedPromoCode, retryToken).then((result) => {
+    void getPaymentInitPromise(packageId, appliedPromoCode, retryToken, cartKey).then((result) => {
       if (cancelled || seq !== paymentInitSeq.current) return;
       if (!result.ok) {
         setPaymentError(result.message);
@@ -150,7 +176,7 @@ export default function BillingCheckoutPage() {
     return () => {
       cancelled = true;
     };
-  }, [packageId, appliedPromoCode, retryToken]);
+  }, [packageId, appliedPromoCode, retryToken, cartKey]);
 
   const retryPaymentInit = useCallback(() => {
     setRetryToken((t) => t + 1);
@@ -161,7 +187,12 @@ export default function BillingCheckoutPage() {
     setPromoMessage(null);
     if (!packageId) return;
     setApplyingPromo(true);
-    const d = await getCheckoutDiscount({ packageId, code: promoCode, allowAuto: false });
+    const d = await getCheckoutDiscount({
+      packageId,
+      code: promoCode,
+      allowAuto: false,
+      subtotalCents: cartSubtotal != null ? Math.round(cartSubtotal * 100) : undefined,
+    });
     setApplyingPromo(false);
 
     if (!d) {
@@ -373,7 +404,8 @@ export default function BillingCheckoutPage() {
               promoMessage={promoMessage}
               promoError={promoError}
               applyingPromo={applyingPromo}
-              loading={summary?.packagePrice == null}
+              lines={summaryLines}
+              loading={cartSubtotal == null}
               consultationFeeCents={consultationFeeCents}
               renewalShippingCents={renewalShippingCents}
               onPromoCodeChange={(value) => {

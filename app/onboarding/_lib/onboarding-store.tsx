@@ -42,6 +42,7 @@ export type OnboardingState = {
   bmi: number | null;
   medicationId: string | null;
   variantId: string | null;
+  additionalProductsReviewed: boolean;
   requiresQuestionnaire: boolean;
   fullName: string;
   email: string;
@@ -79,6 +80,7 @@ export const initialOnboardingState: OnboardingState = {
   bmi: null,
   medicationId: null,
   variantId: null,
+  additionalProductsReviewed: false,
   requiresQuestionnaire: false,
   fullName: "",
   email: "",
@@ -162,6 +164,10 @@ function summaryToState(summary: IntakeSummaryDto, prev: OnboardingState): Onboa
     bmi: summary.bmi ?? base.bmi,
     ...imperial,
     medicationId: summary.medicineId ?? base.medicationId,
+    additionalProductsReviewed:
+      base.additionalProductsReviewed ||
+      Boolean(summary.selectedPackageId) ||
+      (summary.cartItems ?? []).some((item) => !item.isPrimary),
     requiresQuestionnaire: summary.requiresQuestionnaire,
     fullName: summary.fullName ?? base.fullName,
     email: summary.email ?? base.email,

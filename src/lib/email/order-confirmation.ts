@@ -1,10 +1,11 @@
 import "server-only";
 
+import { loadCheckoutCart } from "@/lib/intake/session-cart";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { formatOrderId } from "@/lib/orders/order-id";
 import { ensureMedicationOrderForPayment } from "@/lib/orders/ensure-medication-order";
 import { sendOnce, wasEmailSent, markEmailSent } from "./idempotency";
-import { orderConfirmedEmail } from "./order-confirmation-emails";
+import { orderConfirmedEmail, type OrderConfirmationLine } from "./order-confirmation-emails";
 import { appUrl, patientEmailByUserId } from "./recipients";
 import { sendTransactionalEmail } from "./send";
 import { sendPushToUser } from "@/lib/push/send";
@@ -24,6 +25,56 @@ type OrderRow = {
 
 const ORDER_COLUMNS =
   "id, user_id, session_id, medicine_id, variant_id, package_id, kind, requires_consultation";
+
+async function isAddonInitialPayment(stripeSubscriptionId: string | null): Promise<boolean> {
+  if (!stripeSubscriptionId) return false;
+  const { data: sub } = await supabaseAdmin
+    .from("subscriptions")
+    .select("id, is_checkout_primary")
+    .eq("stripe_subscription_id", stripeSubscriptionId)
+    .maybeSingle();
+  if (!sub || sub.is_checkout_primary !== false) return false;
+
+  const { data: prior } = await supabaseAdmin
+    .from("medication_requests")
+    .select("id")
+    .eq("subscription_id", sub.id)
+    .eq("kind", "followup")
+    .limit(1)
+    .maybeSingle();
+  return !prior;
+}
+
+async function suppressAddonCheckoutReceipts(stripeSubscriptionId: string | null): Promise<void> {
+  if (!stripeSubscriptionId) return;
+  const { data: primary } = await supabaseAdmin
+    .from("subscriptions")
+    .select("id")
+    .eq("stripe_subscription_id", stripeSubscriptionId)
+    .eq("is_checkout_primary", true)
+    .maybeSingle();
+  if (!primary?.id) return;
+
+  const { data: addons } = await supabaseAdmin
+    .from("subscriptions")
+    .select("stripe_subscription_id")
+    .eq("checkout_group_id", primary.id)
+    .eq("is_checkout_primary", false);
+  const stripeIds = (addons ?? [])
+    .map((row) => row.stripe_subscription_id)
+    .filter((id): id is string => Boolean(id));
+  if (stripeIds.length === 0) return;
+
+  const { data: payments } = await supabaseAdmin
+    .from("payments")
+    .select("id")
+    .in("stripe_subscription_id", stripeIds);
+  for (const row of payments ?? []) {
+    if (!(await wasEmailSent(REMINDER_TYPE, row.id))) {
+      await markEmailSent(REMINDER_TYPE, row.id);
+    }
+  }
+}
 
 function invoiceUrlFromRawEvent(rawEvent: unknown): string | null {
   if (!rawEvent || typeof rawEvent !== "object" || Array.isArray(rawEvent)) return null;
@@ -112,6 +163,7 @@ async function loadOrderLabels(order: OrderRow): Promise<{
   medicineName: string;
   variantName: string | null;
   planName: string | null;
+  lines: OrderConfirmationLine[];
 }> {
   const [medicine, variant, pkg] = await Promise.all([
     order.medicine_id
@@ -129,10 +181,32 @@ async function loadOrderLabels(order: OrderRow): Promise<{
       : Promise.resolve({ data: null }),
   ]);
 
+  const fallbackName = medicine.data?.name ?? "Your medication";
+  const cart = order.session_id ? await loadCheckoutCart(order.session_id) : [];
+  const lines: OrderConfirmationLine[] = cart
+    .filter((line) => line.medicineName)
+    .map((line) => ({
+      name: line.medicineName,
+      detail:
+        [line.variantName, line.packageName ?? line.categoryName].filter(Boolean).join(" · ") ||
+        null,
+      amountCents: line.packagePrice != null ? Math.round(Number(line.packagePrice) * 100) : null,
+    }));
+
+  if (order.kind === "initial" && lines.length > 1) {
+    return {
+      medicineName: lines.map((line) => line.name).join(", "),
+      variantName: null,
+      planName: null,
+      lines,
+    };
+  }
+
   return {
-    medicineName: medicine.data?.name ?? "Your medication",
+    medicineName: lines[0]?.name || fallbackName,
     variantName: variant.data?.name ?? null,
     planName: pkg.data?.name ?? null,
+    lines,
   };
 }
 
@@ -154,6 +228,17 @@ export async function sendOrderConfirmationEmail(paymentId: string): Promise<boo
     return false;
   }
 
+  // Add-on subscriptions open on a $0 trial invoice. The receipt is the
+  // primary checkout payment, which already includes every medicine.
+  if ((payment.amount_cents ?? 0) <= 0) return false;
+
+  // One checkout sends one receipt, from the primary payment. An added
+  // medicine keeps its own subscription, but its first invoice is not a
+  // second order confirmation.
+  if (await isAddonInitialPayment(payment.stripe_subscription_id)) return false;
+
+  if (await wasEmailSent(REMINDER_TYPE, payment.id)) return false;
+
   if (payment.stripe_payment_intent_id) {
     const { data: extraPay } = await supabaseAdmin
       .from("additional_payments")
@@ -169,6 +254,13 @@ export async function sendOrderConfirmationEmail(paymentId: string): Promise<boo
     return false;
   }
 
+  if (
+    (await wasEmailSent(REMINDER_TYPE, order.id)) ||
+    (await wasEmailSent(REMINDER_TYPE, payment.id))
+  ) {
+    return false;
+  }
+
   const recipient = await resolveRecipient(order);
   if (!recipient) {
     console.warn("[email] order confirmation skipped: no patient email for order", order.id);
@@ -181,6 +273,7 @@ export async function sendOrderConfirmationEmail(paymentId: string): Promise<boo
     medicineName: labels.medicineName,
     variantName: labels.variantName,
     planName: labels.planName,
+    lines: labels.lines,
     orderNumber: formatOrderId(order.id),
     amountCents: payment.amount_cents,
     currency: payment.currency,
@@ -200,6 +293,9 @@ export async function sendOrderConfirmationEmail(paymentId: string): Promise<boo
   const sent = await sendOnce(REMINDER_TYPE, payment.id, () =>
     sendTransactionalEmail({ to: recipient.email, subject, html }),
   );
+  if (sent) {
+    await suppressAddonCheckoutReceipts(payment.stripe_subscription_id);
+  }
   if (sent && order.user_id) {
     await sendPushToUser(order.user_id, {
       title: "Order confirmed",

@@ -8,6 +8,7 @@ import {
   sendIncompleteOrderReminders,
   sendOrderStatusEmails,
   sendRefillReminders,
+  sendTrackingIdEmails,
 } from "@/lib/email/reminders";
 
 export const runtime = "nodejs";
@@ -41,6 +42,7 @@ export async function GET(request: Request) {
     const incompleteOrders = await sendIncompleteOrderReminders();
     const refills = await sendRefillReminders();
     const orderStatuses = await sendOrderStatusEmails();
+    const trackingIds = await sendTrackingIdEmails();
     const orderConfirmations = await sendMissedOrderConfirmationEmails();
     const adminNewRequests = await sendMissedAdminNewRequestEmails();
     const inquiryUpdates = await sendUnsentInquiryUpdateEmails();
@@ -49,6 +51,7 @@ export async function GET(request: Request) {
       incompleteOrders,
       refills,
       orderStatuses,
+      trackingIds,
       orderConfirmations,
       adminNewRequests,
       inquiryUpdates,

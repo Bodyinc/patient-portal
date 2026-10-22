@@ -4,6 +4,7 @@ import type Stripe from "stripe";
 import { stripe } from "./server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { recordPayment } from "./record-payment";
+import { ensureCheckoutAddons } from "@/lib/checkout/provision-addons";
 import { sendOrderConfirmationEmail } from "@/lib/email/order-confirmation";
 import { maybeConvertReferral } from "@/lib/referrals";
 import { recordInvoiceWalletDebit } from "@/lib/wallet";
@@ -245,6 +246,11 @@ export async function reconcileLatestSubscriptionForUser(userId: string): Promis
       .limit(1)
       .maybeSingle();
     if (payment) {
+      try {
+        await ensureCheckoutAddons(userId);
+      } catch (error) {
+        console.error("[checkout] addon ensure on reconcile failed:", error);
+      }
       try {
         await sendOrderConfirmationEmail(payment.id);
       } catch (error) {

@@ -1,5 +1,6 @@
 "use server";
 
+import { loadCheckoutCart } from "@/lib/intake/session-cart";
 import { requireIntakeSession } from "@/lib/intake/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createGuestStripeCustomer } from "@/lib/stripe/customers";
@@ -70,15 +71,40 @@ export async function createOnboardingSubscription(
     }
   }
 
+  const cart = await loadCheckoutCart(session.id);
+  const hasPrimary = cart.some((line) => line.isPrimary);
+  const addons = hasPrimary
+    ? cart.filter(
+        (line) =>
+          !line.isPrimary && line.packageId && line.packageId !== pkg.id && line.stripePriceId,
+      )
+    : [];
+  const missingPrice = hasPrimary
+    ? cart.find((line) => !line.isPrimary && line.packageId && !line.stripePriceId)
+    : undefined;
+  if (missingPrice) {
+    return {
+      ok: false,
+      message: `${missingPrice.medicineName} is not available for purchase yet.`,
+    };
+  }
+
+  const addonCents = addons.reduce(
+    (sum, line) => sum + Math.round(Number(line.packagePrice ?? 0) * 100),
+    0,
+  );
   // DB-driven discount: an entered code, or the admin's auto-apply (welcome) promo.
-  const subtotalCents = Math.round(Number(pkg.price) * 100);
+  const subtotalCents = Math.round(Number(pkg.price) * 100) + addonCents;
   const discount = await resolveCheckoutDiscount({
     code: promoCode,
     subtotalCents,
     allowAuto: true,
   });
 
-  const oneTimeFees: Array<{ amountCents: number; description: string }> = [];
+  const oneTimeFees: Array<{ amountCents: number; description: string }> = addons.map((line) => ({
+    amountCents: Math.round(Number(line.packagePrice ?? 0) * 100),
+    description: `${line.medicineName} · ${line.packageName ?? line.categoryName}`,
+  }));
   if (discount) {
     oneTimeFees.push({
       amountCents: -discount.discountCents,
@@ -104,7 +130,9 @@ export async function createOnboardingSubscription(
   const { subscriptionId, clientSecret } = await createSubscriptionForPrice({
     customerId,
     priceId: pkg.stripe_price_id,
-    description: `${medicineName}${variantName ? ` — ${variantName}` : ""} · ${planLabel}`,
+    description: `${medicineName}${variantName ? ` — ${variantName}` : ""} · ${planLabel}${
+      addons.length ? ` + ${addons.length} more` : ""
+    }`,
     oneTimeFees,
     // First onboarding invoice is medication-only; shipping recurs from the first renewal.
     recurringShippingCents: effectiveShippingCents(settings),
@@ -117,6 +145,14 @@ export async function createOnboardingSubscription(
       ...(variantName ? { variant_name: variantName } : {}),
       // Redeemed on invoice.paid — not at form open — so promo recreation doesn't over-count.
       ...(discount ? { promo_id: discount.promo.id, promo_code: discount.label } : {}),
+      ...(addons.length
+        ? {
+            addon_package_ids: addons
+              .map((line) => line.packageId)
+              .filter(Boolean)
+              .join(","),
+          }
+        : {}),
     },
   });
 
@@ -133,18 +169,30 @@ export async function createOnboardingSubscription(
     })
     .eq("id", session.id);
 
-  await supabaseAdmin.from("subscriptions").upsert(
-    {
-      session_id: session.id,
-      stripe_subscription_id: subscriptionId,
-      stripe_customer_id: customerId,
-      stripe_price_id: pkg.stripe_price_id,
-      package_id: pkg.id,
-      medicine_id: pkg.medicine_id,
-      status: "incomplete",
-    },
-    { onConflict: "stripe_subscription_id" },
-  );
+  const { data: subRow } = await supabaseAdmin
+    .from("subscriptions")
+    .upsert(
+      {
+        session_id: session.id,
+        stripe_subscription_id: subscriptionId,
+        stripe_customer_id: customerId,
+        stripe_price_id: pkg.stripe_price_id,
+        package_id: pkg.id,
+        medicine_id: pkg.medicine_id,
+        status: "incomplete",
+        is_checkout_primary: true,
+      },
+      { onConflict: "stripe_subscription_id" },
+    )
+    .select("id")
+    .single();
+
+  if (subRow?.id) {
+    await supabaseAdmin
+      .from("subscriptions")
+      .update({ checkout_group_id: subRow.id, is_checkout_primary: true })
+      .eq("id", subRow.id);
+  }
 
   return { ok: true, clientSecret };
 }

@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 
 import MedicineProductImage from "../../../onboarding/_components/MedicineProductImage";
 import DashboardHeader from "../../_components/DashboardHeader";
+import TrackingIdValue from "../../_components/TrackingIdValue";
 
 type DashboardPageClientProps = {
   data: DashboardPageDataDto;
@@ -142,7 +143,7 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
                   data.treatment?.subscriptionId ? (
                   <DashboardConsultationButton
                     subscriptionId={data.treatment.subscriptionId}
-                    label="Open consultation"
+                    label="Support"
                   />
                 ) : (
                   <Button
@@ -217,7 +218,7 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
                 (consultationStatus === "open" || consultationStatus === "closed") ? (
                   <DashboardConsultationButton
                     subscriptionId={data.treatment.subscriptionId!}
-                    label="Open consultation"
+                    label={consultationStatus === "closed" ? "Support" : "Open consultation"}
                   />
                 ) : null}
                 {canRefill ? (
@@ -233,6 +234,19 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
               </div>
             </div>
           </div>
+
+          {data.treatment.consultationApproved || data.treatment.trackingNumber ? (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-[#E8EEED] px-4 py-3 sm:px-5">
+              {data.treatment.consultationApproved ? (
+                <span className="inline-flex rounded-full bg-[#E0FAE8] px-2.5 py-1 text-xs font-medium text-[#34845F]">
+                  Consultation approved
+                </span>
+              ) : null}
+              {data.treatment.trackingNumber ? (
+                <TrackingIdValue trackingNumber={data.treatment.trackingNumber} />
+              ) : null}
+            </div>
+          ) : null}
 
           {data.activeTreatmentCount > 1 ? (
             <p className="border-t border-[#E8EEED] px-4 py-3 text-sm text-[#152A51]/70 sm:px-5">

@@ -22,6 +22,7 @@ type ShopCatalogClientProps = {
   patientId: string;
   avatarUrl: string | null;
   offer?: PortalOfferDto | null;
+  autopayMedicineIds?: string[];
 };
 
 function parseSort(value: string | null): ShopSortOption {
@@ -39,6 +40,7 @@ export default function ShopCatalogClient({
   patientId,
   avatarUrl,
   offer = null,
+  autopayMedicineIds = [],
 }: ShopCatalogClientProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -109,6 +111,7 @@ export default function ShopCatalogClient({
 
   const list = catalogQuery.data ?? initialList;
   const isPending = catalogQuery.isFetching;
+  const autopayMedicines = useMemo(() => new Set(autopayMedicineIds), [autopayMedicineIds]);
 
   return (
     <section className="space-y-4">
@@ -173,7 +176,11 @@ export default function ShopCatalogClient({
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-5">
             {list.items.map((item) => (
-              <ShopProductCard key={item.id} item={item} />
+              <ShopProductCard
+                key={item.id}
+                item={item}
+                renewsAutomatically={autopayMedicines.has(item.id)}
+              />
             ))}
           </div>
         )}

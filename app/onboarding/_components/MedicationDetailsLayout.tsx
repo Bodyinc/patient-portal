@@ -26,6 +26,8 @@ type MedicationDetailsLayoutProps = {
   onImportantOpenChange: (open: boolean) => void;
   continueLabel?: string;
   continueDisabled?: boolean;
+  /** Shown above the actions when checkout should not continue. */
+  blockedMessage?: string | null;
   onExploreMore: () => void;
   onContinue: () => void;
   className?: string;
@@ -86,6 +88,7 @@ export default function MedicationDetailsLayout({
   onImportantOpenChange,
   continueLabel = "Continue",
   continueDisabled = false,
+  blockedMessage,
   onExploreMore,
   onContinue,
   className,
@@ -127,6 +130,12 @@ export default function MedicationDetailsLayout({
             <p className="mt-5 text-[22px] font-medium tracking-[-0.3px] text-[#152A51] sm:text-[24px]">
               {formatFromPrice(fromPriceCents)}
             </p>
+
+            {blockedMessage ? (
+              <p className="mt-4 rounded-[14px] border border-[#E8EEED] bg-[#F3F6F6] px-4 py-3 text-sm leading-relaxed text-[#152A51]">
+                {blockedMessage}
+              </p>
+            ) : null}
 
             <div className="mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:justify-start">
               <Button

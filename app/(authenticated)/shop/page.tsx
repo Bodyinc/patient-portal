@@ -1,4 +1,5 @@
 import { requirePatientSession } from "@/lib/auth/require-patient";
+import { listAutopayMedicineIds } from "@/lib/orders/refill-eligibility";
 import { fetchActivePortalOffer } from "@/lib/offers/service-data";
 import { getPatientDisplayIdentity } from "@/lib/profile/identity";
 import { fetchShopCatalogData, fetchShopCategoriesData } from "@/lib/shop/service-data";
@@ -39,7 +40,7 @@ export default async function ShopPage({
   const searchQuery = (resolvedSearchParams.q ?? "").trim();
 
   try {
-    const [categories, list, offer, identity] = await Promise.all([
+    const [categories, list, offer, identity, autopayMedicineIds] = await Promise.all([
       fetchShopCategoriesData(),
       fetchShopCatalogData({
         categorySlug: category,
@@ -53,6 +54,10 @@ export default async function ShopPage({
         return null;
       }),
       getPatientDisplayIdentity(user.id),
+      listAutopayMedicineIds(user.id).catch((err) => {
+        console.error("[shop] autopay lookup failed:", err);
+        return [] as string[];
+      }),
     ]);
 
     return (
@@ -66,6 +71,7 @@ export default async function ShopPage({
             patientId={patientId}
             avatarUrl={identity.avatarUrl}
             offer={offer}
+            autopayMedicineIds={autopayMedicineIds}
           />
         </div>
       </main>

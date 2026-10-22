@@ -5,13 +5,20 @@ import { useRouter } from "next/navigation";
 
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { getDbMedicineImageSrc } from "@/lib/intake/medicine-image";
+import { AUTOPAY_REFILL_MESSAGE } from "@/lib/orders/refill-copy";
 import type { ShopMedicineCardDto } from "@/lib/shop/types";
 import { formatFromPrice } from "@/lib/pricing";
 
 import MedicineProductImage from "../../../onboarding/_components/MedicineProductImage";
 import MedicationDetailsLayout from "../../../onboarding/_components/MedicationDetailsLayout";
 
-export default function ShopProductCard({ item }: { item: ShopMedicineCardDto }) {
+export default function ShopProductCard({
+  item,
+  renewsAutomatically = false,
+}: {
+  item: ShopMedicineCardDto;
+  renewsAutomatically?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [importantOpen, setImportantOpen] = useState(false);
   const router = useRouter();
@@ -40,7 +47,7 @@ export default function ShopProductCard({ item }: { item: ShopMedicineCardDto })
   }, [open]);
 
   function handleContinue() {
-    if (!available) return;
+    if (!available || renewsAutomatically) return;
     const params = new URLSearchParams({
       id: item.id,
       name: item.name,
@@ -117,8 +124,15 @@ export default function ShopProductCard({ item }: { item: ShopMedicineCardDto })
             notice={item.notice}
             importantOpen={importantOpen}
             onImportantOpenChange={setImportantOpen}
-            continueLabel={available ? "Continue" : "Pricing coming soon"}
-            continueDisabled={!available}
+            continueLabel={
+              renewsAutomatically
+                ? "Renews automatically"
+                : available
+                  ? "Continue"
+                  : "Pricing coming soon"
+            }
+            continueDisabled={!available || renewsAutomatically}
+            blockedMessage={renewsAutomatically ? AUTOPAY_REFILL_MESSAGE : null}
             onExploreMore={() => setOpen(false)}
             onContinue={handleContinue}
           />

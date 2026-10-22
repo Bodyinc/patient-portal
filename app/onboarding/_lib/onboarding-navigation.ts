@@ -10,6 +10,7 @@ export const ONBOARDING_STEPS = [
   { id: "personal-info", path: "/onboarding/personal-info" },
   { id: "delivery-address", path: "/onboarding/delivery-address" },
   { id: "medications", path: "/onboarding/medications" },
+  { id: "additional-products", path: "/onboarding/additional-products" },
   { id: "select-plan", path: "/onboarding/select-plan" },
   { id: "billing-checkout", path: "/onboarding/billing-checkout" },
   { id: "order-confirmation", path: "/onboarding/order-confirmation" },
@@ -132,6 +133,7 @@ export function getEarliestIncompleteStep(state: OnboardingState): string {
   if (!state.fullName || !state.email) return "/onboarding/personal-info";
   if (!isAddressComplete(state)) return "/onboarding/delivery-address";
   if (!state.medicationId) return "/onboarding/medications";
+  if (!state.additionalProductsReviewed) return "/onboarding/additional-products";
   if (!state.selectedPackageId) return "/onboarding/select-plan";
   if (!state.checkoutConfirmed) return "/onboarding/billing-checkout";
   return "/onboarding/order-confirmation";

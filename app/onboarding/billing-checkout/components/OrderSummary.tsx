@@ -4,9 +4,16 @@ import type { ReactNode } from "react";
 
 import { fieldControlClass } from "../../_lib/onboarding-theme";
 
+type SummaryLine = {
+  name: string;
+  planLabel: string;
+  amount: number;
+};
+
 type OrderSummaryProps = {
   medicationName: string;
   planLabel: string;
+  lines?: SummaryLine[];
   medicationTotal: number;
   medicationOriginalTotal: number;
   subtotal: number;
@@ -52,6 +59,7 @@ function WaivedFee({ cents }: { cents: number }) {
 export default function OrderSummary({
   medicationName,
   planLabel,
+  lines = [],
   medicationTotal,
   medicationOriginalTotal,
   discount,
@@ -78,10 +86,27 @@ export default function OrderSummary({
       </h2>
 
       <div className="py-3">
-        <div className="min-w-0">
-          <p className="truncate text-[14px] font-medium text-[#152A51]">{medicationName}</p>
-          <p className="truncate text-[12px] text-[#152A51]/70">{planLabel}</p>
-        </div>
+        {lines.length > 1 ? (
+          <ul className="space-y-3">
+            {lines.map((line) => (
+              <li
+                key={`${line.name}-${line.planLabel}`}
+                className="flex items-start justify-between gap-3"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-[14px] font-medium text-[#152A51]">{line.name}</p>
+                  <p className="truncate text-[12px] text-[#152A51]/70">{line.planLabel}</p>
+                </div>
+                <p className="shrink-0 text-[14px] text-[#152A51]">{formatMoney(line.amount)}</p>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="min-w-0">
+            <p className="truncate text-[14px] font-medium text-[#152A51]">{medicationName}</p>
+            <p className="truncate text-[12px] text-[#152A51]/70">{planLabel}</p>
+          </div>
+        )}
 
         <div className="mt-4 space-y-2 border-t border-[#E8E8E8] pt-4 text-[14px] text-[#152A51]">
           {loading ? (
