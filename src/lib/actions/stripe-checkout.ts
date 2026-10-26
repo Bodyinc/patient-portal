@@ -9,7 +9,9 @@ import { resolveCheckoutDiscount } from "@/lib/stripe/promos";
 import { getPlatformSettings, effectiveShippingCents } from "@/lib/settings/platform-settings";
 
 export type OnboardingSubscriptionResult =
-  { ok: true; clientSecret: string } | { ok: false; message: string };
+  | { ok: true; paid: false; clientSecret: string }
+  | { ok: true; paid: true; clientSecret: null }
+  | { ok: false; message: string };
 
 export async function createOnboardingSubscription(
   promoCode?: string | null,
@@ -127,36 +129,47 @@ export async function createOnboardingSubscription(
   const planLabel =
     pkg.duration_months === 1 ? "Monthly Plan" : `${pkg.duration_months}-Month Plan`;
 
-  const { subscriptionId, clientSecret } = await createSubscriptionForPrice({
-    customerId,
-    priceId: pkg.stripe_price_id,
-    description: `${medicineName}${variantName ? ` — ${variantName}` : ""} · ${planLabel}${
-      addons.length ? ` + ${addons.length} more` : ""
-    }`,
-    oneTimeFees,
-    // First onboarding invoice is medication-only; shipping recurs from the first renewal.
-    recurringShippingCents: effectiveShippingCents(settings),
-    shippingOnFirstInvoice: false,
-    metadata: {
-      intake_session_id: session.id,
-      package_id: pkg.id,
-      medicine_id: pkg.medicine_id,
-      ...(pkg.variant_id ? { variant_id: pkg.variant_id } : {}),
-      ...(variantName ? { variant_name: variantName } : {}),
-      // Redeemed on invoice.paid — not at form open — so promo recreation doesn't over-count.
-      ...(discount ? { promo_id: discount.promo.id, promo_code: discount.label } : {}),
-      ...(addons.length
-        ? {
-            addon_package_ids: addons
-              .map((line) => line.packageId)
-              .filter(Boolean)
-              .join(","),
-          }
-        : {}),
-    },
-  });
+  let subscriptionId: string;
+  let clientSecret: string | null;
+  let paid: boolean;
+  try {
+    ({ subscriptionId, clientSecret, paid } = await createSubscriptionForPrice({
+      customerId,
+      priceId: pkg.stripe_price_id,
+      description: `${medicineName}${variantName ? ` — ${variantName}` : ""} · ${planLabel}${
+        addons.length ? ` + ${addons.length} more` : ""
+      }`,
+      oneTimeFees,
+      // First onboarding invoice is medication-only; shipping recurs from the first renewal.
+      recurringShippingCents: effectiveShippingCents(settings),
+      shippingOnFirstInvoice: false,
+      metadata: {
+        intake_session_id: session.id,
+        package_id: pkg.id,
+        medicine_id: pkg.medicine_id,
+        ...(pkg.variant_id ? { variant_id: pkg.variant_id } : {}),
+        ...(variantName ? { variant_name: variantName } : {}),
+        // Redeemed on invoice.paid — not at form open — so promo recreation doesn't over-count.
+        ...(discount ? { promo_id: discount.promo.id, promo_code: discount.label } : {}),
+        ...(addons.length
+          ? {
+              addon_package_ids: addons
+                .map((line) => line.packageId)
+                .filter(Boolean)
+                .join(","),
+            }
+          : {}),
+      },
+    }));
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error instanceof Error ? error.message : "Unable to start payment. Please try again.",
+    };
+  }
 
-  if (!clientSecret) {
+  if (!clientSecret && !paid) {
     return { ok: false, message: "Unable to start payment. Please try again." };
   }
 
@@ -179,7 +192,7 @@ export async function createOnboardingSubscription(
         stripe_price_id: pkg.stripe_price_id,
         package_id: pkg.id,
         medicine_id: pkg.medicine_id,
-        status: "incomplete",
+        status: paid ? "active" : "incomplete",
         is_checkout_primary: true,
       },
       { onConflict: "stripe_subscription_id" },
@@ -194,7 +207,10 @@ export async function createOnboardingSubscription(
       .eq("id", subRow.id);
   }
 
-  return { ok: true, clientSecret };
+  if (paid || !clientSecret) {
+    return { ok: true, paid: true, clientSecret: null };
+  }
+  return { ok: true, paid: false, clientSecret };
 }
 
 // Client-facing discount preview for the checkout cart. code=null returns the auto-apply

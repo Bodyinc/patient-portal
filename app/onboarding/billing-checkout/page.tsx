@@ -76,7 +76,9 @@ export default function BillingCheckoutPage() {
   const [consultationFeeCents, setConsultationFeeCents] = useState(0);
   const [renewalShippingCents, setRenewalShippingCents] = useState(0);
   const [retryToken, setRetryToken] = useState(0);
+  const [finishWithoutCard, setFinishWithoutCard] = useState(false);
   const paymentInitSeq = useRef(0);
+  const finishedWithoutCard = useRef(false);
   const termsRef = useRef<HTMLDivElement>(null);
   const paymentRef = useRef<HTMLDivElement>(null);
 
@@ -169,6 +171,11 @@ export default function BillingCheckoutPage() {
         setPaymentLoading(false);
         return;
       }
+      if (result.paid) {
+        setPaymentLoading(false);
+        setFinishWithoutCard(true);
+        return;
+      }
       setClientSecret(result.clientSecret);
       setPaymentLoading(false);
     });
@@ -233,6 +240,12 @@ export default function BillingCheckoutPage() {
     toast.success("Payment confirmed.");
     router.push(ORDER_CONFIRMATION_REDIRECT);
   }
+
+  useEffect(() => {
+    if (!finishWithoutCard || finishedWithoutCard.current) return;
+    finishedWithoutCard.current = true;
+    void handlePaid();
+  }, [finishWithoutCard]);
 
   const paymentReady = Boolean(clientSecret) && !paymentLoading && !paymentError;
   const showPayment = paymentOpen && consentAccepted;

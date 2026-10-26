@@ -6,16 +6,18 @@ import { Lock } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { getStripeJs } from "@/lib/stripe/client";
+import { getStripeJs, isSetupIntentClientSecret } from "@/lib/stripe/client";
 
 function PaymentFields({
   returnUrl,
   consentAccepted,
   onPaid,
+  saveCardOnly,
 }: {
   returnUrl: string;
   consentAccepted: boolean;
   onPaid: () => void;
+  saveCardOnly: boolean;
 }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -33,7 +35,8 @@ function PaymentFields({
     setSubmitting(true);
     setError(null);
 
-    const { error: confirmError } = await stripe.confirmPayment({
+    const confirm = saveCardOnly ? stripe.confirmSetup : stripe.confirmPayment;
+    const { error: confirmError } = await confirm({
       elements,
       confirmParams: { return_url: returnUrl },
       redirect: "if_required",
@@ -62,7 +65,11 @@ function PaymentFields({
         disabled={!stripe || submitting || !consentAccepted}
         className="h-[46px] w-full rounded-full bg-[#E3E084] text-[14px] font-medium text-[#152A51] hover:bg-[#D9D674] disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {submitting ? "Processing…" : "Pay & Start Treatment"}
+        {submitting
+          ? "Processing…"
+          : saveCardOnly
+            ? "Save card & start treatment"
+            : "Pay & Start Treatment"}
       </Button>
     </form>
   );
@@ -86,7 +93,12 @@ export default function OnboardingPaymentForm({
         <Lock size={16} className="text-[#152A51]" />
       </div>
       <Elements stripe={getStripeJs()} options={{ clientSecret, appearance: { theme: "stripe" } }}>
-        <PaymentFields returnUrl={returnUrl} consentAccepted={consentAccepted} onPaid={onPaid} />
+        <PaymentFields
+          returnUrl={returnUrl}
+          consentAccepted={consentAccepted}
+          onPaid={onPaid}
+          saveCardOnly={isSetupIntentClientSecret(clientSecret)}
+        />
       </Elements>
       <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-[11px] text-[#152A51]/70">
         <Lock className="h-3 w-3" aria-hidden />

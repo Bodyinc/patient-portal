@@ -259,7 +259,7 @@ async function handleInvoicePaid(
     await redeemPromoFromSubscription(subId);
   }
 
-  if ((invoice.amount_paid ?? 0) > 0) {
+  if ((invoice.amount_paid ?? 0) > 0 || invoice.status === "paid") {
     await supabaseAdmin
       .from("subscriptions")
       .update({ status: "active" })
