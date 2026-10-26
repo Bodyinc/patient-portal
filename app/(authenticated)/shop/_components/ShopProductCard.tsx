@@ -98,7 +98,7 @@ export default function ShopProductCard({
             {item.description}
           </p>
           <div className="mt-auto space-y-2.5 pt-3">
-            <p className="text-[20px] font-medium leading-none tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
+            <p className="text-[26px] font-medium leading-none tracking-[-0.3px] whitespace-nowrap text-[#152A51]">
               {formatFromPrice(item.fromPriceCents)}
             </p>
             <button

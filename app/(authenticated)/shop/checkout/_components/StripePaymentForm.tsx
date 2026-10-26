@@ -4,9 +4,9 @@ import { useState } from "react";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 
 import { Button } from "@/components/ui/button";
-import { getStripeJs } from "@/lib/stripe/client";
+import { getStripeJs, isSetupIntentClientSecret } from "@/lib/stripe/client";
 
-function PaymentFields({ returnUrl }: { returnUrl: string }) {
+function PaymentFields({ returnUrl, saveCardOnly }: { returnUrl: string; saveCardOnly: boolean }) {
   const stripe = useStripe();
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
@@ -19,7 +19,8 @@ function PaymentFields({ returnUrl }: { returnUrl: string }) {
     setSubmitting(true);
     setError(null);
 
-    const { error: confirmError } = await stripe.confirmPayment({
+    const confirm = saveCardOnly ? stripe.confirmSetup : stripe.confirmPayment;
+    const { error: confirmError } = await confirm({
       elements,
       confirmParams: { return_url: returnUrl },
     });
@@ -44,7 +45,11 @@ function PaymentFields({ returnUrl }: { returnUrl: string }) {
         disabled={!stripe || submitting}
         className="h-[46px] w-full rounded-full bg-[#E3E084] text-[#152A51] shadow-none hover:bg-[#D9D674]"
       >
-        {submitting ? "Processing…" : "Pay & Start Subscription"}
+        {submitting
+          ? "Processing…"
+          : saveCardOnly
+            ? "Save card & start subscription"
+            : "Pay & Start Subscription"}
       </Button>
     </form>
   );
@@ -76,7 +81,10 @@ export default function StripePaymentForm({
           },
         }}
       >
-        <PaymentFields returnUrl={returnUrl} />
+        <PaymentFields
+          returnUrl={returnUrl}
+          saveCardOnly={isSetupIntentClientSecret(clientSecret)}
+        />
       </Elements>
     </section>
   );

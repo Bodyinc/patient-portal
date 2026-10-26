@@ -21,9 +21,7 @@ export default function OrderSummaryCard({
 }: OrderSummaryCardProps) {
   return (
     <section className="rounded-[24px] border border-[#E8EEED] bg-white p-4 sm:p-5">
-      <h3 className="text-xl font-medium tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
-        Order Summary
-      </h3>
+      <h3 className="text-[26px] font-medium tracking-[-0.3px] text-[#152A51]">Order Summary</h3>
       <div className="mt-4 space-y-3 text-sm text-[#152A51]/80">
         <div className="flex items-center justify-between border-b border-[#E8EEED] pb-2">
           <span>Subtotal</span>

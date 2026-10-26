@@ -8,3 +8,8 @@ export function getStripeJs(): Promise<Stripe | null> {
   }
   return stripePromise;
 }
+
+/** A $0 first invoice uses a SetupIntent (`seti_`) so the card can be saved for renewal. */
+export function isSetupIntentClientSecret(clientSecret: string): boolean {
+  return clientSecret.startsWith("seti_");
+}

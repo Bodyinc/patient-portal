@@ -37,7 +37,7 @@ function toDbImageSrc(imageSrc: string | null | undefined): string | null {
 export function ActiveMedicationsEmptyState() {
   return (
     <section className="rounded-[16px] border border-[#E8EEED] bg-white p-4 sm:p-5">
-      <h2 className="mb-4 text-lg font-medium tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
+      <h2 className="mb-4 text-[26px] font-medium tracking-[-0.3px] text-[#152A51]">
         Active Treatments
       </h2>
       <div className="rounded-[16px] border border-dashed border-[#E8EEED] bg-[#F3F6F6] px-4 py-8 text-center">
@@ -84,7 +84,7 @@ export default function CurrentMedicationCard({
   return (
     <article className="overflow-hidden rounded-[10px] border border-[#E8EEED] bg-white">
       {!hideTitle ? (
-        <h2 className="border-b border-[#E8EEED] px-4 py-3 text-lg font-medium tracking-[-0.3px] text-[#152A51] sm:px-5 sm:text-[22px]">
+        <h2 className="border-b border-[#E8EEED] px-4 py-3 text-[26px] font-medium tracking-[-0.3px] text-[#152A51] sm:px-5">
           Active Treatment
         </h2>
       ) : null}

@@ -89,7 +89,11 @@ export async function createSubscriptionForPrice(params: {
       payment_method_types: ["card"],
     },
     metadata,
-    expand: ["latest_invoice.payment_intent", "latest_invoice.confirmation_secret"],
+    expand: [
+      "latest_invoice.payment_intent",
+      "latest_invoice.confirmation_secret",
+      "pending_setup_intent",
+    ],
   });
 
   // Onboarding: add shipping AFTER the first invoice exists, with no proration, so the first
@@ -119,8 +123,13 @@ export async function createSubscriptionForPrice(params: {
     }
   }
 
-  const clientSecret = extractClientSecret(subscription);
+  // A promo that zeros the first invoice has no PaymentIntent. Stripe still returns a
+  // SetupIntent so the patient can save a card for the renewal.
+  const clientSecret = extractClientSecret(subscription) ?? setupIntentClientSecret(subscription);
   if (!clientSecret) {
+    if (invoiceSettledWithoutPayment(subscription)) {
+      return { subscriptionId: subscription.id, clientSecret: null, paid: true };
+    }
     throw new Error("Stripe returned no client secret for the subscription's first invoice.");
   }
 
@@ -204,9 +213,13 @@ export async function retrieveSubscriptionClientSecret(
   subscriptionId: string,
 ): Promise<string | null> {
   const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
-    expand: ["latest_invoice.payment_intent", "latest_invoice.confirmation_secret"],
+    expand: [
+      "latest_invoice.payment_intent",
+      "latest_invoice.confirmation_secret",
+      "pending_setup_intent",
+    ],
   });
-  return extractClientSecret(subscription);
+  return extractClientSecret(subscription) ?? setupIntentClientSecret(subscription);
 }
 
 // Before creating a fresh subscription for a session, void any prior incomplete one so
@@ -286,4 +299,23 @@ function extractClientSecret(subscription: Stripe.Subscription): string | null {
   }
 
   return null;
+}
+
+function setupIntentClientSecret(subscription: Stripe.Subscription): string | null {
+  const setup = (
+    subscription as Stripe.Subscription & {
+      pending_setup_intent?: string | Stripe.SetupIntent | null;
+    }
+  ).pending_setup_intent;
+  if (!setup || typeof setup === "string") return null;
+  return setup.client_secret ?? null;
+}
+
+function invoiceSettledWithoutPayment(subscription: Stripe.Subscription): boolean {
+  if (subscription.status !== "active" && subscription.status !== "trialing") return false;
+  const invoice = subscription.latest_invoice;
+  if (!invoice || typeof invoice === "string") return false;
+  const amountDue = (invoice as { amount_due?: number | null }).amount_due;
+  const status = (invoice as { status?: string | null }).status;
+  return status === "paid" || amountDue === 0;
 }

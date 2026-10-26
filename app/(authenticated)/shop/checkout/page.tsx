@@ -38,7 +38,7 @@ export default async function ShopCheckoutPage({
 
   if (!medicineId) {
     return (
-      <main className="mx-auto flex w-full max-w-[1440px] flex-1 flex-col overflow-x-hidden px-4 py-4 sm:px-6 lg:h-full lg:min-h-0 lg:overflow-hidden lg:px-1">
+      <main className="mx-auto flex w-full max-w-full flex-1 flex-col overflow-x-hidden px-4 py-4 sm:px-6 lg:h-full lg:min-h-0 lg:overflow-hidden lg:px-1">
         <div className="rounded-[16px] border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           Missing product context. Please return to Shop and choose a product.
         </div>
@@ -51,7 +51,7 @@ export default async function ShopCheckoutPage({
     if (refillBlock) {
       const identity = await getPatientDisplayIdentity(user.id);
       return (
-        <main className="mx-auto flex w-full max-w-[1440px] flex-1 flex-col overflow-x-hidden px-4 py-4 sm:px-6 lg:px-1">
+        <main className="mx-auto flex w-full max-w-full flex-1 flex-col overflow-x-hidden px-4 py-4 sm:px-6 lg:px-1">
           <DashboardHeader
             fullName={identity.fullName}
             patientId={toPatientId(user.id)}
@@ -104,7 +104,7 @@ export default async function ShopCheckoutPage({
     ]);
 
     return (
-      <main className="mx-auto flex w-full max-w-[1440px] flex-1 flex-col overflow-x-hidden px-4 py-4 sm:px-6 lg:h-full lg:min-h-0 lg:overflow-hidden lg:px-1">
+      <main className="mx-auto flex w-full max-w-full flex-1 flex-col overflow-x-hidden px-4 py-4 sm:px-6 lg:h-full lg:min-h-0 lg:overflow-hidden lg:px-1">
         <ShopCheckoutClient
           bootstrap={bootstrap}
           fullName={identity.fullName}
@@ -120,7 +120,7 @@ export default async function ShopCheckoutPage({
     );
   } catch (error) {
     return (
-      <main className="mx-auto flex w-full max-w-[1440px] flex-1 flex-col overflow-x-hidden px-4 py-4 sm:px-6 lg:h-full lg:min-h-0 lg:overflow-hidden lg:px-1">
+      <main className="mx-auto flex w-full max-w-full flex-1 flex-col overflow-x-hidden px-4 py-4 sm:px-6 lg:h-full lg:min-h-0 lg:overflow-hidden lg:px-1">
         <div className="rounded-[16px] border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {error instanceof Error ? error.message : "Unable to load checkout data."}
         </div>

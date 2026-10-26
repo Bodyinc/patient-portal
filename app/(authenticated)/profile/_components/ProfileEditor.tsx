@@ -52,9 +52,7 @@ function Section({
 }) {
   return (
     <section className="rounded-[24px] border border-[#E8EEED] bg-white p-4 sm:p-6">
-      <h2 className="text-lg font-medium tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
-        {title}
-      </h2>
+      <h2 className="text-[26px] font-medium tracking-[-0.3px] text-[#152A51]">{title}</h2>
       <div className="mt-3 h-px bg-[#E8EEED]" />
       <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6">
         {fields.map((field) => (
@@ -224,7 +222,7 @@ export default function ProfileEditor({ initialProfile }: { initialProfile: Edit
   }
 
   return (
-    <main className="mx-auto w-full max-w-[1680px] flex-1 overflow-x-hidden px-4 py-4 sm:px-6 lg:px-8 xl:px-10">
+    <main className="mx-auto w-full max-w-full flex-1 overflow-x-hidden px-4 py-4 sm:px-6 lg:px-8 xl:px-10">
       <div className="flex w-full flex-col gap-6">
         <section className="space-y-2">
           <h1 className="text-xl font-medium tracking-[-0.5px] text-[#152A51] sm:text-2xl lg:text-[28px]">
@@ -255,7 +253,7 @@ export default function ProfileEditor({ initialProfile }: { initialProfile: Edit
                 </div>
               )}
               <div className="min-w-0">
-                <p className="truncate text-lg font-medium tracking-[-0.3px] text-[#152A51] sm:text-[22px]">
+                <p className="truncate text-[26px] font-medium tracking-[-0.3px] text-[#152A51]">
                   {fullName}
                 </p>
                 <p className="text-sm text-[#152A51]/60">Patient ID: {patientId}</p>

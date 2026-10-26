@@ -27,7 +27,7 @@ export default function OrderConfirmationPage() {
     <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col overflow-y-auto scrollbar-hide px-4 py-6 sm:px-6 sm:py-8">
       <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between lg:gap-10">
         {/* Left: confirmation copy + password / dashboard actions */}
-        <div className="flex min-w-0 flex-1 flex-col items-center gap-6 text-center lg:pt-4">
+        <div className="flex min-w-0 flex-1 flex-col items-stretch gap-6 text-left lg:pt-4">
           <ConfirmationHeader
             orderNumber={data?.orderNumber ?? null}
             orderDate={data?.orderDate ?? null}

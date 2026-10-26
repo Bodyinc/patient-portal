@@ -33,7 +33,7 @@ export default function DashboardSidebar({ className, onNavigate }: DashboardSid
     >
       {/* Top navigation container that scrolls internally if items exceed height */}
       <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide">
-        <div className="flex justify-center">
+        <div className="flex justify-start">
           <Image src="/logo.svg" alt="BodyInc" width={128} height={40} priority />
         </div>
 

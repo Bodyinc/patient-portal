@@ -26,7 +26,7 @@ export default function ConsultationsPageClient({ data }: ConsultationsPageClien
   }
 
   return (
-    <main className="mx-auto w-full max-w-[1440px] flex-1 overflow-x-hidden px-4 py-4 sm:px-6 lg:px-2">
+    <main className="mx-auto w-full max-w-full flex-1 overflow-x-hidden px-4 py-4 sm:px-6 lg:px-2">
       <DashboardHeader
         fullName={data.fullName}
         patientId={data.patientId}

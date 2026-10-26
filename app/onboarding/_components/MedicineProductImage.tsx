@@ -88,7 +88,7 @@ export default function MedicineProductImage({
 
   return (
     <div
-      className={cn("relative w-full", frameClass, className)}
+      className={cn("relative aspect-[386/359] w-full shrink-0", frameClass, className)}
       style={{ aspectRatio: MEDICATION_CARD_IMAGE_ASPECT }}
     >
       {framedImage}
