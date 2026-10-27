@@ -49,11 +49,7 @@ const addressSchema = z
       .trim()
       .min(1, "Enter your address")
       .max(255, "Enter a shorter address"),
-    apartment: z
-      .string()
-      .trim()
-      .min(1, "Enter your apartment number")
-      .max(60, "Enter a shorter apartment number"),
+    apartment: z.string().trim().max(60, "Enter a shorter apartment number"),
     postalCode: ZIP_CODE_SCHEMA,
     city: z.string().trim().min(1, "Enter your city").max(120, "Enter a shorter city"),
     phone: z.string().trim(),
@@ -233,7 +229,7 @@ export default function DeliveryAddressPage() {
           </div>
           <div className="space-y-4">
             <Label htmlFor="apartment" className={fieldLabelClass}>
-              Apartment number <span className={fieldRequiredMarkClass}>*</span>
+              Apartment number <span className="font-normal text-[#152A51]/50">(optional)</span>
             </Label>
             <Input
               id="apartment"

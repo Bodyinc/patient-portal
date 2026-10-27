@@ -470,7 +470,9 @@ export default function QuickbloxConsultationRoom({
   const sdkConfigRef = useRef(sdkConfig);
   sdkConfigRef.current = sdkConfig;
 
-  const providerReady = Boolean(sdkConfig.caseAssigned && sdkConfig.dialogId);
+  const [providerInRoom, setProviderInRoom] = useState(false);
+  // Claimed in the portal, or already present in the QuickBlox room.
+  const providerReady = Boolean(sdkConfig.dialogId && (sdkConfig.caseAssigned || providerInRoom));
   const canMessage = providerReady && connected;
   const resolveUserNamesRef = useRef(resolveUserNames);
   resolveUserNamesRef.current = resolveUserNames;
@@ -650,6 +652,7 @@ export default function QuickbloxConsultationRoom({
     QB.chat.onMessageListener = (userId, msg) => {
       console.log("[QuickBlox] onMessageListener:", userId, msg);
       if (userId === currentUserId) return; // ignore our own reflections
+      setProviderInRoom(true);
 
       const rawExt = msg.extension as
         | {
@@ -696,6 +699,7 @@ export default function QuickbloxConsultationRoom({
     QB.chat.onJoinOccupant = (_dialogId, userId) => {
       console.log("[QuickBlox] onJoinOccupant:", userId);
       if (!userId) return;
+      if (userId !== currentUserId) setProviderInRoom(true);
       resolveUserNamesRef.current([userId]);
 
       setMessages((prev) => {
@@ -758,6 +762,9 @@ export default function QuickbloxConsultationRoom({
       const dialog = dRes.items[0];
       if (dialog.occupants_ids?.length) {
         resolveUserNamesRef.current(dialog.occupants_ids);
+        if (dialog.occupants_ids.some((id: number) => id !== currentUserId)) {
+          setProviderInRoom(true);
+        }
       }
       const roomJid = dialog.xmpp_room_jid;
       if (roomJid) {
@@ -828,6 +835,7 @@ export default function QuickbloxConsultationRoom({
             })
             .reverse();
 
+          if (historical.some((m) => !m.isSelf)) setProviderInRoom(true);
           setMessages((prev) => {
             const existingIds = new Set(historical.map((m) => m.id));
             const localJoins = prev.filter(

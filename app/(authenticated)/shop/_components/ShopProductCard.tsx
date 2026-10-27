@@ -7,7 +7,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { getDbMedicineImageSrc } from "@/lib/intake/medicine-image";
 import { AUTOPAY_REFILL_MESSAGE } from "@/lib/orders/refill-copy";
 import type { ShopMedicineCardDto } from "@/lib/shop/types";
-import { formatFromPrice } from "@/lib/pricing";
+import { formatMonthly } from "@/lib/pricing";
 
 import MedicineProductImage from "../../../onboarding/_components/MedicineProductImage";
 import MedicationDetailsLayout from "../../../onboarding/_components/MedicationDetailsLayout";
@@ -98,8 +98,17 @@ export default function ShopProductCard({
             {item.description}
           </p>
           <div className="mt-auto space-y-2.5 pt-3">
-            <p className="text-[26px] font-medium leading-none tracking-[-0.3px] whitespace-nowrap text-[#152A51]">
-              {formatFromPrice(item.fromPriceCents)}
+            <p className="whitespace-nowrap leading-none text-[#152A51]">
+              {item.fromPriceCents == null ? (
+                <span className="text-[16px] font-normal">Pricing coming soon</span>
+              ) : (
+                <>
+                  <span className="text-[16px] font-normal">From </span>
+                  <span className="text-[28px] font-semibold tracking-[-0.3px]">
+                    {formatMonthly(item.fromPriceCents)}/mo
+                  </span>
+                </>
+              )}
             </p>
             <button
               type="button"

@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import MedicineProductImage from "./MedicineProductImage";
 import type { MedicineDto } from "@/lib/intake/types";
-import { formatFromPrice } from "@/lib/pricing";
+import { formatMonthly } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
 import { fieldControlClass } from "../_lib/onboarding-theme";
 
@@ -102,8 +102,17 @@ export default function MedicationCard({
           </p>
         ) : null}
 
-        <p className="text-[26px] font-medium leading-none tracking-[-0.3px] whitespace-nowrap text-[#152A51]">
-          {formatFromPrice(displayFromPriceCents)}
+        <p className="whitespace-nowrap leading-none text-[#152A51]">
+          {displayFromPriceCents == null ? (
+            <span className="text-[16px] font-normal">Pricing coming soon</span>
+          ) : (
+            <>
+              <span className="text-[16px] font-normal">From </span>
+              <span className="text-[28px] font-semibold tracking-[-0.3px]">
+                {formatMonthly(displayFromPriceCents)}/mo
+              </span>
+            </>
+          )}
         </p>
 
         {/* Dose selector hidden for now — base dose is kept automatically */}
@@ -166,7 +175,7 @@ export default function MedicationCard({
         <div className="mt-auto pt-2">
           <span
             className={cn(
-              "inline-flex h-[46px] w-[132px] shrink-0 items-center justify-center gap-2 rounded-full text-[14px] font-medium leading-none text-[#152A51] transition",
+              "inline-flex h-[46px] w-[132px] shrink-0 items-center justify-start gap-2 rounded-full py-0 pl-[11px] pr-0 text-[14px] font-medium leading-none text-[#152A51] transition",
               selected ? "bg-[#E3E084]" : "border border-[#152A51]/15 bg-white",
             )}
             aria-hidden
