@@ -58,6 +58,16 @@ function normalizeStoredAnswers(
   );
 }
 
+function isPregnancyQuestion(text: string) {
+  const normalized = text.toLowerCase();
+  return normalized.includes("pregnant") || normalized.includes("breastfeeding");
+}
+
+function questionVisibleForSex(question: QuestionDto, sex: string | null) {
+  if ((sex ?? "").trim().toLowerCase() !== "male") return true;
+  return !isPregnancyQuestion(question.text);
+}
+
 function findDisqualifyingAnswer(
   questions: QuestionDto[],
   answers: Record<string, QuestionnaireAnswerValue>,
@@ -140,7 +150,11 @@ export default function QuestionnairePage() {
       return;
     }
 
-    for (const question of questionnaire.questions) {
+    const visibleQuestions = questionnaire.questions.filter((question) =>
+      questionVisibleForSex(question, state.sex),
+    );
+
+    for (const question of visibleQuestions) {
       if (question.isRequired && !isQuestionAnswered(question.questionType, answers[question.id])) {
         toast.error("Please answer all required questions before continuing");
         return;
@@ -161,8 +175,14 @@ export default function QuestionnairePage() {
     }
 
     setSaving(true);
-    const responses = questionnaire.questions.map((q) =>
-      toResponseInput(q.id, q.questionType, answers[q.id] ?? {}),
+    const visibleAnswers = Object.fromEntries(
+      visibleQuestions.flatMap((question) => {
+        const answer = answers[question.id];
+        return answer ? [[question.id, answer] as const] : [];
+      }),
+    );
+    const responses = visibleQuestions.map((q) =>
+      toResponseInput(q.id, q.questionType, visibleAnswers[q.id] ?? {}),
     );
 
     // Goal-level save/evaluate — medicine is chosen later in the flow.
@@ -177,7 +197,7 @@ export default function QuestionnairePage() {
 
     if (
       eligibility.result === "ineligible" ||
-      findDisqualifyingAnswer(questionnaire.questions, answers)
+      findDisqualifyingAnswer(visibleQuestions, visibleAnswers)
     ) {
       setSaving(false);
       const reason =
@@ -185,7 +205,7 @@ export default function QuestionnairePage() {
       setIneligibleReason(reason);
       toast.error(reason);
       updateState({
-        questionnaireAnswers: answers,
+        questionnaireAnswers: visibleAnswers,
         eligibilityResult: "ineligible",
         questionnaireComplete: false,
       });
@@ -196,7 +216,7 @@ export default function QuestionnairePage() {
     setIneligibleReason(null);
 
     const patch = {
-      questionnaireAnswers: answers,
+      questionnaireAnswers: visibleAnswers,
       eligibilityResult: eligibility.result,
       questionnaireComplete: true,
     };
@@ -238,7 +258,10 @@ export default function QuestionnairePage() {
     );
   }
 
-  const disqualifyingPrompt = findDisqualifyingAnswer(questionnaire.questions, answers);
+  const visibleQuestions = questionnaire.questions.filter((question) =>
+    questionVisibleForSex(question, state.sex),
+  );
+  const disqualifyingPrompt = findDisqualifyingAnswer(visibleQuestions, answers);
   const blockedReason =
     ineligibleReason ??
     (disqualifyingPrompt
@@ -265,7 +288,7 @@ export default function QuestionnairePage() {
       descriptionClassName="mt-2 text-[13px] sm:text-[14px]"
     >
       <div className="space-y-4 text-left sm:space-y-5">
-        {questionnaire.questions.map((question, index) => (
+        {visibleQuestions.map((question, index) => (
           <div key={question.id} className="space-y-2.5">
             <p className="text-[14px] font-medium leading-snug text-[#152A51] sm:text-[15px]">
               {index + 1}. {question.text}

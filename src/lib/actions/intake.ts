@@ -801,11 +801,7 @@ const addressSchema = z
       .trim()
       .min(1, "Enter your address")
       .max(255, "Enter a shorter address"),
-    apartment: z
-      .string()
-      .trim()
-      .min(1, "Enter your apartment number")
-      .max(60, "Enter a shorter apartment number"),
+    apartment: z.string().trim().max(60, "Enter a shorter apartment number"),
     city: z.string().trim().min(1, "Enter your city").max(120, "Enter a shorter city"),
     postalCode: ZIP_CODE_SCHEMA,
     phone: z.string().trim(),
@@ -886,7 +882,7 @@ export async function saveIntakeAddress(
     .from("intake_sessions")
     .update({
       street_address: data.streetAddress,
-      apartment: data.apartment,
+      apartment: data.apartment || null,
       city: data.city,
       postal_code: data.postalCode,
       phone: data.phone,

@@ -59,9 +59,7 @@ function isQuestionnaireComplete(state: OnboardingState) {
 }
 
 function isAddressComplete(state: OnboardingState) {
-  return Boolean(
-    state.streetAddress && state.apartment && state.city && state.postalCode && state.state,
-  );
+  return Boolean(state.streetAddress && state.city && state.postalCode && state.state);
 }
 
 function isBmiComplete(state: OnboardingState) {

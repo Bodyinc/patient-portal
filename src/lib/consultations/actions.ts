@@ -301,7 +301,7 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
     subscription.id,
   );
 
-  const [{ data: profile }, { data: intake }, { data: medicationRequest }] = await Promise.all([
+  const [{ data: profile }, { data: intake }, medicationRequests] = await Promise.all([
     supabaseAdmin
       .from("profiles")
       .select("full_name, email, dob, sex, phone, state_code")
@@ -315,17 +315,31 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
       .order("updated_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
-    supabaseAdmin
-      .from("medication_requests")
-      .select("provider_id")
-      .eq("user_id", user.id)
-      .eq("subscription_id", subscription.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+    (async () => {
+      const { data: subRow } = await supabaseAdmin
+        .from("subscriptions")
+        .select("checkout_group_id")
+        .eq("id", subscription.id)
+        .maybeSingle();
+      const subscriptionIds = new Set<string>([subscription.id]);
+      if (subRow?.checkout_group_id) {
+        const { data: siblings } = await supabaseAdmin
+          .from("subscriptions")
+          .select("id")
+          .eq("checkout_group_id", subRow.checkout_group_id);
+        for (const row of siblings ?? []) subscriptionIds.add(row.id);
+      }
+      const { data } = await supabaseAdmin
+        .from("medication_requests")
+        .select("provider_id")
+        .eq("user_id", user.id)
+        .in("subscription_id", [...subscriptionIds]);
+      return data ?? [];
+    })(),
   ]);
 
-  const caseAssigned = Boolean(medicationRequest?.provider_id);
+  // A checkout can have several medication requests. Claiming any of them assigns the visit.
+  const caseAssigned = (medicationRequests ?? []).some((row) => Boolean(row.provider_id));
 
   const email = (profile?.email || user.email || "").trim().toLowerCase();
   if (!email) return { ok: false, message: "Your account is missing an email address." };
