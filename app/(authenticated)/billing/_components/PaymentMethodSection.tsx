@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { getStripeJs } from "@/lib/stripe/client";
+import { getStripeJs, paymentErrorMessage } from "@/lib/stripe/client";
 
 function UpdateCardForm({ onDone }: { onDone: () => void }) {
   const stripe = useStripe();
@@ -36,7 +36,7 @@ function UpdateCardForm({ onDone }: { onDone: () => void }) {
     });
 
     if (confirmError) {
-      setError(confirmError.message ?? "Could not save the card.");
+      setError(paymentErrorMessage(confirmError, "Could not save the card."));
       setSubmitting(false);
       return;
     }

@@ -6,7 +6,7 @@ import { Lock } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { getStripeJs, isSetupIntentClientSecret } from "@/lib/stripe/client";
+import { getStripeJs, isSetupIntentClientSecret, paymentErrorMessage } from "@/lib/stripe/client";
 
 function PaymentFields({
   returnUrl,
@@ -43,7 +43,7 @@ function PaymentFields({
     });
 
     if (confirmError) {
-      setError(confirmError.message ?? "Payment could not be completed.");
+      setError(paymentErrorMessage(confirmError, "Payment could not be completed."));
       setSubmitting(false);
       return;
     }

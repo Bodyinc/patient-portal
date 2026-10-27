@@ -13,3 +13,15 @@ export function getStripeJs(): Promise<Stripe | null> {
 export function isSetupIntentClientSecret(clientSecret: string): boolean {
   return clientSecret.startsWith("seti_");
 }
+
+export function paymentErrorMessage(
+  error: { message?: string; decline_code?: string } | null | undefined,
+  fallback: string,
+): string {
+  const message = error?.message ?? "";
+  const decline = error?.decline_code ?? "";
+  if (decline === "live_mode_test_card" || /known test card/i.test(message)) {
+    return "This is a test card. Enter a real debit or credit card to pay.";
+  }
+  return message || fallback;
+}

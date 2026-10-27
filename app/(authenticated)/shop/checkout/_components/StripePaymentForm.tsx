@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 
 import { Button } from "@/components/ui/button";
-import { getStripeJs, isSetupIntentClientSecret } from "@/lib/stripe/client";
+import { getStripeJs, isSetupIntentClientSecret, paymentErrorMessage } from "@/lib/stripe/client";
 
 function PaymentFields({ returnUrl, saveCardOnly }: { returnUrl: string; saveCardOnly: boolean }) {
   const stripe = useStripe();
@@ -27,7 +27,7 @@ function PaymentFields({ returnUrl, saveCardOnly }: { returnUrl: string; saveCar
 
     // Reached only when confirmation fails without a redirect.
     if (confirmError) {
-      setError(confirmError.message ?? "Payment could not be completed.");
+      setError(paymentErrorMessage(confirmError, "Payment could not be completed."));
       setSubmitting(false);
     }
   }
