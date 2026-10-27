@@ -6,6 +6,7 @@ import { getPatientDisplayIdentity } from "@/lib/profile/identity";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 import { ELIGIBLE_SUBSCRIPTION_STATUSES, isQuickbloxConfigured } from "./config";
+import { loadConsultationEligibility } from "./eligibility";
 import { isConsultationFinishedEvent } from "./finished";
 import { checkJotformSubmission } from "./jotform";
 import {
@@ -36,7 +37,7 @@ export async function hasCompletedOnboarding(userId: string): Promise<boolean> {
 }
 
 export async function fetchConsultationsPageData(userId: string): Promise<ConsultationsPageData> {
-  const [identity, onboardingComplete, subsResult, consultsResult, requestsResult] =
+  const [identity, onboardingComplete, subsResult, consultsResult, requestsResult, eligibility] =
     await Promise.all([
       getPatientDisplayIdentity(userId),
       hasCompletedOnboarding(userId),
@@ -55,6 +56,7 @@ export async function fetchConsultationsPageData(userId: string): Promise<Consul
         )
         .eq("user_id", userId),
       supabaseAdmin.from("medication_requests").select("id, subscription_id").eq("user_id", userId),
+      loadConsultationEligibility(userId),
     ]);
 
   if (subsResult.error) throw new Error(subsResult.error.message);
@@ -225,7 +227,10 @@ export async function fetchConsultationsPageData(userId: string): Promise<Consul
     }
   >;
   const visibleSubscriptions = subscriptionRows.filter(
-    (subscription) => subscription.is_checkout_primary !== false,
+    (subscription) =>
+      subscription.is_checkout_primary !== false &&
+      (eligibility.needingSubscriptionIds.has(subscription.id) ||
+        eligibility.visitSubscriptionIds.has(subscription.id)),
   );
 
   const plans: ConsultationPlanState[] = visibleSubscriptions.map((subscription) => {

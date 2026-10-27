@@ -201,6 +201,38 @@ type PaymentRow = {
 const PAYMENT_SELECT =
   "id, amount_cents, status, created_at, stripe_subscription_id, stripe_invoice_id, stripe_payment_intent_id, raw_event, plan_id";
 
+function billingReason(rawEvent: Json | null): string | null {
+  if (!rawEvent || typeof rawEvent !== "object" || Array.isArray(rawEvent)) return null;
+  const reason = (rawEvent as { billing_reason?: unknown }).billing_reason;
+  return typeof reason === "string" ? reason : null;
+}
+
+/** Add-on subscriptions open on a $0 trial invoice. The paid checkout invoice already covers them. */
+async function omitAddonTrialInvoices(payments: PaymentRow[]): Promise<PaymentRow[]> {
+  const stripeIds = [
+    ...new Set(payments.map((payment) => payment.stripe_subscription_id).filter(Boolean)),
+  ] as string[];
+  if (stripeIds.length === 0) return payments;
+
+  const { data, error } = await supabaseAdmin
+    .from("subscriptions")
+    .select("stripe_subscription_id, is_checkout_primary")
+    .in("stripe_subscription_id", stripeIds);
+  if (error) throw new Error(error.message);
+
+  const addonIds = new Set(
+    (data ?? [])
+      .filter((row) => row.is_checkout_primary === false && row.stripe_subscription_id)
+      .map((row) => row.stripe_subscription_id as string),
+  );
+
+  return payments.filter((payment) => {
+    if ((payment.amount_cents ?? 0) > 0) return true;
+    if (!payment.stripe_subscription_id) return true;
+    return !addonIds.has(payment.stripe_subscription_id);
+  });
+}
+
 function medicineNameFromAdditionalReason(reason: string | null): string | null {
   if (!reason) return null;
   const match = reason.match(/price difference(?:\s+for(?:\s+changing\s+to)?)?\s+(.+)/i);
@@ -257,7 +289,9 @@ async function enrichBillingPayments(
     subscriptionIds.length
       ? supabaseAdmin
           .from("subscriptions")
-          .select("stripe_subscription_id, medicine_id, package_id, medicines(name)")
+          .select(
+            "stripe_subscription_id, medicine_id, package_id, checkout_group_id, is_checkout_primary, medicines(name)",
+          )
           .in("stripe_subscription_id", subscriptionIds)
       : Promise.resolve({ data: [] }),
     packageIds.length
@@ -377,6 +411,37 @@ async function enrichBillingPayments(
   const subscriptionByStripeId = new Map(
     (subscriptions ?? []).map((sub) => [sub.stripe_subscription_id, sub]),
   );
+  const checkoutGroupIds = [
+    ...new Set(
+      (subscriptions ?? [])
+        .map((sub) => sub.checkout_group_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const { data: groupSubs } = checkoutGroupIds.length
+    ? await supabaseAdmin
+        .from("subscriptions")
+        .select("checkout_group_id, is_checkout_primary, medicines(name)")
+        .eq("user_id", userId)
+        .in("checkout_group_id", checkoutGroupIds)
+    : {
+        data: [] as Array<{
+          checkout_group_id: string | null;
+          is_checkout_primary: boolean | null;
+        }>,
+      };
+  const namesByGroup = new Map<string, string[]>();
+  const orderedGroupSubs = [...(groupSubs ?? [])].sort(
+    (a, b) => (a.is_checkout_primary === false ? 1 : 0) - (b.is_checkout_primary === false ? 1 : 0),
+  );
+  for (const row of orderedGroupSubs) {
+    if (!row.checkout_group_id) continue;
+    const name = (row as { medicines?: { name: string } | null }).medicines?.name;
+    if (!name) continue;
+    const list = namesByGroup.get(row.checkout_group_id) ?? [];
+    if (!list.includes(name)) list.push(name);
+    namesByGroup.set(row.checkout_group_id, list);
+  }
   const requestById = new Map((extraRequests ?? []).map((row) => [row.id, row]));
   const medicineNameById = new Map((extraMedicines ?? []).map((row) => [row.id, row.name]));
   const variantNameById = new Map((extraVariants ?? []).map((row) => [row.id, row.name]));
@@ -437,7 +502,17 @@ async function enrichBillingPayments(
     const addSubMedicine = (addSub as { medicines?: { name: string } | null } | undefined)
       ?.medicines?.name;
 
+    const groupNames = subscription?.checkout_group_id
+      ? namesByGroup.get(subscription.checkout_group_id)
+      : undefined;
+    const isCombinedCheckout =
+      billingReason(payment.raw_event) === "subscription_create" &&
+      subscription?.is_checkout_primary !== false &&
+      (groupNames?.length ?? 0) > 1;
+    const combinedName = isCombinedCheckout ? groupNames!.join(", ") : null;
+
     const medicineName =
+      combinedName ??
       addMedicineName ??
       medicineNameFromAdditionalReason(addPay?.reason ?? parsedDescription) ??
       medicine?.name ??
@@ -449,6 +524,7 @@ async function enrichBillingPayments(
       : (medicineName ?? parsedDescription);
 
     const subscriptionName =
+      combinedName ??
       medicineName ??
       pkg?.name ??
       addPkg?.name ??
@@ -490,26 +566,6 @@ export async function fetchBillingPayments(
   const pageSize = Math.max(1, Math.min(50, options.pageSize ?? 10));
   const query = (options.query ?? "").trim();
 
-  if (!query) {
-    const start = (page - 1) * pageSize;
-    const {
-      data: payments,
-      error,
-      count,
-    } = await supabaseAdmin
-      .from("payments")
-      .select(PAYMENT_SELECT, { count: "exact" })
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .range(start, start + pageSize - 1);
-    if (error) throw new Error(error.message);
-
-    const items = await enrichBillingPayments((payments ?? []) as PaymentRow[], userId);
-    const total = count ?? 0;
-    const totalPages = total === 0 ? 0 : Math.ceil(total / pageSize);
-    return { items, total, page, pageSize, totalPages, query };
-  }
-
   const { data: payments, error } = await supabaseAdmin
     .from("payments")
     .select(PAYMENT_SELECT)
@@ -518,8 +574,11 @@ export async function fetchBillingPayments(
     .limit(200);
   if (error) throw new Error(error.message);
 
-  const enriched = await enrichBillingPayments((payments ?? []) as PaymentRow[], userId);
-  const filtered = enriched.filter((payment) => matchesPaymentQuery(payment, query));
+  const visible = await omitAddonTrialInvoices((payments ?? []) as PaymentRow[]);
+  const enriched = await enrichBillingPayments(visible, userId);
+  const filtered = query
+    ? enriched.filter((payment) => matchesPaymentQuery(payment, query))
+    : enriched;
   const total = filtered.length;
   const totalPages = total === 0 ? 0 : Math.ceil(total / pageSize);
   const start = (page - 1) * pageSize;

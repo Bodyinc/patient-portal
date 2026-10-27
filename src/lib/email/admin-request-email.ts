@@ -1,9 +1,11 @@
 import "server-only";
 
+import { isInitialAddonSubscription } from "@/lib/checkout/group";
+import { loadCheckoutCart } from "@/lib/intake/session-cart";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { formatOrderId } from "@/lib/orders/order-id";
 import { ensureMedicationOrderForPayment } from "@/lib/orders/ensure-medication-order";
-import { sendOnce } from "./idempotency";
+import { markEmailSent, sendOnce } from "./idempotency";
 import { adminAppUrl, adminRecipientEmails, patientEmailByUserId } from "./recipients";
 import { sendTransactionalEmail } from "./send";
 import { emailButton, emailLayout } from "./layout";
@@ -40,6 +42,7 @@ function adminNewRequestEmail(params: {
   variantName: string | null;
   planName: string | null;
   orderNumber: string;
+  combinedOrder?: boolean;
   kind: string;
   status: string;
   reviewUrl: string | null;
@@ -61,6 +64,9 @@ function adminNewRequestEmail(params: {
 
   const body = [
     `<p>A new medication request was created and is waiting in the admin queue.</p>`,
+    params.combinedOrder
+      ? `<p>These medicines were purchased together and are one order with one invoice.</p>`
+      : "",
     details,
     params.reviewUrl ? emailButton("Open request", params.reviewUrl) : "",
   ].join("");
@@ -165,12 +171,23 @@ export async function sendAdminNewRequestEmail(paymentId: string): Promise<boole
     return false;
   }
 
+  // Add-on medicines are part of the primary checkout email, not a second order.
+  if (
+    order.kind === "initial" &&
+    (await isInitialAddonSubscription(payment.stripe_subscription_id))
+  ) {
+    await markEmailSent(REMINDER_TYPE, order.id);
+    return false;
+  }
+
   const recipients = await adminRecipientEmails();
   if (recipients.length === 0) {
     console.warn("[email] admin new-request skipped: no admin emails configured");
     return false;
   }
 
+  const cart =
+    order.kind === "initial" && order.session_id ? await loadCheckoutCart(order.session_id) : [];
   const [medicine, variant, pkg, patient] = await Promise.all([
     order.medicine_id
       ? supabaseAdmin.from("medicines").select("name").eq("id", order.medicine_id).maybeSingle()
@@ -192,7 +209,11 @@ export async function sendAdminNewRequestEmail(paymentId: string): Promise<boole
   const { subject, html } = adminNewRequestEmail({
     patientName: patient.fullName?.trim() || "Unknown patient",
     patientEmail: patient.email,
-    medicineName: medicine.data?.name ?? "Medication",
+    medicineName:
+      cart.length > 1
+        ? cart.map((line) => line.medicineName).join(", ")
+        : (medicine.data?.name ?? "Medication"),
+    combinedOrder: cart.length > 1,
     variantName: variant.data?.name ?? null,
     planName: pkg.data?.name ?? null,
     orderNumber: formatOrderId(order.id),

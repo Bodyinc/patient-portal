@@ -1334,7 +1334,7 @@ export async function getOnboardingConfirmationData(): Promise<
       .from("medication_requests")
       .select("id, created_at")
       .eq("session_id", session.id)
-      .order("created_at", { ascending: false })
+      .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle(),
     getPublicFees(),

@@ -83,7 +83,9 @@ export function orderConfirmedEmail(params: {
     `<p>Hi ${firstName(params.fullName)},</p>`,
     `<p>We've received your payment of <strong>${amount}</strong>. This email is your payment receipt and order confirmation.</p>`,
     lines.length > 1
-      ? `<p>This is one order. The treatments below are included together, and one consultation covers all of them.</p>`
+      ? params.requiresConsultation
+        ? `<p>This is one order and one invoice. The treatments below are included together, and one consultation covers all of them.</p>`
+        : `<p>This is one order and one invoice. The treatments below are included together.</p>`
       : "",
     emailSoftPanel(
       `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;">${details}</table>`,
@@ -91,7 +93,7 @@ export function orderConfirmedEmail(params: {
     invoiceLink,
     `<p>${nextStepCopy(params.requiresConsultation)}</p>`,
     emailButton("Track my order", params.myMedsUrl),
-    emailButton("Start consultation", consultationsUrl),
+    params.requiresConsultation ? emailButton("Start consultation", consultationsUrl) : "",
   ].join("");
 
   return {

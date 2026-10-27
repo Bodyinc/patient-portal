@@ -26,6 +26,28 @@ export async function consultationAnchorId(subscriptionId: string): Promise<stri
   return primary?.id ?? subscriptionId;
 }
 
+/** First invoice of an add-on subscription. That charge is already on the primary invoice. */
+export async function isInitialAddonSubscription(
+  stripeSubscriptionId: string | null,
+): Promise<boolean> {
+  if (!stripeSubscriptionId) return false;
+  const { data: sub } = await supabaseAdmin
+    .from("subscriptions")
+    .select("id, is_checkout_primary")
+    .eq("stripe_subscription_id", stripeSubscriptionId)
+    .maybeSingle();
+  if (!sub || sub.is_checkout_primary !== false) return false;
+
+  const { data: prior } = await supabaseAdmin
+    .from("medication_requests")
+    .select("id")
+    .eq("subscription_id", sub.id)
+    .eq("kind", "followup")
+    .limit(1)
+    .maybeSingle();
+  return !prior;
+}
+
 /**
  * Label for every product in the intake checkout.
  * A single product keeps the caller-supplied medicine name.

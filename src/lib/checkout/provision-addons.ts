@@ -2,6 +2,7 @@ import "server-only";
 
 import type Stripe from "stripe";
 
+import { sessionRequiresConsultation } from "@/lib/consultations/eligibility";
 import { ensureMedicationOrderForPayment } from "@/lib/orders/ensure-medication-order";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { stripe } from "@/lib/stripe/server";
@@ -139,6 +140,21 @@ export async function provisionAddonSubscriptions(params: {
   await stripe.subscriptions.update(params.stripeSubscriptionId, {
     metadata: { ...subscription.metadata, addons_provisioned: "1" },
   });
+  await alignPrimaryConsultationFlag(primary.id, primary.session_id);
+}
+
+/** The primary request carries the one consultation when any medicine in the cart needs it. */
+async function alignPrimaryConsultationFlag(
+  primarySubscriptionId: string,
+  sessionId: string | null,
+): Promise<void> {
+  if (!(await sessionRequiresConsultation(sessionId))) return;
+  await supabaseAdmin
+    .from("medication_requests")
+    .update({ requires_consultation: true })
+    .eq("subscription_id", primarySubscriptionId)
+    .eq("kind", "initial")
+    .in("status", ["pending_review", "payment_completed", "provider_assigned"]);
 }
 
 /**
@@ -198,6 +214,7 @@ export async function ensureCheckoutAddons(userId: string): Promise<void> {
     for (const addon of addons ?? []) {
       await ensureOrderForSubscription(addon.stripe_subscription_id);
     }
+    await alignPrimaryConsultationFlag(primary.id, primary.session_id);
   }
 }
 

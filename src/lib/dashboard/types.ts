@@ -41,6 +41,10 @@ export type DashboardPageDataDto = {
   activeTreatmentCount: number;
   pendingPayments: DashboardPendingPaymentDto[];
   consultationsEnabled: boolean;
+  /** This treatment's checkout includes a medicine that requires a consultation. */
+  consultationRequired: boolean;
+  /** A consultation visit already exists for this treatment, including after it is finished. */
+  consultationVisit: boolean;
   /** Latest medication request was rejected or cancelled — hide intake CTA and that treatment. */
   latestOrderClosed: boolean;
 };

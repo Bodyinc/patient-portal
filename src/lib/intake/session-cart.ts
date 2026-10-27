@@ -7,6 +7,7 @@ import type { IntakeCartItemDto } from "./types";
 export type CheckoutCartLine = IntakeCartItemDto & {
   stripePriceId: string | null;
   durationMonths: number | null;
+  requiresConsultation: boolean;
 };
 
 type MedicineRow = {
@@ -38,7 +39,7 @@ export async function loadCheckoutCart(sessionId: string): Promise<CheckoutCartL
 
   const [categories, medicines, packages, variants] = await Promise.all([
     supabaseAdmin.from("medication_categories").select("id, slug, name").in("id", categoryIds),
-    supabaseAdmin.from("medicines").select("id, name").in("id", medicineIds),
+    supabaseAdmin.from("medicines").select("id, name, requires_consultation").in("id", medicineIds),
     packageIds.length
       ? supabaseAdmin
           .from("packages")
@@ -95,6 +96,9 @@ export async function loadCheckoutCart(sessionId: string): Promise<CheckoutCartL
         isPrimary: row.is_primary,
         stripePriceId: pkg?.stripe_price_id ?? null,
         durationMonths: pkg?.duration_months ?? null,
+        requiresConsultation: Boolean(
+          (medicine as { requires_consultation?: boolean } | undefined)?.requires_consultation,
+        ),
         createdAt: row.created_at,
       };
     })

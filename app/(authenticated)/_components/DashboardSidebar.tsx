@@ -11,9 +11,14 @@ import { DASHBOARD_FOOTER_NAV, DASHBOARD_NAV, isNavItemActive } from "../_lib/da
 type DashboardSidebarProps = {
   className?: string;
   onNavigate?: () => void;
+  showConsultations?: boolean;
 };
 
-export default function DashboardSidebar({ className, onNavigate }: DashboardSidebarProps) {
+export default function DashboardSidebar({
+  className,
+  onNavigate,
+  showConsultations = false,
+}: DashboardSidebarProps) {
   const pathname = usePathname();
 
   function signOut() {
@@ -40,19 +45,21 @@ export default function DashboardSidebar({ className, onNavigate }: DashboardSid
         <div className="my-5 border-b border-[#E5E7EB]" />
 
         <nav className="mt-3 space-y-2 sm:mt-6">
-          {DASHBOARD_NAV.map((item) => {
-            const active = isNavItemActive(pathname, item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={onNavigate}
-                className={cn(navItemClass, active && "bg-[#E8EEED]")}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
+          {DASHBOARD_NAV.filter((item) => showConsultations || item.href !== "/consultations").map(
+            (item) => {
+              const active = isNavItemActive(pathname, item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={onNavigate}
+                  className={cn(navItemClass, active && "bg-[#E8EEED]")}
+                >
+                  {item.label}
+                </Link>
+              );
+            },
+          )}
         </nav>
       </div>
 

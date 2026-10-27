@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isInitialAddonSubscription } from "@/lib/checkout/group";
 import { loadCheckoutCart } from "@/lib/intake/session-cart";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { formatOrderId } from "@/lib/orders/order-id";
@@ -25,25 +26,6 @@ type OrderRow = {
 
 const ORDER_COLUMNS =
   "id, user_id, session_id, medicine_id, variant_id, package_id, kind, requires_consultation";
-
-async function isAddonInitialPayment(stripeSubscriptionId: string | null): Promise<boolean> {
-  if (!stripeSubscriptionId) return false;
-  const { data: sub } = await supabaseAdmin
-    .from("subscriptions")
-    .select("id, is_checkout_primary")
-    .eq("stripe_subscription_id", stripeSubscriptionId)
-    .maybeSingle();
-  if (!sub || sub.is_checkout_primary !== false) return false;
-
-  const { data: prior } = await supabaseAdmin
-    .from("medication_requests")
-    .select("id")
-    .eq("subscription_id", sub.id)
-    .eq("kind", "followup")
-    .limit(1)
-    .maybeSingle();
-  return !prior;
-}
 
 async function suppressAddonCheckoutReceipts(stripeSubscriptionId: string | null): Promise<void> {
   if (!stripeSubscriptionId) return;
@@ -164,6 +146,7 @@ async function loadOrderLabels(order: OrderRow): Promise<{
   variantName: string | null;
   planName: string | null;
   lines: OrderConfirmationLine[];
+  requiresConsultation: boolean;
 }> {
   const [medicine, variant, pkg] = await Promise.all([
     order.medicine_id
@@ -183,6 +166,9 @@ async function loadOrderLabels(order: OrderRow): Promise<{
 
   const fallbackName = medicine.data?.name ?? "Your medication";
   const cart = order.session_id ? await loadCheckoutCart(order.session_id) : [];
+  const cartNeedsConsultation =
+    order.kind === "initial" && cart.some((line) => line.requiresConsultation);
+  const requiresConsultation = order.requires_consultation || cartNeedsConsultation;
   const lines: OrderConfirmationLine[] = cart
     .filter((line) => line.medicineName)
     .map((line) => ({
@@ -199,6 +185,7 @@ async function loadOrderLabels(order: OrderRow): Promise<{
       variantName: null,
       planName: null,
       lines,
+      requiresConsultation,
     };
   }
 
@@ -207,6 +194,7 @@ async function loadOrderLabels(order: OrderRow): Promise<{
     variantName: variant.data?.name ?? null,
     planName: pkg.data?.name ?? null,
     lines,
+    requiresConsultation,
   };
 }
 
@@ -235,7 +223,7 @@ export async function sendOrderConfirmationEmail(paymentId: string): Promise<boo
   // One checkout sends one receipt, from the primary payment. An added
   // medicine keeps its own subscription, but its first invoice is not a
   // second order confirmation.
-  if (await isAddonInitialPayment(payment.stripe_subscription_id)) return false;
+  if (await isInitialAddonSubscription(payment.stripe_subscription_id)) return false;
 
   if (await wasEmailSent(REMINDER_TYPE, payment.id)) return false;
 
@@ -277,7 +265,7 @@ export async function sendOrderConfirmationEmail(paymentId: string): Promise<boo
     orderNumber: formatOrderId(order.id),
     amountCents: payment.amount_cents,
     currency: payment.currency,
-    requiresConsultation: order.requires_consultation,
+    requiresConsultation: labels.requiresConsultation,
     isRefill: order.kind !== "initial",
     myMedsUrl: `${appUrl()}/my-meds`,
     consultationsUrl: `${appUrl()}/consultations`,
@@ -300,7 +288,7 @@ export async function sendOrderConfirmationEmail(paymentId: string): Promise<boo
     await sendPushToUser(order.user_id, {
       title: "Order confirmed",
       body: `${labels.medicineName} · ${formatOrderId(order.id)}`,
-      url: order.requires_consultation ? "/consultations" : "/my-meds",
+      url: labels.requiresConsultation ? "/consultations" : "/my-meds",
     }).catch((error) => console.error("[push] order confirmation failed:", error));
   }
   return sent;

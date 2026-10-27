@@ -6,6 +6,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 import { appointmentIdToReopen, visitIdToOpen } from "./appointment-id";
 import { getQuickbloxConfig, isEligibleSubscriptionStatus, isQuickbloxConfigured } from "./config";
+import { loadConsultationEligibility } from "./eligibility";
 import { isConsultationFinishedEvent } from "./finished";
 import type {
   IntakeAnswerItem,
@@ -294,6 +295,12 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
         : null,
   }));
   const forThisSub = allRows.find((row) => row.subscription_id === subscription.id);
+  if (!forThisSub) {
+    const eligibility = await loadConsultationEligibility(user.id);
+    if (!eligibility.needingSubscriptionIds.has(subscription.id)) {
+      return { ok: false, message: "This order does not include a consultation." };
+    }
+  }
   const ownAppointmentId = appointmentIdToReopen(
     allRows.map((row) => ({
       subscriptionId: row.subscription_id,

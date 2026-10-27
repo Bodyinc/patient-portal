@@ -10,6 +10,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 import { consultationAnchorId } from "@/lib/checkout/group";
 import { isQuickbloxConfigured } from "@/lib/consultations/config";
+import { loadConsultationEligibility } from "@/lib/consultations/eligibility";
 import { isConsultationFinishedEvent } from "@/lib/consultations/finished";
 import { fetchAppointmentStatuses, getCachedClientSession } from "@/lib/consultations/quickblox";
 import { readQbClientSession } from "@/lib/consultations/session-cookie";
@@ -151,7 +152,7 @@ function isClosedOrderStatus(status: string | null | undefined): boolean {
 }
 
 export async function fetchDashboardPageData(userId: string): Promise<DashboardPageDataDto> {
-  const [didReconcile, pendingPayments, identity, activeMeds, intake, requestRows] =
+  const [didReconcile, pendingPayments, identity, activeMeds, intake, requestRows, eligibility] =
     await Promise.all([
       maybeReconcileIncompleteSubscription(userId).catch((err) => {
         console.error("[stripe] dashboard incomplete reconcile failed:", err);
@@ -169,6 +170,7 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
         .select("id, subscription_id, medicine_id, status, created_at")
         .eq("user_id", userId)
         .order("created_at", { ascending: false }),
+      loadConsultationEligibility(userId),
     ]);
 
   const requests = requestRows.data ?? [];
@@ -275,15 +277,31 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
     }
   }
 
+  const checkoutMeds = currentMed
+    ? visibleMeds.filter((med) =>
+        currentMed.checkoutGroupId
+          ? med.checkoutGroupId === currentMed.checkoutGroupId
+          : med.subscriptionId === currentMed.subscriptionId,
+      )
+    : [];
+  const displayMeds = checkoutMeds.length > 0 ? checkoutMeds : currentMed ? [currentMed] : [];
+  const planNames = [...new Set(displayMeds.map((med) => med.currentPlan).filter(Boolean))];
+  const doses = [
+    ...new Set(
+      displayMeds
+        .map((med) => med.variantName || med.dosage)
+        .filter((value) => value && value !== "—"),
+    ),
+  ];
   const treatmentFromSub: DashboardTreatmentDto | null = currentMed
     ? {
         medicineId: currentMed.medicineId,
         packageId: currentMed.packageId,
         variantId: currentMed.variantId,
         subscriptionId: currentMed.subscriptionId,
-        name: currentMed.medicationName,
-        currentPlan: currentMed.currentPlan,
-        variantDose: currentMed.variantName || currentMed.dosage || "—",
+        name: displayMeds.map((med) => med.medicationName).join(", "),
+        currentPlan: planNames.join(", ") || currentMed.currentPlan,
+        variantDose: doses.join(", ") || "—",
         nextRefillDate: currentMed.nextRefillDate,
         imageSrc: toDbImageSrc(currentMed.imageSrc),
         consultationStatus,
@@ -310,9 +328,18 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
     bmiCategory: getBmiCategory(intake.bmi),
     goals: intake.goals,
     treatment,
-    activeTreatmentCount: visibleMeds.length,
+    activeTreatmentCount: new Set(
+      visibleMeds.map((med) => med.checkoutGroupId ?? med.subscriptionId),
+    ).size,
     pendingPayments,
     consultationsEnabled: isQuickbloxConfigured(),
+    consultationRequired: Boolean(
+      currentMed?.subscriptionId &&
+      eligibility.needingSubscriptionIds.has(currentMed.subscriptionId),
+    ),
+    consultationVisit: Boolean(
+      currentMed?.subscriptionId && eligibility.visitSubscriptionIds.has(currentMed.subscriptionId),
+    ),
     latestOrderClosed,
   };
 }
