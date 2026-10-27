@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
-import { getStripeJs } from "@/lib/stripe/client";
+import { getStripeJs, paymentErrorMessage } from "@/lib/stripe/client";
 
 function money(cents: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
@@ -31,7 +31,7 @@ function Fields({ amountCents }: { amountCents: number }) {
     });
 
     if (confirmError) {
-      setError(confirmError.message ?? "Payment could not be completed.");
+      setError(paymentErrorMessage(confirmError, "Payment could not be completed."));
       setSubmitting(false);
       return;
     }

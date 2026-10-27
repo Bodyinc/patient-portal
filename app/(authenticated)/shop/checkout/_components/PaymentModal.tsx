@@ -13,7 +13,7 @@ import {
   DialogPortal,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { getStripeJs, isSetupIntentClientSecret } from "@/lib/stripe/client";
+import { getStripeJs, isSetupIntentClientSecret, paymentErrorMessage } from "@/lib/stripe/client";
 import { cn } from "@/lib/utils";
 
 function PaymentFields({ returnUrl, saveCardOnly }: { returnUrl: string; saveCardOnly: boolean }) {
@@ -36,7 +36,7 @@ function PaymentFields({ returnUrl, saveCardOnly }: { returnUrl: string; saveCar
     });
 
     if (confirmError) {
-      setError(confirmError.message ?? "Payment could not be completed.");
+      setError(paymentErrorMessage(confirmError, "Payment could not be completed."));
       setSubmitting(false);
     }
   }
