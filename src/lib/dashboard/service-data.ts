@@ -10,6 +10,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 import { consultationAnchorId } from "@/lib/checkout/group";
 import { isQuickbloxConfigured } from "@/lib/consultations/config";
+import { isConsultationFinishedEvent } from "@/lib/consultations/finished";
 import { fetchAppointmentStatuses, getCachedClientSession } from "@/lib/consultations/quickblox";
 import { readQbClientSession } from "@/lib/consultations/session-cookie";
 
@@ -232,36 +233,44 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
 
     if (visit?.qb_appointment_id) {
       consultationStatus = visit.ended_at ? "closed" : "open";
-      if (isQuickbloxConfigured()) {
+      // A still-open QuickBlox room must not undo a visit the provider already finished.
+      if (consultationStatus !== "closed" && isQuickbloxConfigured()) {
         const clientToken =
           getCachedClientSession(userId, consultationSubscriptionId)?.token ??
           (await readQbClientSession(userId, consultationSubscriptionId))?.token;
         const live = (
           await fetchAppointmentStatuses([visit.qb_appointment_id], { clientToken })
         ).get(visit.qb_appointment_id);
-        if (live) consultationStatus = live.open ? "open" : "closed";
+        if (live && !live.open) consultationStatus = "closed";
       }
     }
 
-    // Also check if provider/doctor completed the visit via medication_request_events
-    if (consultationStatus !== "closed") {
-      const matchingReq = requests.find((r) => r.subscription_id === consultationSubscriptionId);
-      if (matchingReq?.id) {
+    if (visit && consultationStatus !== "closed") {
+      const subscriptionIds = new Set<string>([consultationSubscriptionId]);
+      const { data: anchorSub } = await supabaseAdmin
+        .from("subscriptions")
+        .select("checkout_group_id")
+        .eq("id", consultationSubscriptionId)
+        .maybeSingle();
+      if (anchorSub?.checkout_group_id) {
+        const { data: siblings } = await supabaseAdmin
+          .from("subscriptions")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("checkout_group_id", anchorSub.checkout_group_id);
+        for (const row of siblings ?? []) subscriptionIds.add(row.id);
+      }
+      const requestIds = requests
+        .filter((row) => row.subscription_id && subscriptionIds.has(row.subscription_id))
+        .map((row) => row.id);
+      if (requestIds.length > 0) {
         const { data: events } = await supabaseAdmin
           .from("medication_request_events")
           .select("note, status")
-          .eq("request_id", matchingReq.id);
-        const hasCompletedEvent = (events ?? []).some((ev) => {
-          const note = (ev.note ?? "").toLowerCase();
-          const status = (ev.status ?? "").toLowerCase();
-          return (
-            note.includes("consultation completed") ||
-            note.includes("consultation finished") ||
-            status === "consultation_completed" ||
-            status === "consultation_finished"
-          );
-        });
-        if (hasCompletedEvent) consultationStatus = "closed";
+          .in("request_id", requestIds);
+        if ((events ?? []).some((ev) => isConsultationFinishedEvent(ev))) {
+          consultationStatus = "closed";
+        }
       }
     }
   }

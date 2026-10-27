@@ -6,6 +6,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 import { appointmentIdToReopen, visitIdToOpen } from "./appointment-id";
 import { getQuickbloxConfig, isEligibleSubscriptionStatus, isQuickbloxConfigured } from "./config";
+import { isConsultationFinishedEvent } from "./finished";
 import type {
   IntakeAnswerItem,
   PatientConsultationData,
@@ -331,7 +332,7 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
       }
       const { data } = await supabaseAdmin
         .from("medication_requests")
-        .select("provider_id")
+        .select("id, provider_id")
         .eq("user_id", user.id)
         .in("subscription_id", [...subscriptionIds]);
       return data ?? [];
@@ -428,7 +429,8 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
 
       const activeVisit = openVisits.find((v) => v.id === appointmentId);
 
-      // Check if the visit has already been finished by doctor / admin (date_end set)
+      // Finished when the provider recorded it, or QuickBlox has date_end.
+      // A still-open chat room does not keep the visit open.
       let isFinished = Boolean(forThisSub?.ended_at);
       let liveStatus = null;
       if (!isFinished) {
@@ -441,6 +443,18 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
         } else {
           const inspected = await inspectAppointment(appointmentId, client.token);
           if (inspected?.date_end) {
+            isFinished = true;
+          }
+        }
+      }
+      if (!isFinished && medicationRequests.length > 0) {
+        const requestIds = medicationRequests.map((row) => row.id).filter(Boolean);
+        if (requestIds.length > 0) {
+          const { data: events } = await supabaseAdmin
+            .from("medication_request_events")
+            .select("note, status")
+            .in("request_id", requestIds);
+          if ((events ?? []).some((event) => isConsultationFinishedEvent(event))) {
             isFinished = true;
           }
         }
