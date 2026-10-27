@@ -39,8 +39,8 @@ export default function ConsultationsPageClient({ data }: ConsultationsPageClien
             Consultations
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[#152A51]/80 sm:text-base">
-            Talk with your provider by video or chat. Each checkout includes one consultation, even
-            when the order has more than one treatment.
+            Talk with your provider by video or chat. A checkout includes one consultation when a
+            medicine in the order requires it, and that visit covers every treatment in the order.
           </p>
         </div>
 
@@ -125,8 +125,8 @@ export default function ConsultationsPageClient({ data }: ConsultationsPageClien
         ) : (
           <p className="rounded-[16px] border border-[#E8EEED] bg-white px-4 py-3 text-sm text-[#152A51]">
             {data.onboardingComplete
-              ? "You need an active or new plan to start a consultation."
-              : "Finish onboarding and intake first. After that, you can start your consultation from this page."}
+              ? "Consultations show up here when a medicine you ordered is set to require one."
+              : "Finish onboarding first. If a medicine in your order requires a consultation, you can start it from this page."}
           </p>
         )}
       </section>

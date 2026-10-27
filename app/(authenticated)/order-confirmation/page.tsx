@@ -20,20 +20,20 @@ export default async function OrderConfirmationPage() {
   await reconcileLatestSubscriptionForUser(user.id);
 
   // The three reads below are independent — run them in one parallel wave.
-  const [{ data: sub }, { data: pay }, settings, { data: profile }] = await Promise.all([
+  const [{ data: subs }, { data: pay }, settings, { data: profile }] = await Promise.all([
     supabaseAdmin
       .from("subscriptions")
       .select(
-        "id, package_id, medicine_id, created_at, packages(name, price, original_price, duration_months), medicines(name)",
+        "id, is_checkout_primary, checkout_group_id, package_id, medicine_id, created_at, packages(name, price, original_price, duration_months), medicines(name, requires_consultation)",
       )
       .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+      .order("created_at", { ascending: false }),
     supabaseAdmin
       .from("payments")
       .select("amount_cents, raw_event")
       .eq("user_id", user.id)
+      .eq("status", "succeeded")
+      .gt("amount_cents", 0)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
@@ -41,12 +41,43 @@ export default async function OrderConfirmationPage() {
     supabaseAdmin.from("profiles").select("email").eq("id", user.id).maybeSingle(),
   ]);
 
-  const pkg = (
-    sub as {
-      packages?: { name: string; price: number; original_price: number; duration_months: number };
-    } | null
-  )?.packages;
-  const med = (sub as { medicines?: { name: string } } | null)?.medicines;
+  type ConfirmationSub = {
+    id: string;
+    is_checkout_primary: boolean | null;
+    checkout_group_id: string | null;
+    packages?: {
+      name: string;
+      price: number;
+      original_price: number;
+      duration_months: number;
+    } | null;
+    medicines?: { name: string; requires_consultation: boolean } | null;
+  };
+  const subscriptionRows = (subs ?? []) as ConfirmationSub[];
+  const sub =
+    subscriptionRows.find((row) => row.is_checkout_primary !== false) ??
+    subscriptionRows[0] ??
+    null;
+  const group = sub?.checkout_group_id
+    ? subscriptionRows.filter((row) => row.checkout_group_id === sub.checkout_group_id)
+    : sub
+      ? [sub]
+      : [];
+  const needsConsultation = group.some((row) => Boolean(row.medicines?.requires_consultation));
+  const medicineLabel =
+    group
+      .map((row) => row.medicines?.name)
+      .filter((name): name is string => Boolean(name))
+      .join(", ") || null;
+  const planLabel =
+    [
+      ...new Set(
+        group.map((row) => row.packages?.name).filter((name): name is string => Boolean(name)),
+      ),
+    ].join(", ") || null;
+
+  const pkg = sub?.packages ?? null;
+  const med = medicineLabel ? { name: medicineLabel } : null;
 
   const totalPaid = pay
     ? Number(pay.amount_cents) / 100
@@ -88,9 +119,11 @@ export default async function OrderConfirmationPage() {
   const shipping = shippingCents / 100;
   const consultation = consultationCents / 100;
   const listPrice =
-    pkg?.original_price != null && planPrice != null && Number(pkg.original_price) > planPrice
-      ? Number(pkg.original_price)
-      : planPrice;
+    group.length > 1
+      ? null
+      : pkg?.original_price != null && planPrice != null && Number(pkg.original_price) > planPrice
+        ? Number(pkg.original_price)
+        : planPrice;
   const planSavings =
     listPrice != null && planPrice != null ? Math.max(0, listPrice - planPrice) : 0;
   const discountTotal =
@@ -129,7 +162,9 @@ export default async function OrderConfirmationPage() {
             </div>
             <div className="flex justify-between">
               <span className="text-[#152A51]/80">Plan</span>
-              <span className="font-medium text-[#152A51]">{pkg?.name ?? "Treatment Plan"}</span>
+              <span className="font-medium text-[#152A51]">
+                {planLabel ?? pkg?.name ?? "Treatment Plan"}
+              </span>
             </div>
             <div className="flex items-center justify-between gap-3">
               <span className="text-[#152A51]/80">Email</span>
@@ -229,12 +264,14 @@ export default async function OrderConfirmationPage() {
         </div>
 
         <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-center">
-          <Link
-            href={sub?.id ? `/consultations/open/${sub.id}` : "/consultations"}
-            className="rounded-md bg-[#152A51] px-6 py-2.5 text-center text-sm font-medium text-white hover:bg-[#152A51]/90"
-          >
-            Start Intake & Consultation
-          </Link>
+          {needsConsultation ? (
+            <Link
+              href={sub?.id ? `/consultations/open/${sub.id}` : "/consultations"}
+              className="rounded-md bg-[#152A51] px-6 py-2.5 text-center text-sm font-medium text-white hover:bg-[#152A51]/90"
+            >
+              Start Intake & Consultation
+            </Link>
+          ) : null}
           <Link
             href="/dashboard"
             className="rounded-md bg-[#E3E084] px-6 py-2.5 text-center text-sm font-medium text-[#152A51] hover:bg-[#D9D674]"

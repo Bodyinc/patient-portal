@@ -1,5 +1,6 @@
 import "server-only";
 
+import { sessionRequiresConsultation } from "@/lib/consultations/eligibility";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 type PaymentRow = {
@@ -140,16 +141,21 @@ export async function ensureMedicationOrderForPayment(params: {
   // Added medicines belong to the primary checkout's consultation.
   const coveredByPrimaryConsultation =
     kind === "initial" && subscription.is_checkout_primary === false;
+  const cartNeedsConsultation =
+    kind === "initial"
+      ? await sessionRequiresConsultation(subscription.session_id ?? payment.session_id)
+      : false;
   const needsConsultation = coveredByPrimaryConsultation
     ? false
     : priorRequest
       ? Boolean(medicine.requires_followup)
-      : Boolean(medicine.requires_consultation);
-  let status = coveredByPrimaryConsultation
-    ? "pending_review"
-    : needsConsultation
-      ? "pending_review"
-      : "approved";
+      : Boolean(medicine.requires_consultation) || cartNeedsConsultation;
+  // One consultation covers the checkout. Medicines that don't need one are approved
+  // on their own; a checkout that needs one stays in review together.
+  const checkoutNeedsReview = coveredByPrimaryConsultation
+    ? cartNeedsConsultation || Boolean(medicine.requires_consultation)
+    : needsConsultation;
+  let status = checkoutNeedsReview ? "pending_review" : "approved";
 
   const providerId = await resolveProviderId({
     needsConsultation,

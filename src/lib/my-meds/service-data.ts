@@ -22,7 +22,7 @@ import type {
 const ACTIVE_SUBSCRIPTION_STATUSES = ["active", "trialing", "past_due"];
 
 const SUBSCRIPTION_SELECT =
-  "id, medicine_id, package_id, status, is_checkout_primary, current_period_end, cancel_at_period_end, created_at, updated_at, medicines(id, name, image_url, important_info), packages(id, name, duration_months, variant_id, medicine_variants(id, name))";
+  "id, medicine_id, package_id, status, is_checkout_primary, checkout_group_id, current_period_end, cancel_at_period_end, created_at, updated_at, medicines(id, name, image_url, important_info), packages(id, name, duration_months, variant_id, medicine_variants(id, name))";
 
 type EmbeddedMedicine = {
   name: string;
@@ -46,6 +46,7 @@ type SubscriptionRow = {
   current_period_end: string | null;
   cancel_at_period_end: boolean;
   is_checkout_primary?: boolean | null;
+  checkout_group_id?: string | null;
   created_at: string;
   updated_at: string;
   medicines?: EmbeddedMedicine;
@@ -129,6 +130,7 @@ function mapActiveMedication(
 
   return {
     subscriptionId: subscription.id,
+    checkoutGroupId: subscription.checkout_group_id ?? null,
     medicineId: subscription.medicine_id,
     packageId: subscription.package_id ?? pkg?.id ?? null,
     variantId: pkg?.medicine_variants?.id ?? pkg?.variant_id ?? null,
@@ -240,6 +242,27 @@ async function latestOrderStatusBySubscription(
 function mapOrderToRequestDto(
   o: Awaited<ReturnType<typeof fetchPatientOrders>>[number],
 ): MyMedsMedicationRequestDto {
+  const lines = o.lines.map((line) => ({
+    id: line.id,
+    medicationName: line.medicationName,
+    planName: line.planName,
+    status: line.status,
+    statusLabel: line.statusLabel,
+    isRejected: line.isRejected,
+    trackingNumber: line.trackingNumber,
+    consultationApproved: line.consultationApproved,
+    pendingPaymentCents: line.pendingPaymentCents,
+    prescription: line.prescription
+      ? {
+          id: line.prescription.id,
+          medicineName: line.prescription.medicineName,
+          directions: line.prescription.directions,
+          documentUrl: line.prescription.documentUrl,
+        }
+      : null,
+    timeline: line.timeline,
+  }));
+
   return {
     id: o.id,
     orderNumber: o.orderNumber,
@@ -250,8 +273,12 @@ function mapOrderToRequestDto(
     isRejected: o.isRejected,
     requestDate: o.createdAt,
     trackingNumber: o.trackingNumber,
-    consultationApproved: isConsultationApproved(o.status, o.requiresConsultation),
+    consultationApproved:
+      lines.length > 0
+        ? lines.some((line) => line.consultationApproved)
+        : isConsultationApproved(o.status, o.requiresConsultation),
     pendingPaymentCents: o.pendingPayment?.amountCents ?? null,
+    payRequestId: o.payRequestId,
     prescription: o.prescription
       ? {
           id: o.prescription.id,
@@ -261,6 +288,7 @@ function mapOrderToRequestDto(
         }
       : null,
     timeline: o.timeline,
+    lines,
   };
 }
 
@@ -273,33 +301,11 @@ export async function fetchMedicationRequests(
   const query = (options.query ?? "").trim();
   const start = (page - 1) * pageSize;
 
-  // Search spans medicine/plan names, so keep the wider fetch + in-memory filter.
-  // Default browse path paginates in SQL to avoid loading every request on each page.
-  if (!query) {
-    const [{ count, error: countError }, orders] = await Promise.all([
-      supabaseAdmin
-        .from("medication_requests")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", userId),
-      fetchPatientOrders(userId, { limit: pageSize, offset: start }),
-    ]);
-    if (countError) throw new Error(countError.message);
-
-    const total = count ?? 0;
-    return {
-      items: orders.map(mapOrderToRequestDto),
-      total,
-      page,
-      pageSize,
-      totalPages: total === 0 ? 0 : Math.ceil(total / pageSize),
-      query,
-    };
-  }
-
+  // Group a checkout into one order before paging, so a page boundary cannot split it.
   const orders = await fetchPatientOrders(userId);
   const filtered = orders
     .map(mapOrderToRequestDto)
-    .filter((request) => matchesRequestQuery(request, query));
+    .filter((request) => (query ? matchesRequestQuery(request, query) : true));
   const total = filtered.length;
 
   return {

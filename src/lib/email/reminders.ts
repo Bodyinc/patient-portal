@@ -251,12 +251,20 @@ export async function sendUnsentOrderStatusEmails(opts?: {
 
   const [{ data: medicines }, profileById, sessionById] = await Promise.all([
     medicineIds.length
-      ? supabaseAdmin.from("medicines").select("id, name").in("id", medicineIds)
-      : Promise.resolve({ data: [] as Array<{ id: string; name: string }> }),
+      ? supabaseAdmin
+          .from("medicines")
+          .select("id, name, requires_consultation")
+          .in("id", medicineIds)
+      : Promise.resolve({
+          data: [] as Array<{ id: string; name: string; requires_consultation: boolean }>,
+        }),
     patientEmailsByUserIds(userIds),
     patientEmailsByIntakeSessionIds(sessionIds),
   ]);
   const medicineById = new Map((medicines ?? []).map((m) => [m.id, m.name]));
+  const consultationByMedicineId = new Map(
+    (medicines ?? []).map((m) => [m.id, Boolean(m.requires_consultation)]),
+  );
 
   const extraPayRequestIds = [
     ...new Set(
@@ -300,10 +308,14 @@ export async function sendUnsentOrderStatusEmails(opts?: {
         console.warn("[email] order status skipped: no recipient yet", event.id);
       } else {
         const extraPay = extraPayByRequest.get(event.request_id);
+        const needsConsultation = Boolean(
+          request?.requires_consultation ||
+          (request?.medicine_id && consultationByMedicineId.get(request.medicine_id)),
+        );
         const ctaUrl =
           event.status === "awaiting_additional_payment" && request
             ? `${appUrl()}/orders/${request.id}/pay`
-            : event.status === "provider_assigned"
+            : event.status === "provider_assigned" && needsConsultation
               ? `${appUrl()}/consultations`
               : `${appUrl()}/my-meds`;
 

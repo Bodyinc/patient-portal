@@ -13,9 +13,13 @@ import { PushEnableBanner } from "./PushNotifications";
 
 type DashboardShellProps = {
   children: ReactNode;
+  showConsultations?: boolean;
 };
 
-export default function DashboardShell({ children }: DashboardShellProps) {
+export default function DashboardShell({
+  children,
+  showConsultations = false,
+}: DashboardShellProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   return (
@@ -30,14 +34,18 @@ export default function DashboardShell({ children }: DashboardShellProps) {
             </Button>
           </SheetTrigger>
           <SheetContent side="left" className="w-[260px] border-r border-[#E5E7EB] bg-white p-0">
-            <DashboardSidebar className="h-full" onNavigate={() => setMobileNavOpen(false)} />
+            <DashboardSidebar
+              className="h-full"
+              showConsultations={showConsultations}
+              onNavigate={() => setMobileNavOpen(false)}
+            />
           </SheetContent>
         </Sheet>
       </div>
 
       {/* Sidebar container strictly locked to full height */}
       <aside className="hidden lg:flex lg:h-full lg:w-[260px] lg:min-w-[260px] lg:max-w-[260px] lg:shrink-0">
-        <DashboardSidebar className="h-full w-full" />
+        <DashboardSidebar className="h-full w-full" showConsultations={showConsultations} />
       </aside>
 
       {/* Dashboard area scrolls independently when content overflows */}

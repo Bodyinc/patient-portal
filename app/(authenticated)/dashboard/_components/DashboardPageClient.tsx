@@ -62,7 +62,10 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
     : null;
   const canRefill = Boolean(data.treatment?.canRequestRefill);
   const consultationStatus = data.treatment?.consultationStatus ?? "none";
-  const showConsultationCta = data.consultationsEnabled && Boolean(data.treatment?.subscriptionId);
+  const showConsultationCta =
+    data.consultationsEnabled &&
+    Boolean(data.treatment?.subscriptionId) &&
+    (data.consultationRequired || data.consultationVisit);
 
   const treatmentFields = data.treatment
     ? [
@@ -129,7 +132,7 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
                 ) : null}
               </div>
             </>
-          ) : (
+          ) : data.consultationRequired || data.consultationVisit ? (
             <>
               <h3 className="text-[26px] font-medium leading-snug tracking-[-0.3px] text-[#152A51]">
                 Ready to begin your treatment journey?
@@ -153,6 +156,23 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
                     <Link href="/consultations">Complete intake form</Link>
                   </Button>
                 )}
+              </div>
+            </>
+          ) : (
+            <>
+              <h3 className="text-[26px] font-medium leading-snug tracking-[-0.3px] text-[#152A51]">
+                Your order is confirmed
+              </h3>
+              <p className="mt-3 max-w-xl text-sm leading-relaxed text-[#152A51]/80 sm:text-[15px] sm:leading-7">
+                Follow your treatments, refills, and tracking from My Meds.
+              </p>
+              <div className="mt-auto pt-5">
+                <Button
+                  asChild
+                  className="h-[46px] w-full rounded-full bg-[#E3E084] px-6 text-sm font-medium text-[#152A51] hover:bg-[#D9D674] sm:w-fit"
+                >
+                  <Link href="/my-meds">View treatment details</Link>
+                </Button>
               </div>
             </>
           )}

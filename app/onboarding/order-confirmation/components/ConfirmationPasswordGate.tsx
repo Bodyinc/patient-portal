@@ -35,7 +35,7 @@ function DashboardActions({ email }: { email: string | null }) {
           onClick={() => router.push("/dashboard")}
           className="h-[46px] w-full rounded-full bg-[#E3E084] px-6 text-[14px] font-medium text-[#152A51] shadow-none hover:bg-[#D9D674] sm:w-auto"
         >
-          Go to Dashboard
+          Complete intake form
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
 

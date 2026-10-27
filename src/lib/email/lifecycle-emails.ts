@@ -180,7 +180,7 @@ export function consultationStartedEmail(params: {
   const body = [
     `<p>Hi ${firstName(params.fullName)},</p>`,
     `<p>You started your included consultation for <strong>${med}</strong>.</p>`,
-    `<p>Each subscription includes <strong>one consultation</strong>. You can reopen this same visit anytime from Consultations. Starting another visit for this plan is not included.</p>`,
+    `<p>This order includes <strong>one consultation</strong>, even when it has more than one treatment. You can reopen this same visit anytime from Consultations.</p>`,
     emailButton("Open Consultations", params.consultationsUrl),
   ].join("");
   return {

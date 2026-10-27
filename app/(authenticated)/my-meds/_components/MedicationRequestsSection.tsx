@@ -12,7 +12,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import type { MyMedsMedicationRequestDto, MyMedsMedicationRequestsListDto } from "./types";
+import type {
+  MyMedsMedicationRequestDto,
+  MyMedsMedicationRequestsListDto,
+  MyMedsOrderLineDto,
+  MyMedsTimelineStepDto,
+} from "./types";
 import { formatPortalDate } from "@/lib/date-format";
 import TrackingIdValue from "../../_components/TrackingIdValue";
 
@@ -32,6 +37,91 @@ function formatDate(value: string): string {
 function money(cents: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
     (cents ?? 0) / 100,
+  );
+}
+
+function payRequestId(request: MyMedsMedicationRequestDto): string | null {
+  if (!request.pendingPaymentCents) return null;
+  return request.payRequestId ?? request.id;
+}
+
+function OrderTimeline({ steps }: { steps: MyMedsTimelineStepDto[] }) {
+  return (
+    <ol>
+      {steps.map((step, i) => {
+        const isLast = i === steps.length - 1;
+        return (
+          <li key={step.key} className="flex gap-3">
+            <div className="flex flex-col items-center">
+              <span
+                className={`mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 ${
+                  step.state === "done"
+                    ? "border-[#6A9B9C] bg-[#6A9B9C]"
+                    : step.state === "current"
+                      ? "border-[#152A51] bg-white ring-4 ring-[#152A51]/15"
+                      : "border-[#E8EEED] bg-white"
+                }`}
+              />
+              {!isLast ? (
+                <span
+                  className={`w-0.5 grow ${step.state === "done" ? "bg-[#6A9B9C]" : "bg-[#E8EEED]"}`}
+                  style={{ minHeight: "28px" }}
+                />
+              ) : null}
+            </div>
+            <div className="pb-6">
+              <div
+                className={`text-sm ${
+                  step.state === "upcoming" ? "text-[#152A51]/40" : "font-medium text-[#152A51]"
+                }`}
+              >
+                {step.label}
+              </div>
+              {step.at ? (
+                <div className="text-xs text-[#152A51]/50">{formatDate(step.at)}</div>
+              ) : null}
+            </div>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function OrderLineDetail({ line }: { line: MyMedsOrderLineDto }) {
+  return (
+    <div className="rounded-[14px] border border-[#E8EEED] p-3">
+      <p className="text-sm font-medium text-[#152A51]">{line.medicationName}</p>
+      {line.planName ? <p className="text-xs text-[#152A51]/60">{line.planName}</p> : null}
+      <p className="mt-1 text-xs font-medium text-[#152A51]/80">{line.statusLabel}</p>
+      {line.trackingNumber ? (
+        <div className="mt-2">
+          <TrackingIdValue trackingNumber={line.trackingNumber} />
+        </div>
+      ) : null}
+      {line.prescription ? (
+        <div className="mt-3 rounded-[14px] border border-[#E8EEED] bg-[#F3F6F6] p-3">
+          <div className="text-sm font-medium text-[#152A51]">Prescription</div>
+          <div className="text-sm text-[#152A51]/80">{line.prescription.medicineName}</div>
+          <div className="mt-2 flex items-center gap-2">
+            <Link
+              href={`/prescriptions/${line.prescription.id}`}
+              target="_blank"
+              className="rounded-full border border-[#152A51] px-3 py-1.5 text-sm font-medium text-[#152A51] hover:bg-white"
+            >
+              View
+            </Link>
+            <Link
+              href={`/prescriptions/${line.prescription.id}?download=1`}
+              target="_blank"
+              className="rounded-full bg-[#152A51] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#152A51]/90"
+            >
+              Download
+            </Link>
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -146,15 +236,17 @@ export default function MedicationRequestsSection({
                   <TableCell className="text-sm text-[#152A51]">
                     {request.trackingNumber ? (
                       <TrackingIdValue trackingNumber={request.trackingNumber} labeled={false} />
+                    ) : request.lines.some((line) => line.trackingNumber) ? (
+                      "Multiple"
                     ) : (
                       "—"
                     )}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-3">
-                      {request.pendingPaymentCents ? (
+                      {payRequestId(request) ? (
                         <Link
-                          href={`/orders/${request.id}/pay`}
+                          href={`/orders/${payRequestId(request)}/pay`}
                           className="rounded-full bg-[#152A51] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#152A51]/90"
                         >
                           Pay now
@@ -241,13 +333,13 @@ export default function MedicationRequestsSection({
               </p>
             ) : (
               <div className="pt-1">
-                {active.pendingPaymentCents ? (
+                {active.pendingPaymentCents && payRequestId(active) ? (
                   <div className="mb-4 flex items-center justify-between gap-3 rounded-[14px] border border-[#E8EEED] bg-[#FFF6D6] p-3">
                     <span className="text-sm text-[#786C46]">
                       {money(active.pendingPaymentCents)} due to continue
                     </span>
                     <Link
-                      href={`/orders/${active.id}/pay`}
+                      href={`/orders/${payRequestId(active)}/pay`}
                       className="rounded-full bg-[#152A51] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#152A51]/90"
                     >
                       Pay now
@@ -255,60 +347,27 @@ export default function MedicationRequestsSection({
                   </div>
                 ) : null}
 
-                <ol>
-                  {active.timeline.map((step, i) => {
-                    const isLast = i === active.timeline.length - 1;
-                    return (
-                      <li key={step.key} className="flex gap-3">
-                        <div className="flex flex-col items-center">
-                          <span
-                            className={`mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 ${
-                              step.state === "done"
-                                ? "border-[#6A9B9C] bg-[#6A9B9C]"
-                                : step.state === "current"
-                                  ? "border-[#152A51] bg-white ring-4 ring-[#152A51]/15"
-                                  : "border-[#E8EEED] bg-white"
-                            }`}
-                          />
-                          {!isLast ? (
-                            <span
-                              className={`w-0.5 grow ${
-                                step.state === "done" ? "bg-[#6A9B9C]" : "bg-[#E8EEED]"
-                              }`}
-                              style={{ minHeight: "28px" }}
-                            />
-                          ) : null}
-                        </div>
-                        <div className="pb-6">
-                          <div
-                            className={`text-sm ${
-                              step.state === "upcoming"
-                                ? "text-[#152A51]/40"
-                                : "font-medium text-[#152A51]"
-                            }`}
-                          >
-                            {step.label}
-                          </div>
-                          {step.at ? (
-                            <div className="text-xs text-[#152A51]/50">{formatDate(step.at)}</div>
-                          ) : null}
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ol>
+                {active.lines.length > 1 ? (
+                  <div className="space-y-3">
+                    {active.lines.map((line) => (
+                      <OrderLineDetail key={line.id} line={line} />
+                    ))}
+                  </div>
+                ) : (
+                  <OrderTimeline steps={active.timeline} />
+                )}
 
-                {active.consultationApproved ? (
+                {active.lines.length > 1 ? null : active.consultationApproved ? (
                   <p className="mt-1 text-sm font-medium text-[#34845F]">Consultation approved</p>
                 ) : null}
 
-                {active.trackingNumber ? (
+                {active.lines.length <= 1 && active.trackingNumber ? (
                   <div className="mt-1">
                     <TrackingIdValue trackingNumber={active.trackingNumber} />
                   </div>
                 ) : null}
 
-                {active.prescription ? (
+                {active.lines.length <= 1 && active.prescription ? (
                   <div className="mt-3 rounded-[14px] border border-[#E8EEED] bg-[#F3F6F6] p-3">
                     <div className="text-sm font-medium text-[#152A51]">Prescription</div>
                     <div className="text-sm text-[#152A51]/80">

@@ -1,5 +1,6 @@
 export type MyMedsCurrentMedicationDto = {
   subscriptionId: string;
+  checkoutGroupId: string | null;
   medicineId: string | null;
   packageId: string | null;
   variantId: string | null;
@@ -38,6 +39,25 @@ export type MyMedsTimelineStepDto = {
   at: string | null;
 };
 
+export type MyMedsOrderLineDto = {
+  id: string;
+  medicationName: string;
+  planName: string | null;
+  status: string;
+  statusLabel: string;
+  isRejected: boolean;
+  trackingNumber: string | null;
+  consultationApproved: boolean;
+  pendingPaymentCents: number | null;
+  prescription: {
+    id: string;
+    medicineName: string;
+    directions: string | null;
+    documentUrl: string | null;
+  } | null;
+  timeline: MyMedsTimelineStepDto[];
+};
+
 export type MyMedsMedicationRequestDto = {
   id: string;
   orderNumber: string;
@@ -50,6 +70,8 @@ export type MyMedsMedicationRequestDto = {
   trackingNumber: string | null;
   consultationApproved: boolean;
   pendingPaymentCents: number | null;
+  /** Request that owns an extra charge when the checkout was grouped into one order. */
+  payRequestId: string | null;
   prescription: {
     id: string;
     medicineName: string;
@@ -57,6 +79,8 @@ export type MyMedsMedicationRequestDto = {
     documentUrl: string | null;
   } | null;
   timeline: MyMedsTimelineStepDto[];
+  /** Present when several medicines purchased together are shown as one order. */
+  lines: MyMedsOrderLineDto[];
 };
 
 export type MyMedsMedicationRequestsListDto = {
