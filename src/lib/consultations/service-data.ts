@@ -6,6 +6,7 @@ import { getPatientDisplayIdentity } from "@/lib/profile/identity";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 import { ELIGIBLE_SUBSCRIPTION_STATUSES, isQuickbloxConfigured } from "./config";
+import { isConsultationFinishedEvent } from "./finished";
 import { checkJotformSubmission } from "./jotform";
 import {
   ensureQuickbloxClient,
@@ -92,9 +93,33 @@ export async function fetchConsultationsPageData(userId: string): Promise<Consul
         : null,
   }));
 
-  // Check if provider/doctor completed the visit via medication_request_events
+  // Provider completion can land on any medicine in the checkout, while the
+  // consultation row belongs to the primary subscription.
+  const primaryBySubId = new Map<string, string>();
+  const groupedSubs = new Map<
+    string,
+    Array<{ id: string; is_checkout_primary?: boolean | null }>
+  >();
+  for (const row of (subsResult.data ?? []) as Array<{
+    id: string;
+    is_checkout_primary?: boolean | null;
+    checkout_group_id?: string | null;
+  }>) {
+    if (!row.checkout_group_id) {
+      primaryBySubId.set(row.id, row.id);
+      continue;
+    }
+    const list = groupedSubs.get(row.checkout_group_id) ?? [];
+    list.push(row);
+    groupedSubs.set(row.checkout_group_id, list);
+  }
+  for (const rows of groupedSubs.values()) {
+    const primary = rows.find((row) => row.is_checkout_primary !== false) ?? rows[0];
+    for (const row of rows) primaryBySubId.set(row.id, primary.id);
+  }
+
   const requestIds = (requestsResult.data ?? []).map((r) => r.id);
-  const completedEventsBySub = new Map<string, string>(); // subscription_id -> completed_at
+  const completedEventsBySub = new Map<string, string>();
   if (requestIds.length > 0) {
     const { data: events } = await supabaseAdmin
       .from("medication_request_events")
@@ -106,16 +131,10 @@ export async function fetchConsultationsPageData(userId: string): Promise<Consul
 
     for (const ev of events ?? []) {
       const subId = subByReqId.get(ev.request_id);
-      if (!subId || completedEventsBySub.has(subId)) continue;
-      const note = (ev.note ?? "").toLowerCase();
-      const status = (ev.status ?? "").toLowerCase();
-      if (
-        note.includes("consultation completed") ||
-        note.includes("consultation finished") ||
-        status === "consultation_completed" ||
-        status === "consultation_finished"
-      ) {
-        completedEventsBySub.set(subId, ev.created_at);
+      if (!subId || !isConsultationFinishedEvent(ev)) continue;
+      const targets = [subId, primaryBySubId.get(subId) ?? subId];
+      for (const id of targets) {
+        if (!completedEventsBySub.has(id)) completedEventsBySub.set(id, ev.created_at);
       }
     }
   }
@@ -155,18 +174,19 @@ export async function fetchConsultationsPageData(userId: string): Promise<Consul
   await Promise.all(
     consultRows.map(async (row) => {
       const live = qbStatus.get(row.qb_appointment_id);
-      if (!live) return;
-      if (!live.open && !row.ended_at) {
-        const finishTime = live.dateEnd || now;
-        const { error } = await supabaseAdmin
-          .from("patient_consultations")
-          .update({ ended_at: finishTime, updated_at: now })
-          .eq("id", row.id);
-        if (error && !/ended_at/i.test(error.message)) {
-          console.warn("[consultations] persist ended_at failed:", error.message);
-        }
-        row.ended_at = finishTime;
+      const eventCompletedAt = completedEventsBySub.get(row.subscription_id) ?? null;
+      const providerFinished = Boolean(eventCompletedAt);
+      const quickbloxFinished = Boolean(live && !live.open);
+      if ((!providerFinished && !quickbloxFinished) || row.ended_at) return;
+      const finishTime = eventCompletedAt || live?.dateEnd || now;
+      const { error } = await supabaseAdmin
+        .from("patient_consultations")
+        .update({ ended_at: finishTime, updated_at: now })
+        .eq("id", row.id);
+      if (error && !/ended_at/i.test(error.message)) {
+        console.warn("[consultations] persist ended_at failed:", error.message);
       }
+      row.ended_at = finishTime;
     }),
   );
 
