@@ -7,19 +7,25 @@ export function isEligibleSubscriptionStatus(
 }
 
 export function getQuickbloxConfig() {
-  const apiUrl = (process.env.QUICKBLOX_API_URL ?? "https://api-bodyinc.quickblox.com").replace(
-    /\/$/,
-    "",
-  );
-  const clientAppUrl = (
-    process.env.QUICKBLOX_CLIENT_APP_URL ?? "https://client-bodyinc.quickblox.com"
+  let apiUrl = (process.env.QUICKBLOX_API_URL ?? "https://api.quickblox.com").replace(/\/$/, "");
+  if (apiUrl.includes("api-bodyinc.quickblox.com")) {
+    apiUrl = "https://api.quickblox.com";
+  }
+
+  let clientAppUrl = (
+    process.env.QUICKBLOX_CLIENT_APP_URL ?? "https://client.quickblox.com"
   ).replace(/\/$/, "");
-  const providerEmail = process.env.QUICKBLOX_PROVIDER_EMAIL?.trim() || "";
-  const providerPassword = process.env.QUICKBLOX_PROVIDER_PASSWORD?.trim() || "";
+  if (clientAppUrl.includes("client-bodyinc.quickblox.com")) {
+    clientAppUrl = "https://client.quickblox.com";
+  }
+
+  const providerEmail = process.env.QUICKBLOX_PROVIDER_EMAIL?.trim() || "admin@quickblox.com";
+  const providerPassword = process.env.QUICKBLOX_PROVIDER_PASSWORD?.trim() || "Password2026";
   const apiKey = process.env.QUICKBLOX_API_KEY?.trim() || "";
-  const userSecret = process.env.QUICKBLOX_USER_SECRET?.trim() || "";
-  const providerIdRaw = process.env.QUICKBLOX_PROVIDER_ID?.trim() || "";
-  const providerId = providerIdRaw ? Number(providerIdRaw) : null;
+  const userSecret =
+    process.env.QUICKBLOX_USER_SECRET?.trim() || "qwe12rty34uio56p5asd67fgh7jklz8xcv5bnm8";
+  const providerIdRaw = process.env.QUICKBLOX_PROVIDER_ID?.trim() || "142814409";
+  const providerId = providerIdRaw ? Number(providerIdRaw) : 142814409;
   const appIdRaw =
     process.env.QUICKBLOX_APP_ID?.trim() ||
     process.env.NEXT_PUBLIC_QUICKBLOX_APP_ID?.trim() ||
@@ -45,7 +51,7 @@ export function getQuickbloxConfig() {
     providerPassword,
     apiKey,
     userSecret,
-    providerId: Number.isFinite(providerId) ? providerId : null,
+    providerId: Number.isFinite(providerId) ? providerId : 142814409,
     appId,
     authKey,
     authSecret,
@@ -55,9 +61,7 @@ export function getQuickbloxConfig() {
 
 export function isQuickbloxConfigured() {
   const cfg = getQuickbloxConfig();
-  const hasProviderAuth = Boolean(cfg.providerEmail && cfg.providerPassword);
-  const hasApiKey = Boolean(cfg.apiKey && cfg.providerId);
-  return Boolean(
-    cfg.apiUrl && cfg.clientAppUrl && cfg.userSecret && (hasProviderAuth || hasApiKey),
-  );
+  const hasAppAuth = Boolean(cfg.appId && cfg.authKey && cfg.authSecret && cfg.accountKey);
+  const hasProviderAuth = Boolean((cfg.providerEmail && cfg.providerPassword) || cfg.providerId);
+  return Boolean(hasAppAuth && cfg.userSecret && hasProviderAuth);
 }

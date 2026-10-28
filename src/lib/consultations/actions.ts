@@ -492,7 +492,23 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
       // ONLY consider it a room if form submission actually exists, or appointment is finished
       const isRoom = Boolean(isFinished || hasFormSubmission);
 
-      const dialogId = forThisSub?.qb_dialog_id ?? activeVisit?.dialogId ?? null;
+      let dialogId = forThisSub?.qb_dialog_id ?? activeVisit?.dialogId ?? null;
+      if (!dialogId && appointmentId && /^[a-f0-9]{24}$/i.test(appointmentId)) {
+        dialogId = appointmentId;
+      }
+      if (!dialogId) {
+        try {
+          const newAppt = await createQuickbloxAppointment({
+            clientId: client.userId,
+            clientToken: client.token,
+            description: `${medicineName} consultation`,
+            reuseOpenVisit: false,
+          });
+          dialogId = newAppt._id;
+        } catch {
+          // ignore
+        }
+      }
       const providerId = activeVisit?.providerId ?? null;
       let providerName: string | null = null;
       if (providerId) {

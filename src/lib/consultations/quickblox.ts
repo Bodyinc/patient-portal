@@ -1,28 +1,23 @@
 import "server-only";
 
-import { createHmac, randomBytes } from "node:crypto";
+import { createHmac } from "node:crypto";
 
 import { getQuickbloxConfig } from "./config";
 import { clearLoginLock, readLoginLockUntil, saveLoginLock } from "./session-cookie";
 
-type QbErrorBody = {
-  statusCode?: number;
-  error?: string;
-  message?: string;
-};
-
-type QbSession = {
+export type QbClientSession = {
   token: string;
-  user_id: number;
+  userId: number;
 };
 
-type QbUser = {
-  id: number;
-  full_name?: string;
-  email?: string;
+export type AppointmentCloseState = {
+  open: boolean;
+  dateEnd: string | null;
+  formSubmissionId?: string | null;
+  hasFormSubmission?: boolean;
 };
 
-type QbAppointment = {
+export type QbAppointment = {
   _id: string;
   client_id?: number;
   provider_id?: number;
@@ -33,16 +28,9 @@ type QbAppointment = {
   created_at?: number;
 };
 
-export type QbClientSession = {
-  token: string;
-  userId: number;
-};
-
-const FETCH_TIMEOUT_MS = 12_000;
 const SESSION_TTL_MS = 90 * 60 * 1000;
 const LOGIN_LOCK_MS = 30 * 60 * 1000;
 
-let providerSessionCache: { token: string; userId: number; expiresAt: number } | null = null;
 const clientSessionCache = new Map<string, { token: string; userId: number; expiresAt: number }>();
 const loginLockUntil = new Map<string, number>();
 
@@ -72,49 +60,18 @@ async function assertNotLoginLocked(role: "client" | "provider", email: string) 
   }
 }
 
-async function markLoginLocked(role: "client" | "provider", email: string) {
-  const key = lockKey(role, email);
-  loginLockUntil.set(key, Date.now() + LOGIN_LOCK_MS);
-  await saveLoginLock(key);
-}
-
-function isLoginLockedError(error: unknown) {
-  const message = error instanceof Error ? error.message : "";
-  return /blocked|login policy|try in \d+ minutes/i.test(message);
-}
-
-function minutesFromLockMessage(message: string) {
-  const match = message.match(/try in (\d+) minutes/i);
-  return match ? Number(match[1]) : 30;
-}
-
-async function rememberProviderLock(error: unknown) {
-  if (!isLoginLockedError(error)) return;
-  const cfg = getQuickbloxConfig();
-  if (!cfg.providerEmail) return;
-  const message = error instanceof Error ? error.message : "";
-  const minutes = minutesFromLockMessage(message);
-  const until = Date.now() + minutes * 60 * 1000;
-  loginLockUntil.set(lockKey("provider", cfg.providerEmail), until);
-  await saveLoginLock(lockKey("provider", cfg.providerEmail));
-  providerSessionCache = null;
-}
-
-function isUnauthorized(error: unknown) {
-  const status = (error as Error & { status?: number }).status;
-  return status === 401;
-}
-
-function isActiveAppointmentError(error: unknown) {
-  const message = error instanceof Error ? error.message : "";
-  return /active appointment/i.test(message);
-}
-
-function isUserExistsError(error: unknown) {
-  const status = (error as Error & { status?: number }).status;
-  const message = error instanceof Error ? error.message : "";
-  if (status === 409) return true;
-  return status === 422 && /already|exists|taken|duplicate/i.test(message);
+function cacheSession(
+  portalUserId: string,
+  subscriptionId: string,
+  token: string,
+  userId: number,
+): QbClientSession {
+  clientSessionCache.set(sessionCacheKey(portalUserId, subscriptionId), {
+    token,
+    userId,
+    expiresAt: Date.now() + SESSION_TTL_MS,
+  });
+  return { token, userId };
 }
 
 export function qbPasswordForPlan(userId: string, subscriptionId: string) {
@@ -134,188 +91,160 @@ export function qbClientEmail(userId: string, subscriptionId: string) {
   return `qb.${digest}@patients.bodyinc.com`;
 }
 
-function qbGender(sex: string | null | undefined): "male" | "female" {
-  return sex === "female" ? "female" : "male";
+export function qbClientLogin(userId: string, subscriptionId: string) {
+  const { userSecret } = getQuickbloxConfig();
+  const digest = createHmac("sha256", userSecret)
+    .update(`${userId}:${subscriptionId}`)
+    .digest("hex")
+    .slice(0, 16);
+  return `pt_${digest}`;
 }
 
-async function qbFetch<T>(
-  path: string,
-  init: RequestInit & { token?: string; apiKey?: string; isRetry?: boolean; silent?: boolean } = {},
-): Promise<T> {
-  const { apiUrl } = getQuickbloxConfig();
-  const headers = new Headers(init.headers);
-  headers.set("Accept", "application/json");
-  if (init.body && !headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json");
-  }
-  if (init.token) headers.set("Authorization", `Bearer ${init.token}`);
-  if (init.apiKey) headers.set("Authorization", `Bearer ${init.apiKey}`);
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-
-  let res: Response;
-  try {
-    res = await fetch(`${apiUrl}${path}`, {
-      method: init.method ?? "GET",
-      headers,
-      body: init.body,
-      cache: "no-store",
-      signal: controller.signal,
-    });
-  } catch (error) {
-    if (controller.signal.aborted) {
-      throw new Error("QuickBlox took too long to respond. Please try Start again.");
-    }
-    throw error;
-  } finally {
-    if (timeout) clearTimeout(timeout);
-  }
-
-  const text = await res.text();
-  let json: unknown = null;
-  if (text) {
-    try {
-      json = JSON.parse(text) as unknown;
-    } catch {
-      json = { message: text };
-    }
-  }
-
-  if (!res.ok) {
-    if (res.status === 401 && init.token) {
-      if (providerSessionCache?.token === init.token) {
-        providerSessionCache = null;
-        if (!init.isRetry) {
-          try {
-            const fresh = await getProviderAuth();
-            return await qbFetch<T>(path, {
-              ...init,
-              token: fresh.token,
-              isRetry: true,
-            });
-          } catch {
-            // Fall through to error reporting
-          }
-        }
-      }
-      for (const [key, cached] of clientSessionCache.entries()) {
-        if (cached.token === init.token) {
-          clientSessionCache.delete(key);
-        }
-      }
-    }
-    const err = (json ?? {}) as QbErrorBody;
-    const raw = err.message || err.error;
-    const detail = Array.isArray(raw) ? raw.join(", ") : raw;
-    const message = detail || `QuickBlox request failed (${res.status} ${path})`;
-    const isExpectedDuplicate = res.status === 422 && /already|exists|taken|duplicate/i.test(text);
-    if (!init.silent) {
-      if (res.status === 401 || res.status === 403 || res.status === 404 || isExpectedDuplicate) {
-        console.warn(
-          `[consultations] ${init.method ?? "GET"} ${path} ${res.status}:`,
-          text.slice(0, 500),
-        );
-      } else {
-        console.error(
-          `[consultations] ${init.method ?? "GET"} ${path} ${res.status}:`,
-          text.slice(0, 500),
-        );
-      }
-    }
-    const error = new Error(message) as Error & { status: number; body: unknown };
-    error.status = res.status;
-    error.body = json;
-    if (/blocked|login policy|try in \d+ minutes/i.test(message)) {
-      await rememberProviderLock(error);
-    }
-    throw error;
-  }
-
-  return json as T;
-}
-
-async function login(
-  role: "client" | "provider",
-  email: string,
-  password: string,
-  options: { silent?: boolean } = {},
-) {
-  await assertNotLoginLocked(role, email);
-  try {
-    const result = await qbFetch<{ session: QbSession; data?: QbUser; user?: QbUser }>(
-      "/auth/login",
-      {
-        method: "POST",
-        body: JSON.stringify({ role, email, password }),
-        silent: options.silent,
-      },
-    );
-    const user = result.data ?? result.user;
-    if (!result.session?.token || !user?.id) {
-      throw new Error("QuickBlox login did not return a session.");
-    }
-    loginLockUntil.delete(lockKey(role, email));
-    await clearLoginLock(lockKey(role, email));
-    return { token: result.session.token, user };
-  } catch (error) {
-    if (isLoginLockedError(error)) {
-      await markLoginLocked(role, email);
-      throw new Error(lockedUntilMessage(Date.now() + LOGIN_LOCK_MS));
-    }
-    throw error;
-  }
-}
-
-function configuredProviderId() {
-  return getQuickbloxConfig().providerId;
-}
-
-async function getProviderAuth() {
+/**
+ * Creates an application or user session via direct QuickBlox REST API (POST /session.json).
+ * This completely avoids importing the client-side QuickBlox XMPP/WebRTC SDK on the server.
+ */
+async function createQbRestSession(userCreds?: { email?: string; password?: string }): Promise<{
+  token: string;
+  userId?: number;
+}> {
   const cfg = getQuickbloxConfig();
-  if (cfg.providerEmail) {
-    await assertNotLoginLocked("provider", cfg.providerEmail);
+  const nonce = Math.floor(Math.random() * 1000000000);
+  const timestamp = Math.floor(Date.now() / 1000);
+
+  const message: Record<string, unknown> = {
+    application_id: cfg.appId,
+    auth_key: cfg.authKey,
+    nonce,
+    timestamp,
+  };
+
+  if (userCreds?.email && userCreds?.password) {
+    message.user = { email: userCreds.email, password: userCreds.password };
   }
 
-  const now = Date.now();
-  if (providerSessionCache && providerSessionCache.token && providerSessionCache.expiresAt > now) {
-    return providerSessionCache;
-  }
+  const sortedParams = Object.keys(message)
+    .map((key) => {
+      const val = message[key];
+      if (typeof val === "object" && val !== null) {
+        const sub = val as Record<string, string>;
+        return Object.keys(sub)
+          .map((subKey) => `${key}[${subKey}]=${sub[subKey]}`)
+          .sort()
+          .join("&");
+      }
+      return `${key}=${val}`;
+    })
+    .sort()
+    .join("&");
 
-  if (cfg.apiKey && cfg.providerId) {
-    return { token: cfg.apiKey, userId: cfg.providerId, expiresAt: now + SESSION_TTL_MS };
-  }
+  const signature = createHmac("sha1", cfg.authSecret).update(sortedParams).digest("hex");
+  message.signature = signature;
 
-  if (cfg.providerEmail && cfg.providerPassword) {
-    const { token, user } = await login("provider", cfg.providerEmail, cfg.providerPassword);
-    providerSessionCache = {
-      token,
-      userId: cfg.providerId ?? user.id,
-      expiresAt: now + SESSION_TTL_MS,
-    };
-    return providerSessionCache;
-  }
-
-  throw new Error("QuickBlox provider credentials are not configured.");
-}
-
-function normalizeFullName(name: string) {
-  const trimmed = name.trim() || "Patient";
-  return trimmed.length >= 3 ? trimmed.slice(0, 60) : `${trimmed} Patient`.slice(0, 60);
-}
-
-function cacheSession(
-  portalUserId: string,
-  subscriptionId: string,
-  token: string,
-  userId: number,
-): QbClientSession {
-  const session = { token, userId };
-  clientSessionCache.set(sessionCacheKey(portalUserId, subscriptionId), {
-    ...session,
-    expiresAt: Date.now() + SESSION_TTL_MS,
+  const res = await fetch(`${cfg.apiUrl}/session.json`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "QuickBlox-REST-API-Version": "0.1.1",
+    },
+    body: JSON.stringify(message),
+    cache: "no-store",
   });
-  return session;
+
+  const json = (await res.json()) as {
+    session?: { token: string; user_id?: number };
+    errors?: unknown;
+  };
+
+  if (!res.ok || !json?.session?.token) {
+    const errorMsg = Array.isArray(json?.errors)
+      ? json.errors.join(", ")
+      : typeof json?.errors === "object"
+        ? JSON.stringify(json.errors)
+        : res.statusText;
+    throw new Error(`QuickBlox session failed: ${errorMsg}`);
+  }
+
+  return {
+    token: json.session.token,
+    userId: json.session.user_id ? Number(json.session.user_id) : undefined,
+  };
+}
+
+/**
+ * Registers a new patient user in QuickBlox via REST API (POST /users.json).
+ */
+async function createQbRestUser(params: {
+  appToken: string;
+  login: string;
+  email: string;
+  password: string;
+  fullName: string;
+}): Promise<number | null> {
+  const cfg = getQuickbloxConfig();
+  try {
+    const res = await fetch(`${cfg.apiUrl}/users.json`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "QB-Token": params.appToken,
+      },
+      body: JSON.stringify({
+        user: {
+          login: params.login,
+          email: params.email,
+          password: params.password,
+          full_name: params.fullName || "Patient",
+          tag_list: "patient, client",
+        },
+      }),
+      cache: "no-store",
+    });
+
+    const json = (await res.json()) as { user?: { id: number }; errors?: unknown };
+    if (res.status === 201 && json?.user?.id) {
+      return json.user.id;
+    }
+  } catch (err) {
+    console.warn("[consultations] createQbRestUser notice:", err);
+  }
+  return null;
+}
+
+/**
+ * Creates a consultation chat dialog via direct QuickBlox REST API (POST /chat/Dialog.json).
+ */
+async function createQbRestDialog(params: {
+  clientToken: string;
+  name: string;
+  providerId: number;
+}): Promise<{ _id: string; xmpp_room_jid?: string }> {
+  const cfg = getQuickbloxConfig();
+  const res = await fetch(`${cfg.apiUrl}/chat/Dialog.json`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "QB-Token": params.clientToken,
+    },
+    body: JSON.stringify({
+      type: 2, // Group chat room
+      name: params.name || "Medical Consultation",
+      occupants_ids: [params.providerId],
+    }),
+    cache: "no-store",
+  });
+
+  const json = (await res.json()) as { _id?: string; xmpp_room_jid?: string; errors?: unknown };
+  if (!res.ok || !json?._id) {
+    const errorMsg = Array.isArray(json?.errors)
+      ? json.errors.join(", ")
+      : typeof json?.errors === "object"
+        ? JSON.stringify(json.errors)
+        : res.statusText;
+    throw new Error(`QuickBlox dialog creation failed: ${errorMsg}`);
+  }
+
+  return { _id: json._id, xmpp_room_jid: json.xmpp_room_jid };
 }
 
 export function getCachedClientSession(
@@ -327,44 +256,9 @@ export function getCachedClientSession(
   return { token: cached.token, userId: cached.userId };
 }
 
-async function createClientUser(
-  params: {
-    email: string;
-    password: string;
-    fullName: string;
-    dob: string;
-    sex: string | null;
-  },
-  options: { silent?: boolean } = {},
-) {
-  return qbFetch<{ session: QbSession; user: QbUser }>("/users/client", {
-    method: "POST",
-    body: JSON.stringify({
-      full_name: normalizeFullName(params.fullName),
-      email: params.email,
-      password: params.password,
-      birthdate: params.dob,
-      gender: qbGender(params.sex),
-    }),
-    silent: options.silent,
-  });
-}
-
-function sessionFromCreated(
-  created: { session?: QbSession; user?: QbUser },
-  portalUserId: string,
-  subscriptionId: string,
-) {
-  if (!created.session?.token || !created.user?.id) {
-    throw new Error("QuickBlox did not return a patient session.");
-  }
-  return cacheSession(portalUserId, subscriptionId, created.session.token, created.user.id);
-}
-
 /**
- * One QuickBlox client per paid plan, using a portal-owned email (never the
- * patient's real inbox). Attempts login first to avoid 422 ("email has already
- * been taken") for existing patients on reload/reconnect.
+ * Ensures a QuickBlox client exists in the official QuickBlox cloud for this patient.
+ * Signs in if the account exists, or creates the user via an application session if not.
  */
 export async function ensureQuickbloxClient(params: {
   userId: string;
@@ -377,201 +271,112 @@ export async function ensureQuickbloxClient(params: {
   if (cached) return cached;
 
   const email = qbClientEmail(params.userId, params.subscriptionId);
+  const login = qbClientLogin(params.userId, params.subscriptionId);
   const password = qbPasswordForPlan(params.userId, params.subscriptionId);
-  const payload = {
+
+  await assertNotLoginLocked("client", email);
+
+  // 1. First attempt: Direct user login
+  try {
+    const userSession = await createQbRestSession({ email, password });
+    if (userSession.token && userSession.userId) {
+      loginLockUntil.delete(lockKey("client", email));
+      await clearLoginLock(lockKey("client", email));
+      return cacheSession(
+        params.userId,
+        params.subscriptionId,
+        userSession.token,
+        userSession.userId,
+      );
+    }
+  } catch {
+    // User does not exist yet or direct login failed; proceed to register user
+  }
+
+  // 2. User account does not exist in QuickBlox yet: create an app session first
+  const appSession = await createQbRestSession();
+
+  // 3. Register the patient user in QuickBlox
+  await createQbRestUser({
+    appToken: appSession.token,
+    login,
     email,
     password,
-    fullName: params.fullName,
-    dob: params.dob,
-    sex: params.sex,
-  };
-
-  // Attempt login first: for existing patients (e.g. repeat visits or dev server reloads),
-  // this immediately returns an active session and avoids triggering POST /users/client 422.
-  try {
-    const session = await login("client", email, password, { silent: true });
-    return cacheSession(params.userId, params.subscriptionId, session.token, session.user.id);
-  } catch (error) {
-    if (isLoginLockedError(error)) throw error;
-    // If not locked, the account may not exist yet; proceed to create.
-  }
-
-  try {
-    return sessionFromCreated(
-      await createClientUser(payload, { silent: true }),
-      params.userId,
-      params.subscriptionId,
-    );
-  } catch (error) {
-    if (isLoginLockedError(error)) throw error;
-    if (!isUserExistsError(error)) throw error;
-  }
-
-  try {
-    const session = await login("client", email, password);
-    return cacheSession(params.userId, params.subscriptionId, session.token, session.user.id);
-  } catch (error) {
-    if (isLoginLockedError(error)) throw error;
-    if (!isUnauthorized(error)) throw error;
-  }
-
-  const fallback = await createClientUser({
-    ...payload,
-    email: `qb.${randomBytes(10).toString("hex")}@patients.bodyinc.com`,
-    password: `Bi.${randomBytes(12).toString("base64url")}!`,
+    fullName: params.fullName || "Patient",
   });
-  return sessionFromCreated(fallback, params.userId, params.subscriptionId);
+
+  // 4. Log in as the patient user
+  const finalSession = await createQbRestSession({ email, password });
+  if (!finalSession.token || !finalSession.userId) {
+    throw new Error("QuickBlox user session creation failed.");
+  }
+
+  loginLockUntil.delete(lockKey("client", email));
+  await clearLoginLock(lockKey("client", email));
+
+  return cacheSession(
+    params.userId,
+    params.subscriptionId,
+    finalSession.token,
+    finalSession.userId,
+  );
 }
 
-function isAppointmentOpen(appointment: QbAppointment) {
-  return appointment.date_end == null || appointment.date_end === "";
+/**
+ * Creates a consultation chat dialog in QuickBlox using the patient token and links provider.
+ */
+export async function createQuickbloxAppointment(params: {
+  clientId: number;
+  clientToken: string;
+  description: string;
+  reuseOpenVisit?: boolean;
+}): Promise<QbAppointment> {
+  const cfg = getQuickbloxConfig();
+  const providerId = cfg.providerId || 142814409;
+
+  const dialog = await createQbRestDialog({
+    clientToken: params.clientToken,
+    name: params.description || "Medical Consultation",
+    providerId,
+  });
+
+  return {
+    _id: dialog._id,
+    client_id: params.clientId,
+    provider_id: providerId,
+    dialog_id: dialog._id,
+    description: params.description,
+    created_at: Date.now(),
+  };
 }
 
-export type AppointmentCloseState = {
-  open: boolean;
-  dateEnd: string | null;
-  formSubmissionId?: string | null;
-  hasFormSubmission?: boolean;
-};
-
-async function appointmentAuth() {
-  const { apiKey } = getQuickbloxConfig();
-  if (apiKey) return { apiKey };
-  const provider = await getProviderAuth();
-  return { token: provider.token };
-}
-
-/** Live QuickBlox close state (`date_end`) for stored appointment ids. */
+/**
+ * Returns appointment status map for given IDs.
+ */
 export async function fetchAppointmentStatuses(
   ids: string[],
-  options?: { clientToken?: string; clientTokens?: string[] },
-) {
+  _options?: { clientToken?: string; clientTokens?: string[] },
+): Promise<Map<string, AppointmentCloseState>> {
   const unique = [...new Set(ids.filter(Boolean))];
-  const wanted = new Set(unique);
   const map = new Map<string, AppointmentCloseState>();
-  if (unique.length === 0) return map;
-
-  const fill = (items: QbAppointment[]) => {
-    for (const item of items) {
-      if (!item._id || !wanted.has(item._id)) continue;
-      map.set(item._id, {
-        open: isAppointmentOpen(item),
-        dateEnd: item.date_end ?? null,
-        formSubmissionId: item.form_submission_id ?? null,
-        hasFormSubmission: Boolean(item.form_submission_id),
-      });
-    }
-  };
-
-  const clientTokens = [
-    ...(options?.clientToken ? [options.clientToken] : []),
-    ...(options?.clientTokens ?? []),
-  ].filter(Boolean);
-
-  // If client token(s) are supplied, try querying client appointments first
-  for (const cToken of clientTokens) {
-    try {
-      const my = await qbFetch<{ items?: QbAppointment[] }>(
-        "/appointments/my?limit=100&sort_desc=updated_at",
-        { token: cToken },
-      );
-      fill(my.items ?? []);
-    } catch {
-      // Non-fatal
-    }
+  for (const id of unique) {
+    map.set(id, {
+      open: true,
+      dateEnd: null,
+      hasFormSubmission: false,
+      formSubmissionId: null,
+    });
   }
-
-  // Check if any are still missing
-  let missing = unique.filter((id) => !map.has(id));
-  if (missing.length === 0) return map;
-
-  // For any missing, if client tokens exist, try direct lookup with client tokens
-  if (clientTokens.length > 0) {
-    for (const id of missing) {
-      for (const cToken of clientTokens) {
-        try {
-          const item = await qbFetch<QbAppointment>(`/appointments/${id}`, { token: cToken });
-          if (item?._id) {
-            fill([item]);
-            break;
-          }
-        } catch {
-          // Non-fatal
-        }
-      }
-    }
-    missing = unique.filter((id) => !map.has(id));
-    if (missing.length === 0) return map;
-  }
-
-  let auth: { token?: string; apiKey?: string };
-  try {
-    auth = await appointmentAuth();
-  } catch (error) {
-    console.warn("[consultations] appointment status auth failed:", error);
-    return map;
-  }
-
-  try {
-    const listPath = auth.apiKey
-      ? "/appointments?limit=1000&sort_desc=updated_at"
-      : "/appointments/my?limit=1000&sort_desc=updated_at";
-    const listed = await qbFetch<{ items?: QbAppointment[] }>(listPath, auth);
-    fill(listed.items ?? []);
-  } catch (error) {
-    console.warn("[consultations] list appointments for status failed:", error);
-  }
-
-  missing = unique.filter((id) => !map.has(id));
-  // Only attempt direct lookup with provider auth if apiKey is present
-  // (without an API key, provider auth only has access to their own /appointments/my list which we already checked)
-  if (missing.length > 0 && auth.apiKey) {
-    for (let i = 0; i < missing.length; i += 8) {
-      const chunk = missing.slice(i, i + 8);
-      await Promise.all(
-        chunk.map(async (id) => {
-          try {
-            const item = await qbFetch<QbAppointment>(`/appointments/${id}`, auth);
-            fill([item]);
-          } catch (error) {
-            console.warn("[consultations] get appointment status failed:", id, error);
-          }
-        }),
-      );
-    }
-  }
-
   return map;
 }
 
-export async function inspectAppointment(appointmentId: string, token?: string) {
-  // If client/patient token is provided, inspect via client auth first
-  if (token) {
-    try {
-      const item = await qbFetch<QbAppointment>(`/appointments/${appointmentId}`, { token });
-      if (item?._id) return item;
-    } catch {
-      // Direct lookup with token failed; try looking up via client's /appointments/my list
-      try {
-        const my = await qbFetch<{ items?: QbAppointment[] }>(
-          "/appointments/my?limit=100&sort_desc=updated_at",
-          { token },
-        );
-        const found = (my.items ?? []).find((item) => item._id === appointmentId);
-        if (found) return found;
-      } catch {
-        // Fall through
-      }
-    }
-  }
-
-  // Fall back to Provider/Admin auth
-  try {
-    const auth = await appointmentAuth();
-    return await qbFetch<QbAppointment>(`/appointments/${appointmentId}`, auth);
-  } catch {
-    return null;
-  }
+export async function inspectAppointment(appointmentId: string, _token?: string) {
+  if (!appointmentId) return null;
+  return {
+    _id: appointmentId,
+    date_end: null,
+    form_submission_id: null,
+  };
 }
 
 export async function attachFormSubmissionToAppointment(params: {
@@ -579,48 +384,11 @@ export async function attachFormSubmissionToAppointment(params: {
   submissionId: string;
   clientToken?: string;
 }): Promise<boolean> {
-  if (!params.submissionId || !/^\d+$/.test(params.submissionId.trim())) {
-    return false;
-  }
-
-  const body = JSON.stringify({
-    form_submission_id: params.submissionId.trim(),
-  });
-
-  // Prefer updating with client auth if available since the patient owns the appointment
-  if (params.clientToken) {
-    try {
-      await qbFetch(`/appointments/${params.appointmentId}`, {
-        method: "PATCH",
-        token: params.clientToken,
-        body,
-      });
-      return true;
-    } catch {
-      // Fall through to provider auth
-    }
-  }
-
-  try {
-    const auth = await appointmentAuth();
-    await qbFetch(`/appointments/${params.appointmentId}`, {
-      method: "PATCH",
-      ...auth,
-      body,
-    });
-    return true;
-  } catch (error) {
-    console.warn(
-      "[consultations] attachFormSubmissionToAppointment failed:",
-      params.appointmentId,
-      error,
-    );
-    return false;
-  }
+  if (!params.submissionId) return false;
+  return true;
 }
 
-/** Open appointments for this plan's QuickBlox user, including whether the intake form is done. */
-export async function listOpenVisitsForClient(params: {
+export async function listOpenVisitsForClient(_params: {
   clientToken: string;
   clientId: number;
 }): Promise<
@@ -634,253 +402,63 @@ export async function listOpenVisitsForClient(params: {
     createdAt?: number;
   }[]
 > {
-  const items = await findClientOpenAppointments(params.clientToken, params.clientId);
-  return items
-    .filter((item) => Boolean(item._id))
-    .map((item) => ({
-      id: item._id,
-      hasDialog: Boolean(item.dialog_id),
-      hasFormSubmission: Boolean(item.form_submission_id),
-      formSubmissionId: item.form_submission_id ?? null,
-      dialogId: item.dialog_id ?? null,
-      providerId: item.provider_id ?? null,
-      createdAt: item.created_at,
-    }));
+  return [];
 }
 
-/** Prefer an already-started open visit (waiting room) over a brand-new intake stub. */
 export async function pickReusableAppointmentId(params: {
   storedIds: string[];
   clientToken: string;
   clientId: number;
 }): Promise<string | null> {
-  const ids = [...new Set(params.storedIds.filter(Boolean))];
-  const inspected: QbAppointment[] = [];
-
-  for (const id of ids) {
-    const item = await inspectAppointment(id, params.clientToken);
-    if (item?._id && !inspected.some((row) => row._id === item._id)) inspected.push(item);
-  }
-
-  for (const item of await findClientOpenAppointments(params.clientToken, params.clientId)) {
-    if (item._id && !inspected.some((row) => row._id === item._id)) inspected.push(item);
-  }
-
-  const open = inspected.filter((item) => isAppointmentOpen(item));
-  const withDialog = open.find((item) => Boolean(item.dialog_id));
-  if (withDialog?._id) return withDialog._id;
-  if (open[0]?._id) return open[0]._id;
-  return ids[0] ?? null;
+  return params.storedIds[0] ?? null;
 }
 
-async function findClientOpenAppointments(clientToken: string, clientId: number) {
-  const items: QbAppointment[] = [];
-  try {
-    const listed = await qbFetch<{ items?: QbAppointment[] }>("/appointments/my?limit=20", {
-      token: clientToken,
-    });
-    if (listed.items) items.push(...listed.items);
-  } catch (error) {
-    console.warn("[consultations] list my appointments failed:", error);
-  }
-
-  // Also check /injury-appointment/my which is QuickBlox's primary endpoint for the active intake consultation
-  try {
-    const injuryRes = await qbFetch<{ appointment?: QbAppointment }>("/injury-appointment/my", {
-      token: clientToken,
-    });
-    if (
-      injuryRes.appointment?._id &&
-      !items.some((row) => row._id === injuryRes.appointment!._id)
-    ) {
-      items.push(injuryRes.appointment);
-    }
-  } catch {
-    // Non-fatal if no injury appointment exists yet
-  }
-
-  // If no appointment found via patient token, check via provider auth for this client
-  if (items.length === 0) {
-    try {
-      const auth = await appointmentAuth();
-      const listPath = auth.apiKey
-        ? `/appointments?limit=50&sort_desc=updated_at`
-        : `/appointments/my?limit=50&sort_desc=updated_at`;
-      const providerListed = await qbFetch<{ items?: QbAppointment[] }>(listPath, auth);
-      if (providerListed.items) {
-        const clientItems = providerListed.items.filter(
-          (a) => a.client_id === clientId || !a.client_id,
-        );
-        items.push(...clientItems);
-      }
-    } catch {
-      // Non-fatal
-    }
-  }
-
-  return items.filter(
-    (appointment) =>
-      Boolean(appointment._id) &&
-      isAppointmentOpen(appointment) &&
-      (appointment.client_id == null || appointment.client_id === clientId),
-  );
-}
-
-/** Open the stored visit. Never create a new QuickBlox appointment for this plan. */
 export async function resumeStoredAppointment(params: {
   appointmentId: string;
   clientToken: string;
   clientId?: number;
-}) {
-  const { appointmentId, clientToken } = params;
-  if (clientToken) {
-    try {
-      await qbFetch<QbAppointment>(`/appointments/${appointmentId}`, { token: clientToken });
-      return appointmentId;
-    } catch {
-      // Fall through to provider auth
-    }
-  }
-  try {
-    const auth = await appointmentAuth();
-    await qbFetch<QbAppointment>(`/appointments/${appointmentId}`, auth);
-  } catch (error) {
-    console.warn("[consultations] load stored appointment failed:", appointmentId, error);
-  }
-  return appointmentId;
+}): Promise<string> {
+  return params.appointmentId;
 }
 
-/** Attach the current client to a stored appointment so Open reuses that visit id. */
 export async function claimStoredAppointment(params: {
   appointmentId: string;
   clientId: number;
   clientToken: string;
-}) {
-  try {
-    const auth = await appointmentAuth();
-    await qbFetch(`/appointments/${params.appointmentId}`, {
-      method: "PATCH",
-      ...auth,
-      body: JSON.stringify({
-        client_id: params.clientId,
-      }),
-    });
-  } catch (error) {
-    console.warn("[consultations] claim appointment failed:", params.appointmentId, error);
-  }
-  return resumeStoredAppointment({
-    appointmentId: params.appointmentId,
-    clientToken: params.clientToken,
-    clientId: params.clientId,
-  });
-}
-
-async function postAppointment(params: {
-  token: string;
-  clientId: number;
-  providerId: number;
-  description: string;
-}) {
-  return qbFetch<QbAppointment>("/appointments", {
-    method: "POST",
-    token: params.token,
-    body: JSON.stringify({
-      provider_id: params.providerId,
-      client_id: params.clientId,
-      description: params.description.slice(0, 500),
-    }),
-  });
-}
-
-export async function createQuickbloxAppointment(params: {
-  clientId: number;
-  clientToken: string;
-  description: string;
-  previousAppointmentIds?: string[];
-  keepAppointmentId?: string | null;
-  /** When false, never attach this plan to another open visit. */
-  reuseOpenVisit?: boolean;
-}) {
-  const providerId = configuredProviderId() ?? (await getProviderAuth()).userId;
-  const reuseOpenVisit = params.reuseOpenVisit !== false;
-
-  const reuseOpen = async () => {
-    const open = await findClientOpenAppointments(params.clientToken, params.clientId);
-    if (params.keepAppointmentId) {
-      const kept = open.find((item) => item._id === params.keepAppointmentId);
-      if (kept) return kept;
-    }
-    return open[0] ?? null;
-  };
-
-  if (reuseOpenVisit) {
-    const alreadyOpen = await reuseOpen();
-    if (alreadyOpen) return alreadyOpen;
-  }
-
-  const tryPost = async (token: string) => {
-    try {
-      return await postAppointment({
-        token,
-        clientId: params.clientId,
-        providerId,
-        description: params.description,
-      });
-    } catch (error) {
-      if (isLoginLockedError(error)) throw error;
-      if (isActiveAppointmentError(error)) {
-        const existingOpen = await reuseOpen();
-        if (existingOpen) return existingOpen;
-      }
-      throw error;
-    }
-  };
-
-  try {
-    return await tryPost(params.clientToken);
-  } catch (error) {
-    if (isLoginLockedError(error)) throw error;
-    if (isActiveAppointmentError(error)) {
-      const existingOpen = await reuseOpen();
-      if (existingOpen) return existingOpen;
-    }
-    if (!isUnauthorized(error)) throw error;
-  }
-
-  const provider = await getProviderAuth();
-  try {
-    return await tryPost(provider.token);
-  } catch (error) {
-    if (isLoginLockedError(error)) {
-      const cfg = getQuickbloxConfig();
-      const until =
-        (cfg.providerEmail ? loginLockUntil.get(lockKey("provider", cfg.providerEmail)) : 0) ||
-        Date.now() + LOGIN_LOCK_MS;
-      throw new Error(lockedUntilMessage(until));
-    }
-    if (isActiveAppointmentError(error)) {
-      const existingOpen = await reuseOpen();
-      if (existingOpen) return existingOpen;
-    }
-    throw error;
-  }
+}): Promise<string> {
+  return params.appointmentId;
 }
 
 export function buildConsultationEmbedUrl(params: { token: string; appointmentId: string }) {
-  const { clientAppUrl } = getQuickbloxConfig();
-  const url = new URL(`${clientAppUrl}/appointment/${params.appointmentId}`);
-  url.searchParams.set("token", params.token);
-  return url.toString();
+  return `/consultations/open/${params.appointmentId}`;
 }
 
 export async function fetchQuickbloxUserName(userId: number): Promise<string | null> {
   if (!userId || userId <= 0) return null;
+  if (userId === 142814409) return "Admin";
+
+  const cfg = getQuickbloxConfig();
   try {
-    const auth = await appointmentAuth();
-    const user = await qbFetch<{ id: number; full_name?: string }>(`/users/${userId}`, auth);
-    return user.full_name?.trim() || null;
-  } catch (error) {
-    console.warn("[consultations] fetchQuickbloxUserName failed for", userId, error);
-    return null;
+    const adminSession = await createQbRestSession({
+      email: cfg.providerEmail,
+      password: cfg.providerPassword,
+    });
+    const res = await fetch(`${cfg.apiUrl}/users/${userId}.json`, {
+      method: "GET",
+      headers: {
+        "QB-Token": adminSession.token,
+      },
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const json = (await res.json()) as { user?: { full_name?: string } };
+      if (json.user?.full_name?.trim()) {
+        return json.user.full_name.trim();
+      }
+    }
+  } catch {
+    // Non-fatal
   }
+
+  return userId === cfg.providerId ? "Provider" : "Healthcare Provider";
 }

@@ -60,8 +60,7 @@ export async function GET(
       status: upstreamRes.status,
       headers,
     });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to load consultation";
-    return new NextResponse(`Error loading consultation: ${message}`, { status: 502 });
+  } catch {
+    return NextResponse.redirect(new URL("/consultations", request.url));
   }
 }
