@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -43,34 +43,28 @@ export default function MedicationsPage() {
     refetch,
   } = useMedicinesForCategory(state.goalId);
 
-  const medications = (catalog?.medicines ?? []).slice(0, 1);
-  const onlyMedication = medications[0] ?? null;
+  const medications = useMemo(() => catalog?.medicines ?? [], [catalog?.medicines]);
+  const medicationKey = medications.map((medicine) => medicine.id).join(",");
 
   useEffect(() => {
-    if (!hydrated || !onlyMedication) return;
-    if (selected === onlyMedication.id) return;
-    const defaultVariant = onlyMedication.variants.length
-      ? [...onlyMedication.variants].sort(
+    if (!hydrated || medications.length === 0) return;
+    const saved = medications.find((medicine) => medicine.id === state.medicationId) ?? null;
+    const target = saved ?? (medications.length === 1 ? medications[0] : null);
+    if (!target) return;
+
+    const defaultVariant = target.variants.length
+      ? [...target.variants].sort(
           (a, b) => (a.fromPriceCents ?? Infinity) - (b.fromPriceCents ?? Infinity),
         )[0].id
       : null;
-    const variantId =
-      state.medicationId === onlyMedication.id
-        ? (state.variantId ?? defaultVariant)
-        : defaultVariant;
-    setSelected(onlyMedication.id);
+    const variantId = saved ? (state.variantId ?? defaultVariant) : defaultVariant;
+    setSelected(target.id);
     setSelectedVariantId(variantId);
-    void prefetchPackagesForMedicine(queryClient, onlyMedication.id, variantId);
-  }, [hydrated, onlyMedication, queryClient, selected, state.medicationId, state.variantId]);
+    void prefetchPackagesForMedicine(queryClient, target.id, variantId);
+  }, [hydrated, medicationKey, medications, queryClient, state.medicationId, state.variantId]);
   const categoryEligible = catalog?.categoryEligible ?? true;
   const ineligibleReason = catalog?.ineligibleReason ?? null;
   const detailsMedication = medications.find((m) => m.id === detailsMedicationId) ?? null;
-
-  useEffect(() => {
-    if (!hydrated || !state.medicationId) return;
-    if (onlyMedication && state.medicationId !== onlyMedication.id) return;
-    setSelected(state.medicationId);
-  }, [hydrated, onlyMedication, state.medicationId]);
 
   async function handleContinue() {
     if (!selected) {
@@ -123,16 +117,16 @@ export default function MedicationsPage() {
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden scrollbar-hide">
           <div className="mx-auto mb-4 w-full min-w-0 max-w-[1220px] shrink-0 px-4 text-center onboarding-font sm:mb-6 sm:px-6">
             <h1 className="pt-6 text-[28px] font-medium leading-none tracking-[-0.5px] text-[#152A51] sm:pt-8 sm:text-[32px]">
-              Your medication
+              Your medications
             </h1>
             <p className="mx-auto mt-3.5 max-w-2xl text-[14px] font-normal leading-snug text-[#152A51]/80">
               {state.goalName
-                ? `This is the treatment for ${state.goalName}.`
-                : "This is the treatment for your selected goal."}
+                ? `Choose a treatment for ${state.goalName}.`
+                : "Choose a treatment for your selected goal."}
             </p>
           </div>
 
-          <div className="mx-auto flex w-full min-w-0 max-w-[420px] justify-center px-4 pb-4 pt-2 sm:px-6">
+          <div className="mx-auto grid w-full min-w-0 max-w-[1220px] grid-cols-1 justify-items-center gap-4 px-4 pb-4 pt-2 sm:grid-cols-2 sm:px-6 lg:grid-cols-3">
             {isLoading ? (
               <p className="col-span-full text-center text-sm text-[#152A51]/70">
                 Loading medications…
