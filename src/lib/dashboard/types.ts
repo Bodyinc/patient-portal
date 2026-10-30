@@ -45,6 +45,8 @@ export type DashboardPageDataDto = {
   consultationRequired: boolean;
   /** A consultation visit already exists for this treatment, including after it is finished. */
   consultationVisit: boolean;
+  /** The consultation intake form has been submitted for this treatment. */
+  intakeSubmitted: boolean;
   /** Latest medication request was rejected or cancelled — hide intake CTA and that treatment. */
   latestOrderClosed: boolean;
 };

@@ -5,7 +5,6 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import type { ConsultationsPageData } from "@/lib/consultations/types";
-import { formatPortalDate } from "@/lib/date-format";
 import { getDbMedicineImageSrc } from "@/lib/intake/medicine-image";
 import { cn } from "@/lib/utils";
 
@@ -52,7 +51,6 @@ export default function ConsultationsPageClient({ data }: ConsultationsPageClien
           <ul className="space-y-3">
             {data.plans.map((plan) => {
               const finished = plan.visitStatus === "closed" || Boolean(plan.endedAt);
-              const used = Boolean(plan.startedAt);
               const busy = pendingId === plan.subscriptionId;
               const imageSrc = getDbMedicineImageSrc(plan.imageSrc);
               const fields = [
@@ -62,9 +60,9 @@ export default function ConsultationsPageClient({ data }: ConsultationsPageClien
                   label: "Consultation",
                   value: !plan.startedAt
                     ? "1 included"
-                    : !plan.hasFormSubmission
-                      ? "Intake form pending"
-                      : `Started ${formatPortalDate(plan.startedAt)}`,
+                    : plan.hasFormSubmission
+                      ? "Intake form complete"
+                      : "Intake form pending",
                 },
               ];
 
@@ -112,9 +110,11 @@ export default function ConsultationsPageClient({ data }: ConsultationsPageClien
                           ? "Opening…"
                           : finished
                             ? "Support"
-                            : used || plan.hasFormSubmission
-                              ? "Open consultation"
-                              : "Start consultation"}
+                            : !plan.startedAt
+                              ? "Start consultation"
+                              : plan.hasFormSubmission
+                                ? "Open consultation"
+                                : "Complete intake form"}
                       </Button>
                     </div>
                   </div>
