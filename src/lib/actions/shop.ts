@@ -1,6 +1,7 @@
 "use server";
 
 import type { IntakeActionResult } from "@/lib/intake/types";
+import { userFacingMessage } from "@/lib/user-message";
 import { fetchShopCatalogData, fetchShopCategoriesData } from "@/lib/shop/service-data";
 import type { ShopCategoryDto, ShopMedicinesListDto, ShopSortOption } from "@/lib/shop/types";
 
@@ -12,7 +13,7 @@ export async function getShopCategories(): Promise<IntakeActionResult<ShopCatego
     return {
       ok: false,
       code: "fetch_error",
-      message: error instanceof Error ? error.message : "Unable to fetch shop categories.",
+      message: userFacingMessage(error, "We couldn't load the shop. Please refresh and try again."),
     };
   }
 }
@@ -28,7 +29,11 @@ export async function getShopMedicines(options: {
     const data = await fetchShopCatalogData(options);
     return { ok: true, data };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to fetch shop catalog.";
+    const raw = error instanceof Error ? error.message : "";
+    const message = userFacingMessage(
+      raw,
+      "We couldn't load the shop. Please refresh and try again.",
+    );
     return {
       ok: false,
       code: message === "Category not found." ? "not_found" : "fetch_error",

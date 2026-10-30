@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
+import { userFacingMessage } from "@/lib/user-message";
 import { getPatientDisplayIdentity } from "@/lib/profile/identity";
 import { getOrCreateStripeCustomer } from "@/lib/stripe/customers";
 import {
@@ -21,7 +22,7 @@ async function requireCustomer() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user)
-    return { error: NextResponse.json({ error: "Authentication required." }, { status: 401 }) };
+    return { error: NextResponse.json({ error: "Sign in to continue." }, { status: 401 }) };
 
   const identity = await getPatientDisplayIdentity(user.id);
   const customerId = await getOrCreateStripeCustomer({
@@ -41,7 +42,7 @@ export async function POST() {
     return NextResponse.json({ clientSecret });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unable to start card update." },
+      { error: userFacingMessage(error, "We couldn't start the card update. Please try again.") },
       { status: 500 },
     );
   }
@@ -87,7 +88,7 @@ export async function PUT(request: Request) {
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unable to update card." },
+      { error: userFacingMessage(error, "We couldn't update your card. Please try again.") },
       { status: 500 },
     );
   }

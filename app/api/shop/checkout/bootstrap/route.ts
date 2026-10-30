@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getShopServiceMode } from "@/lib/shop/service-config";
+import { userFacingMessage } from "@/lib/user-message";
 import { fetchShopCheckoutBootstrapData } from "@/lib/shop/service-data";
 import { toErrorResponse, toSuccessResponse } from "@/lib/shop/service-response";
 import type { ShopCheckoutBootstrapPayload, ShopServiceResponse } from "@/lib/shop/service-types";
@@ -37,7 +38,10 @@ export async function GET(request: Request) {
     const response = toErrorResponse<ShopCheckoutBootstrapPayload>({
       error: {
         code: "fetch_error",
-        message: error instanceof Error ? error.message : "Unable to load checkout data.",
+        message: userFacingMessage(
+          error,
+          "We couldn't load checkout. Please refresh and try again.",
+        ),
       },
       correlationId,
       mode,

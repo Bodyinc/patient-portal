@@ -8,6 +8,7 @@ import {
 } from "@/lib/billing/cancel-reasons";
 import type Stripe from "stripe";
 import { createClient } from "@/lib/supabase/server";
+import { userFacingMessage } from "@/lib/user-message";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { cancelSubscriptionAtPeriodEnd } from "@/lib/stripe/subscriptions";
 import { sendTransactionalEmail } from "@/lib/email/send";
@@ -33,24 +34,30 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+    return NextResponse.json({ error: "Sign in to continue." }, { status: 401 });
   }
 
   let body: Body;
   try {
     body = (await request.json()) as Body;
   } catch {
-    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Something went wrong. Please refresh and try again." },
+      { status: 400 },
+    );
   }
 
   const { subscriptionId, reasons, otherText } = body;
   if (!subscriptionId) {
-    return NextResponse.json({ error: "subscriptionId is required." }, { status: 400 });
+    return NextResponse.json(
+      { error: "We couldn't cancel that subscription. Please refresh and try again." },
+      { status: 400 },
+    );
   }
 
   if (!reasons?.length) {
     return NextResponse.json(
-      { error: "At least one cancellation reason is required." },
+      { error: "Choose at least one reason before continuing." },
       { status: 400 },
     );
   }
@@ -167,12 +174,11 @@ export async function POST(request: Request) {
       currentPeriodEnd,
     });
   } catch (error) {
-    const message =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: unknown }).message)
-        : error instanceof Error
-          ? error.message
-          : "Unable to cancel subscription.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: userFacingMessage(error, "We couldn't cancel that subscription. Please try again."),
+      },
+      { status: 500 },
+    );
   }
 }

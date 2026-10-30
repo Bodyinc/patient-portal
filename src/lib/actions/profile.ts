@@ -8,10 +8,12 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { PROFILE_AVATAR_MAX_BYTES, PROFILE_AVATAR_MAX_LABEL } from "@/lib/profile/avatar";
 import { propagatePatientNameChange } from "@/lib/profile/identity";
+import { isUsStateCode, US_COUNTRY_CODE } from "@/lib/profile/us-states";
+import { userFacingMessage } from "@/lib/user-message";
 import {
   OPTIONAL_DOB_SCHEMA,
-  OPTIONAL_ZIP_CODE_SCHEMA,
   PHONE_SCHEMA,
+  ZIP_CODE_SCHEMA,
   DEFAULT_PHONE_COUNTRY_CODE,
   digitsOnlyPhone,
   digitsOnlyZip,
@@ -26,11 +28,18 @@ const profileUpdateSchema = z.object({
   phone: PHONE_SCHEMA,
   dob: OPTIONAL_DOB_SCHEMA,
   sex: z.enum(["male", "female", "other"], { error: "Select your sex" }).nullable(),
-  stateCode: z.string().trim().max(2).optional().or(z.literal("")),
-  streetAddress: z.string().trim().max(255).optional().or(z.literal("")),
-  apartment: z.string().trim().max(60).optional().or(z.literal("")),
-  city: z.string().trim().max(120).optional().or(z.literal("")),
-  postalCode: OPTIONAL_ZIP_CODE_SCHEMA,
+  stateCode: z
+    .string()
+    .trim()
+    .refine((value) => isUsStateCode(value), "Select your state."),
+  streetAddress: z
+    .string()
+    .trim()
+    .min(1, "Enter your street address.")
+    .max(255, "Enter a shorter street address."),
+  apartment: z.string().trim().max(60, "Enter a shorter apartment number."),
+  city: z.string().trim().min(1, "Enter your city.").max(120, "Enter a shorter city."),
+  postalCode: ZIP_CODE_SCHEMA,
   country: z.string().trim().max(120).optional().or(z.literal("")),
   avatarUrl: z.string().trim().url().optional().or(z.literal("")),
 });
@@ -83,12 +92,14 @@ function mapProfile(profile: ProfileEditableRow): EditableProfileDto {
     phone: digitsOnlyPhone(profile.phone ?? "", DEFAULT_PHONE_COUNTRY_CODE),
     dob: profile.dob ?? "",
     sex: profile.sex ?? null,
-    stateCode: profile.state_code ?? "",
+    stateCode: isUsStateCode(profile.state_code)
+      ? (profile.state_code ?? "").trim().toUpperCase()
+      : "",
     streetAddress: profile.street_address ?? "",
     apartment: profile.apartment ?? "",
     city: profile.city ?? "",
     postalCode: digitsOnlyZip(profile.postal_code ?? ""),
-    country: profile.country ?? "",
+    country: US_COUNTRY_CODE,
     avatarUrl: profile.avatar_url ?? "",
   };
 }
@@ -144,7 +155,14 @@ export async function getMyProfile(): Promise<ProfileActionResult<EditableProfil
     .maybeSingle();
 
   if (error || !profile) {
-    return { ok: false, code: "not_found", message: error?.message ?? "Profile not found." };
+    return {
+      ok: false,
+      code: "not_found",
+      message: userFacingMessage(
+        error?.message,
+        "We couldn't load your profile. Please refresh and try again.",
+      ),
+    };
   }
 
   return { ok: true, data: mapProfile(profile as ProfileEditableRow) };
@@ -174,12 +192,12 @@ export async function updateMyProfile(
     phone: digitsOnlyPhone(data.phone, DEFAULT_PHONE_COUNTRY_CODE) || null,
     dob: data.dob || null,
     sex: data.sex,
-    state_code: data.stateCode || null,
-    street_address: data.streetAddress || null,
+    state_code: data.stateCode.trim().toUpperCase(),
+    street_address: data.streetAddress,
     apartment: data.apartment || null,
-    city: data.city || null,
-    postal_code: data.postalCode || null,
-    country: data.country || null,
+    city: data.city,
+    postal_code: data.postalCode,
+    country: US_COUNTRY_CODE,
     avatar_url: data.avatarUrl || null,
   };
 
@@ -191,7 +209,14 @@ export async function updateMyProfile(
     .single();
 
   if (error || !updated) {
-    return { ok: false, code: "save_error", message: error?.message ?? "Could not save profile." };
+    return {
+      ok: false,
+      code: "save_error",
+      message: userFacingMessage(
+        error?.message,
+        "We couldn't save your profile. Please try again.",
+      ),
+    };
   }
 
   const saved = updated as ProfileEditableRow;
@@ -245,13 +270,24 @@ export async function uploadProfileAvatar(
     .upload(filePath, bytes, { contentType: file.type, upsert: true });
 
   if (uploadError) {
-    return { ok: false, code: "upload_error", message: uploadError.message };
+    return {
+      ok: false,
+      code: "upload_error",
+      message: userFacingMessage(
+        uploadError.message,
+        "We couldn't upload that photo. Please choose a different image.",
+      ),
+    };
   }
 
   const { data: publicData } = supabaseAdmin.storage.from("profile-avatars").getPublicUrl(filePath);
 
   if (!publicData.publicUrl) {
-    return { ok: false, code: "url_error", message: "Could not resolve avatar URL." };
+    return {
+      ok: false,
+      code: "url_error",
+      message: "We couldn't upload that photo. Please choose a different image.",
+    };
   }
 
   return { ok: true, data: { avatarUrl: publicData.publicUrl } };

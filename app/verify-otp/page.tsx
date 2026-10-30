@@ -16,6 +16,7 @@ import {
   sendPatientLoginOtp,
 } from "@/lib/actions/patient-auth";
 import { createClient } from "@/lib/supabase/client";
+import { userFacingMessage } from "@/lib/user-message";
 
 function VerifyOTPContent() {
   const router = useRouter();
@@ -53,7 +54,9 @@ function VerifyOTPContent() {
           type: "email",
         });
         if (fallback.error) {
-          toast.error(fallback.error.message);
+          toast.error(
+            userFacingMessage(fallback.error.message, "That code didn't match. Please try again."),
+          );
           return;
         }
       }

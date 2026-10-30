@@ -1,5 +1,7 @@
 import { loadStripe, type Stripe } from "@stripe/stripe-js";
 
+import { userFacingMessage } from "@/lib/user-message";
+
 let stripePromise: Promise<Stripe | null> | undefined;
 
 export function getStripeJs(): Promise<Stripe | null> {
@@ -23,5 +25,5 @@ export function paymentErrorMessage(
   if (decline === "live_mode_test_card" || /known test card/i.test(message)) {
     return "This is a test card. Enter a real debit or credit card to pay.";
   }
-  return message || fallback;
+  return userFacingMessage(message, fallback);
 }

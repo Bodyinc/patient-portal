@@ -23,6 +23,7 @@ import { sendOnce, wasEmailSent } from "@/lib/email/idempotency";
 import { sendTransactionalEmail } from "@/lib/email/send";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { userFacingMessage } from "@/lib/user-message";
 import { userHasSetPassword } from "@/lib/auth/password-state";
 import { stripe } from "@/lib/stripe/server";
 
@@ -167,7 +168,13 @@ export async function setInitialPassword(rawPassword: string): Promise<SetInitia
 
   const { error } = await supabase.auth.updateUser({ password: parsed.data });
   if (error) {
-    return { ok: false, message: error.message ?? "Could not set your password." };
+    return {
+      ok: false,
+      message: userFacingMessage(
+        error.message,
+        "We couldn't save your password. Please try again.",
+      ),
+    };
   }
 
   // app_metadata is replaced wholesale by updateUserById — spread the existing object or the
@@ -407,7 +414,7 @@ export async function completePostCheckoutSignIn(): Promise<CompletePostCheckout
     return {
       ok: false,
       code: "error",
-      message: error?.message ?? "Could not start your session. Please try logging in.",
+      message: userFacingMessage(error?.message, "We couldn't sign you in. Please try logging in."),
     };
   }
 
@@ -432,7 +439,12 @@ export async function sendPatientLoginOtp(
       redirectTo: `${appUrl()}/verify-otp?purpose=${encodeURIComponent(purpose)}`,
     },
   });
-  if (error) return { ok: false, message: error.message };
+  if (error) {
+    return {
+      ok: false,
+      message: userFacingMessage(error.message, "We couldn't send the code. Please try again."),
+    };
+  }
 
   const code = data?.properties?.email_otp?.trim();
   if (!code) {

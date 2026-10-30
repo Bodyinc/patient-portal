@@ -1,4 +1,5 @@
 import { requirePatientSession } from "@/lib/auth/require-patient";
+import { userFacingMessage } from "@/lib/user-message";
 import { fetchConsultationsPageData } from "@/lib/consultations/service-data";
 
 import ConsultationsPageClient from "./_components/ConsultationsPageClient";
@@ -17,7 +18,10 @@ export default async function ConsultationsPage() {
     return (
       <main className="min-w-0 flex-1 p-4">
         <div className="rounded-[16px] border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error instanceof Error ? error.message : "Unable to load consultations."}
+          {userFacingMessage(
+            error,
+            "We couldn't load your consultations. Please refresh and try again.",
+          )}
         </div>
       </main>
     );

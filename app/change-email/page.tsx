@@ -12,6 +12,7 @@ import AuthPageShell, {
 } from "@/components/AuthPageShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { RequiredMark } from "@/components/required-mark";
 import { Label } from "@/components/ui/label";
 import { changeCheckoutEmail, sendPatientLoginOtp } from "@/lib/actions/patient-auth";
 
@@ -66,7 +67,7 @@ function ChangeEmailContent() {
       <form onSubmit={onSubmit} className="space-y-6">
         <div className="space-y-2">
           <Label htmlFor="change-email" className="text-[14px] font-semibold text-[#152A51]">
-            New Email Address
+            New Email Address <RequiredMark />
           </Label>
           <Input
             id="change-email"

@@ -8,8 +8,10 @@ import { formatSavedCardLabel, getDefaultPaymentMethod } from "@/lib/stripe/paym
 import { createSubscriptionForPrice } from "@/lib/stripe/subscriptions";
 import { resolveCheckoutDiscount, incrementPromoRedemption } from "@/lib/stripe/promos";
 import { getManualRefillBlock } from "@/lib/orders/refill-eligibility";
+import { missingOrderDetailsMessage } from "@/lib/profile/shipping-address";
 import { computeShopOrderFees } from "@/lib/shop/order-fees";
 import { getPlatformSettings } from "@/lib/settings/platform-settings";
+import { userFacingMessage } from "@/lib/user-message";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,7 +29,7 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+    return NextResponse.json({ error: "Sign in to continue." }, { status: 401 });
   }
 
   if ((await getPlatformSettings()).maintenance_mode) {
@@ -43,15 +45,38 @@ export async function POST(request: Request) {
   try {
     body = (await request.json()) as Body;
   } catch {
-    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Something went wrong. Please refresh and try again." },
+      { status: 400 },
+    );
   }
 
   const { medicineId, packageId } = body;
   if (!medicineId || !packageId) {
-    return NextResponse.json({ error: "medicineId and packageId are required." }, { status: 400 });
+    return NextResponse.json({ error: "Select a plan before continuing." }, { status: 400 });
   }
 
   try {
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("full_name, phone, state_code, street_address, city, postal_code")
+      .eq("id", user.id)
+      .maybeSingle();
+    const missingDetails = missingOrderDetailsMessage(
+      {
+        fullName: profile?.full_name,
+        phone: profile?.phone,
+        stateCode: profile?.state_code,
+        streetAddress: profile?.street_address,
+        city: profile?.city,
+        postalCode: profile?.postal_code,
+      },
+      "profile",
+    );
+    if (missingDetails) {
+      return NextResponse.json({ error: missingDetails }, { status: 400 });
+    }
+
     // These three reads are independent — package details, order fees, and the Stripe customer
     // all only depend on inputs we already have, so fetch them in one parallel wave.
     const [{ data: pkg, error: pkgError }, fees, customerId] = await Promise.all([
@@ -74,7 +99,12 @@ export async function POST(request: Request) {
 
     if (pkgError) {
       return NextResponse.json(
-        { error: `Could not load plan: ${pkgError.message}` },
+        {
+          error: userFacingMessage(
+            pkgError.message,
+            "We couldn't load that plan. Please try again.",
+          ),
+        },
         { status: 500 },
       );
     }
@@ -133,7 +163,9 @@ export async function POST(request: Request) {
       .single();
 
     if (orderError || !order) {
-      throw new Error(orderError?.message ?? "Unable to create order.");
+      throw new Error(
+        userFacingMessage(orderError?.message, "We couldn't start your order. Please try again."),
+      );
     }
 
     // Consultation is one-time; shipping is a recurring subscription item (below) so it is
@@ -203,7 +235,7 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unable to start checkout." },
+      { error: userFacingMessage(error, "Unable to start checkout. Please try again.") },
       { status: 500 },
     );
   }

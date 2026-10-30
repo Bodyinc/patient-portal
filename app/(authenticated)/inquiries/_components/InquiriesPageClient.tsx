@@ -5,17 +5,9 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { confirmInquirySolved, replyToInquiry, type PatientInquiry } from "@/lib/actions/feedback";
+import { RequiredMark } from "@/components/required-mark";
+import { formatPortalDateTime } from "@/lib/date-format";
 import { canPatientConfirm, canPatientReply, feedbackStatusLabel } from "@/lib/feedback-status";
-
-function formatDateTime(iso: string) {
-  return new Date(iso).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
 
 function statusClass(status: string) {
   switch (status) {
@@ -80,7 +72,9 @@ function InquiryCard({ inquiry }: { inquiry: PatientInquiry }) {
           <p className="line-clamp-2 text-[15px] font-medium leading-snug text-[#152A51]">
             {inquiry.message}
           </p>
-          <p className="mt-1 text-[13px] text-[#152A51]/60">{formatDateTime(inquiry.updated_at)}</p>
+          <p className="mt-1 text-[13px] text-[#152A51]/60">
+            {formatPortalDateTime(inquiry.updated_at)}
+          </p>
         </div>
         <span
           className={`shrink-0 rounded-full px-3 py-1 text-[12px] font-medium ${statusClass(inquiry.status)}`}
@@ -115,7 +109,7 @@ function InquiryCard({ inquiry }: { inquiry: PatientInquiry }) {
                 }`}
               >
                 {item.author_role === "admin" ? "Body Inc team" : "You"} ·{" "}
-                {formatDateTime(item.created_at)}
+                {formatPortalDateTime(item.created_at)}
               </p>
               <p
                 className={`whitespace-pre-wrap text-[14px] leading-relaxed ${
@@ -146,7 +140,14 @@ function InquiryCard({ inquiry }: { inquiry: PatientInquiry }) {
 
           {allowReply ? (
             <div>
+              <label
+                htmlFor={`reply-${inquiry.id}`}
+                className="mb-2 block text-[14px] text-[#152A51]"
+              >
+                Your reply <RequiredMark />
+              </label>
               <textarea
+                id={`reply-${inquiry.id}`}
                 value={reply}
                 onChange={(event) => setReply(event.target.value)}
                 rows={3}

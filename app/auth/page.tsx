@@ -14,6 +14,7 @@ import AuthPageShell, {
 } from "@/components/AuthPageShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { RequiredMark } from "@/components/required-mark";
 import { Label } from "@/components/ui/label";
 import { onLoginSuccess } from "@/lib/auth/on-login-success";
 import { WRONG_PORTAL_GENERIC_MESSAGE, wrongPortalMessage } from "@/lib/auth/constants";
@@ -126,7 +127,7 @@ function LoginForm() {
     <form onSubmit={onSubmit} className="space-y-6 sm:space-y-7">
       <div className="space-y-2">
         <Label htmlFor="login-email" className="text-[14px] font-semibold leading-5 text-[#152A51]">
-          Email Address
+          Email Address <RequiredMark />
         </Label>
 
         <Input
@@ -147,7 +148,7 @@ function LoginForm() {
           htmlFor="login-password"
           className="text-[14px] font-semibold leading-5 text-[#152A51]"
         >
-          Password
+          Password <RequiredMark />
         </Label>
 
         <Input

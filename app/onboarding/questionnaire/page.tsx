@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { saveQuestionnaireResponses } from "@/lib/actions/intake";
+import { userFacingMessage } from "@/lib/user-message";
 import { booleanAnswerIsDisqualifying, isQuestionAnswered } from "@/lib/intake/questionnaire";
 import type {
   QuestionDto,
@@ -237,7 +238,10 @@ export default function QuestionnairePage() {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4">
         <p className="text-center text-[14px] text-red-600 onboarding-font">
-          {error instanceof Error ? error.message : "Could not load questionnaire."}
+          {userFacingMessage(
+            error,
+            "We couldn't load the questionnaire. Please refresh and try again.",
+          )}
         </p>
         <button
           type="button"

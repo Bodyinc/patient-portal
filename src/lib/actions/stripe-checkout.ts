@@ -2,7 +2,9 @@
 
 import { loadCheckoutCart } from "@/lib/intake/session-cart";
 import { requireIntakeSession } from "@/lib/intake/session";
+import { missingOrderDetailsMessage } from "@/lib/profile/shipping-address";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { userFacingMessage } from "@/lib/user-message";
 import { createGuestStripeCustomer } from "@/lib/stripe/customers";
 import { createSubscriptionForPrice, ensureNoActiveDuplicate } from "@/lib/stripe/subscriptions";
 import { resolveCheckoutDiscount } from "@/lib/stripe/promos";
@@ -32,12 +34,30 @@ export async function createOnboardingSubscription(
 
   const sessionResult = await requireIntakeSession();
   if ("error" in sessionResult) {
-    return { ok: false, message: sessionResult.error };
+    return {
+      ok: false,
+      message: userFacingMessage(sessionResult.error, "Your session expired. Please start again."),
+    };
   }
 
   const session = sessionResult.session;
   if (!session.email) {
     return { ok: false, message: "Add your email before checkout." };
+  }
+
+  const missingDetails = missingOrderDetailsMessage(
+    {
+      fullName: session.full_name,
+      phone: session.phone,
+      stateCode: session.state_code,
+      streetAddress: session.street_address,
+      city: session.city,
+      postalCode: session.postal_code,
+    },
+    "intake",
+  );
+  if (missingDetails) {
+    return { ok: false, message: missingDetails };
   }
   if (!session.selected_plan_id) {
     return { ok: false, message: "Select a treatment plan first." };
@@ -52,7 +72,10 @@ export async function createOnboardingSubscription(
     .maybeSingle();
 
   if (pkgError) {
-    return { ok: false, message: `Could not load plan: ${pkgError.message}` };
+    return {
+      ok: false,
+      message: userFacingMessage(pkgError.message, "We couldn't load that plan. Please try again."),
+    };
   }
   if (!pkg) {
     return { ok: false, message: "Selected plan was not found." };
@@ -162,10 +185,10 @@ export async function createOnboardingSubscription(
       },
     }));
   } catch (error) {
+    console.error("[checkout] createOnboardingSubscription failed:", error);
     return {
       ok: false,
-      message:
-        error instanceof Error ? error.message : "Unable to start payment. Please try again.",
+      message: userFacingMessage(error, "Unable to start payment. Please try again."),
     };
   }
 

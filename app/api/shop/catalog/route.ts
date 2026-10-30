@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getShopMedicines } from "@/lib/actions/shop";
+import { userFacingMessage } from "@/lib/user-message";
 import { getShopServiceMode, parseShopServiceMode } from "@/lib/shop/service-config";
 import { fetchShopCatalogData } from "@/lib/shop/service-data";
 import { toErrorResponse, toSuccessResponse } from "@/lib/shop/service-response";
@@ -115,8 +116,12 @@ export async function GET(request: Request) {
     });
     return withCacheHeaders(NextResponse.json(response));
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to fetch catalog.";
-    const isNotFound = message === "Category not found.";
+    const raw = error instanceof Error ? error.message : "";
+    const isNotFound = raw === "Category not found.";
+    const message = userFacingMessage(
+      raw,
+      "We couldn't load the shop. Please refresh and try again.",
+    );
     const response = toErrorResponse<ShopCatalogPayload>({
       error: {
         code: isNotFound ? "not_found" : "fetch_error",

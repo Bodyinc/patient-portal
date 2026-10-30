@@ -11,6 +11,7 @@ import PlanSelector from "./PlanSelector";
 import ReferralCard from "./ReferralCard";
 import SelectedProductCard from "./SelectedProductCard";
 import { getCheckoutDiscount } from "@/lib/actions/stripe-checkout";
+import { userFacingMessage } from "@/lib/user-message";
 import { getShopOrderFees } from "@/lib/actions/fees";
 import { getStripeJs } from "@/lib/stripe/client";
 import type { CheckoutBootstrap, CheckoutPlanId } from "./types";
@@ -146,7 +147,9 @@ export default function ShopCheckoutClient({
           error?: string;
         };
         if (!response.ok || !data.orderId) {
-          throw new Error(data.error ?? "Unable to start checkout.");
+          throw new Error(
+            userFacingMessage(data.error, "We couldn't start checkout. Please try again."),
+          );
         }
 
         if (data.paid) {
@@ -167,7 +170,7 @@ export default function ShopCheckoutClient({
         });
         setModalOpen(true);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Unable to start checkout.");
+        setError(userFacingMessage(err, "We couldn't start checkout. Please try again."));
       }
     });
   }

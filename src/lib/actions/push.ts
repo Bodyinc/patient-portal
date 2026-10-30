@@ -5,6 +5,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { isPushConfigured, sendPushToUser } from "@/lib/push/send";
+import { userFacingMessage } from "@/lib/user-message";
 
 const subscriptionSchema = z.object({
   endpoint: z.string().url().max(2000),
@@ -28,24 +29,29 @@ export async function savePushSubscription(input: {
   auth: string;
 }): Promise<PushActionResult> {
   if (!isPushConfigured()) {
-    return { ok: false, message: "Push notifications are not configured on this server." };
+    return {
+      ok: false,
+      message: "Notifications aren't available right now. Please try again later.",
+    };
   }
 
   const parsed = subscriptionSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, message: "Invalid push subscription." };
+  if (!parsed.success) {
+    return { ok: false, message: "We couldn't turn on notifications. Please try again." };
+  }
 
   let endpointUrl: URL;
   try {
     endpointUrl = new URL(parsed.data.endpoint);
   } catch {
-    return { ok: false, message: "Invalid push subscription." };
+    return { ok: false, message: "We couldn't turn on notifications. Please try again." };
   }
   if (endpointUrl.protocol !== "https:") {
-    return { ok: false, message: "Invalid push subscription." };
+    return { ok: false, message: "We couldn't turn on notifications. Please try again." };
   }
 
   const userId = await requireUserId();
-  if (!userId) return { ok: false, message: "Not signed in" };
+  if (!userId) return { ok: false, message: "Sign in to continue." };
 
   const { error } = await supabaseAdmin.from("push_subscriptions").upsert(
     {
@@ -57,31 +63,52 @@ export async function savePushSubscription(input: {
     },
     { onConflict: "user_id,endpoint" },
   );
-  if (error) return { ok: false, message: error.message };
+  if (error) {
+    return {
+      ok: false,
+      message: userFacingMessage(
+        error.message,
+        "We couldn't update notifications. Please try again.",
+      ),
+    };
+  }
   return { ok: true };
 }
 
 export async function removePushSubscription(endpoint: string): Promise<PushActionResult> {
   const parsed = z.string().url().max(2000).safeParse(endpoint);
-  if (!parsed.success) return { ok: false, message: "Invalid push subscription." };
+  if (!parsed.success) {
+    return { ok: false, message: "We couldn't turn on notifications. Please try again." };
+  }
 
   const userId = await requireUserId();
-  if (!userId) return { ok: false, message: "Not signed in" };
+  if (!userId) return { ok: false, message: "Sign in to continue." };
 
   const { error } = await supabaseAdmin
     .from("push_subscriptions")
     .delete()
     .eq("user_id", userId)
     .eq("endpoint", parsed.data);
-  if (error) return { ok: false, message: error.message };
+  if (error) {
+    return {
+      ok: false,
+      message: userFacingMessage(
+        error.message,
+        "We couldn't update notifications. Please try again.",
+      ),
+    };
+  }
   return { ok: true };
 }
 
 export async function sendTestPush(): Promise<PushActionResult> {
   const userId = await requireUserId();
-  if (!userId) return { ok: false, message: "Not signed in" };
+  if (!userId) return { ok: false, message: "Sign in to continue." };
   if (!isPushConfigured()) {
-    return { ok: false, message: "Push notifications are not configured on this server." };
+    return {
+      ok: false,
+      message: "Notifications aren't available right now. Please try again later.",
+    };
   }
 
   const delivered = await sendPushToUser(userId, {

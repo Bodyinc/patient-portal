@@ -12,6 +12,7 @@ import AuthPageShell, {
 } from "@/components/AuthPageShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { RequiredMark } from "@/components/required-mark";
 import { Label } from "@/components/ui/label";
 import { onLoginSuccess } from "@/lib/auth/on-login-success";
 import { markPasswordSet } from "@/lib/actions/patient-auth";
@@ -161,7 +162,7 @@ export function ResetPasswordForm({ recovery, error }: ResetPasswordFormProps) {
             <form onSubmit={onSubmit} className="space-y-5 text-left">
               <div>
                 <Label htmlFor="np" className="mb-2 block text-[14px] font-semibold text-[#152A51]">
-                  New Password
+                  New Password <RequiredMark />
                 </Label>
 
                 <Input
@@ -183,7 +184,7 @@ export function ResetPasswordForm({ recovery, error }: ResetPasswordFormProps) {
                   htmlFor="np2"
                   className="mb-2 block text-[14px] font-semibold text-[#152A51]"
                 >
-                  Confirm Password
+                  Confirm Password <RequiredMark />
                 </Label>
 
                 <Input

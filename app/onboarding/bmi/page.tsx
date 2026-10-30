@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Ruler, Weight } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
+import { RequiredMark } from "@/components/required-mark";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { saveIntakeBmi } from "@/lib/actions/intake";
@@ -180,7 +181,9 @@ export default function BmiPage() {
     >
       <div className="space-y-4">
         <div className="space-y-4 text-left">
-          <Label className={fieldLabelClass}>Height</Label>
+          <Label className={fieldLabelClass}>
+            Height <RequiredMark />
+          </Label>
           <div className="grid grid-cols-2 gap-3">
             <div className="relative">
               <Ruler
@@ -236,7 +239,7 @@ export default function BmiPage() {
 
         <div className="space-y-4 text-left">
           <Label htmlFor="weight" className={fieldLabelClass}>
-            Current weight
+            Current weight <RequiredMark />
           </Label>
           <div className="relative">
             <Weight

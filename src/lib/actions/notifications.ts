@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { userFacingMessage } from "@/lib/user-message";
 import {
   fetchPatientNotifications,
   type PatientNotificationDto,
@@ -16,7 +17,7 @@ export async function getMyNotifications(): Promise<NotificationsResult> {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return { ok: false, message: "Not signed in" };
+    return { ok: false, message: "Sign in to continue." };
   }
 
   try {
@@ -25,7 +26,10 @@ export async function getMyNotifications(): Promise<NotificationsResult> {
   } catch (error) {
     return {
       ok: false,
-      message: error instanceof Error ? error.message : "Unable to load notifications",
+      message: userFacingMessage(
+        error,
+        "We couldn't load your notifications. Please refresh and try again.",
+      ),
     };
   }
 }

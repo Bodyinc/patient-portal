@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
+import { formatPortalDate } from "@/lib/date-format";
 import Script from "next/script";
 import { useRouter } from "next/navigation";
 import {
@@ -263,27 +264,7 @@ declare global {
 }
 
 function getDateDividerLabel(timestamp: number): string {
-  const msgDate = new Date(timestamp);
-  const now = new Date();
-  const isToday =
-    msgDate.getFullYear() === now.getFullYear() &&
-    msgDate.getMonth() === now.getMonth() &&
-    msgDate.getDate() === now.getDate();
-  if (isToday) return "Today";
-
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const isYesterday =
-    msgDate.getFullYear() === yesterday.getFullYear() &&
-    msgDate.getMonth() === yesterday.getMonth() &&
-    msgDate.getDate() === yesterday.getDate();
-  if (isYesterday) return "Yesterday";
-
-  return msgDate.toLocaleDateString([], {
-    month: "short",
-    day: "numeric",
-    year: msgDate.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
-  });
+  return formatPortalDate(new Date(timestamp));
 }
 
 export default function QuickbloxConsultationRoom({
@@ -1454,7 +1435,7 @@ export default function QuickbloxConsultationRoom({
 
                   return (
                     <div key={msg.id} className="space-y-2.5">
-                      {/* Date Divider Pill (e.g. "Today", "Yesterday") */}
+                      {/* Date divider, MM/DD/YYYY */}
                       {showDateDivider && dateLabel ? (
                         <div className="my-2.5 flex justify-center">
                           <span className="rounded-full bg-[#E5ECF0]/85 px-3.5 py-0.5 text-[11px] font-medium text-[#152A51]/75 shadow-2xs">
@@ -1798,7 +1779,7 @@ export default function QuickbloxConsultationRoom({
                       <div>
                         <h3 className="font-semibold text-[#152A51]">{patientData.fullName}</h3>
                         <p className="text-xs text-[#152A51]/60">
-                          DOB: {patientData.dob || "—"}{" "}
+                          DOB: {formatPortalDate(patientData.dob)}{" "}
                           {patientData.age ? `(${patientData.age} years)` : ""}
                         </p>
                       </div>
