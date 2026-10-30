@@ -135,11 +135,18 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
           ) : data.consultationRequired || data.consultationVisit ? (
             <>
               <h3 className="text-[26px] font-medium leading-snug tracking-[-0.3px] text-[#152A51]">
-                Ready to begin your treatment journey?
+                {consultationStatus === "closed"
+                  ? "Your consultation is complete"
+                  : data.intakeSubmitted
+                    ? "Your intake form is complete"
+                    : "Ready to begin your treatment journey?"}
               </h3>
               <p className="mt-3 max-w-xl text-sm leading-relaxed text-[#152A51]/80 sm:text-[15px] sm:leading-7">
-                Complete your intake form to start your consultation with a licensed clinician.
-                Please answer all questions to the best of your ability.
+                {consultationStatus === "closed"
+                  ? "This visit is finished. Open it if you need support from your care team."
+                  : data.intakeSubmitted
+                    ? "Your consultation is open. Continue the visit with your clinician."
+                    : "Complete your intake form to start your consultation with a licensed clinician. Please answer all questions to the best of your ability."}
               </p>
               <div className="mt-auto pt-5">
                 {data.latestOrderClosed ? null : consultationStatus === "closed" &&
@@ -148,12 +155,25 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
                     subscriptionId={data.treatment.subscriptionId}
                     label="Support"
                   />
+                ) : data.intakeSubmitted && data.treatment?.subscriptionId ? (
+                  <DashboardConsultationButton
+                    subscriptionId={data.treatment.subscriptionId}
+                    label="Open consultation"
+                  />
                 ) : (
                   <Button
                     asChild
                     className="h-[46px] w-full rounded-full bg-[#E3E084] px-6 text-sm font-medium text-[#152A51] hover:bg-[#D9D674] sm:w-fit"
                   >
-                    <Link href="/consultations">Complete intake form</Link>
+                    <Link
+                      href={
+                        data.treatment?.subscriptionId
+                          ? `/consultations/open/${data.treatment.subscriptionId}`
+                          : "/consultations"
+                      }
+                    >
+                      Complete intake form
+                    </Link>
                   </Button>
                 )}
               </div>
@@ -238,7 +258,13 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
                 (consultationStatus === "open" || consultationStatus === "closed") ? (
                   <DashboardConsultationButton
                     subscriptionId={data.treatment.subscriptionId!}
-                    label={consultationStatus === "closed" ? "Support" : "Open consultation"}
+                    label={
+                      consultationStatus === "closed"
+                        ? "Support"
+                        : data.intakeSubmitted
+                          ? "Open consultation"
+                          : "Complete intake form"
+                    }
                   />
                 ) : null}
                 {canRefill ? (

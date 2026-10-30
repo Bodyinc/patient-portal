@@ -1,6 +1,7 @@
 import "server-only";
 
 import { sessionRequiresConsultation } from "@/lib/consultations/eligibility";
+import { findCompletedIntakeSessionId } from "@/lib/intake/attach-intake";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 type PaymentRow = {
@@ -173,11 +174,23 @@ export async function ensureMedicationOrderForPayment(params: {
     variantId = pkg?.variant_id ?? null;
   }
 
+  const userId = subscription.user_id ?? payment.user_id;
+  let sessionId = subscription.session_id ?? payment.session_id;
+  if (!sessionId && userId) {
+    sessionId = await findCompletedIntakeSessionId(userId);
+    if (sessionId) {
+      await supabaseAdmin
+        .from("subscriptions")
+        .update({ session_id: sessionId })
+        .eq("id", subscription.id);
+    }
+  }
+
   const { data: inserted, error: insertError } = await supabaseAdmin
     .from("medication_requests")
     .insert({
-      user_id: subscription.user_id ?? payment.user_id,
-      session_id: subscription.session_id ?? payment.session_id,
+      user_id: userId,
+      session_id: sessionId,
       subscription_id: subscription.id,
       payment_id: payment.id,
       stripe_invoice_id: payment.stripe_invoice_id,

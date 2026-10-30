@@ -9,6 +9,7 @@ import { maybeReconcileIncompleteSubscription } from "@/lib/stripe/reconcile";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 import { consultationAnchorId } from "@/lib/checkout/group";
+import { attachExistingIntakeToOpenOrders } from "@/lib/intake/attach-intake";
 import { isQuickbloxConfigured } from "@/lib/consultations/config";
 import { loadConsultationEligibility } from "@/lib/consultations/eligibility";
 import { isConsultationFinishedEvent } from "@/lib/consultations/finished";
@@ -152,6 +153,7 @@ function isClosedOrderStatus(status: string | null | undefined): boolean {
 }
 
 export async function fetchDashboardPageData(userId: string): Promise<DashboardPageDataDto> {
+  const completedIntakeSessionId = await attachExistingIntakeToOpenOrders(userId);
   const [didReconcile, pendingPayments, identity, activeMeds, intake, requestRows, eligibility] =
     await Promise.all([
       maybeReconcileIncompleteSubscription(userId).catch((err) => {
@@ -205,6 +207,7 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
 
   const currentMed = visibleMeds[0] ?? null;
   let consultationStatus: DashboardTreatmentDto["consultationStatus"] = "none";
+  let intakeSubmitted = Boolean(completedIntakeSessionId);
   const consultationSubscriptionId = currentMed?.subscriptionId
     ? await consultationAnchorId(currentMed.subscriptionId)
     : null;
@@ -212,14 +215,19 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
     let visit: {
       qb_appointment_id: string;
       ended_at?: string | null;
+      form_submitted?: boolean | null;
+      form_submission_id?: string | null;
     } | null = null;
     const first = await supabaseAdmin
       .from("patient_consultations")
-      .select("qb_appointment_id, ended_at")
+      .select("qb_appointment_id, ended_at, form_submitted, form_submission_id")
       .eq("user_id", userId)
       .eq("subscription_id", consultationSubscriptionId)
       .maybeSingle();
-    if (first.error && /ended_at/i.test(first.error.message)) {
+    if (
+      first.error &&
+      (/ended_at/i.test(first.error.message) || /form_submitted/i.test(first.error.message))
+    ) {
       const retried = await supabaseAdmin
         .from("patient_consultations")
         .select("qb_appointment_id")
@@ -233,6 +241,8 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
       visit = first.data;
     }
 
+    if (visit?.form_submitted || visit?.form_submission_id) intakeSubmitted = true;
+
     if (visit?.qb_appointment_id) {
       consultationStatus = visit.ended_at ? "closed" : "open";
       // A still-open QuickBlox room must not undo a visit the provider already finished.
@@ -243,6 +253,7 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
         const live = (
           await fetchAppointmentStatuses([visit.qb_appointment_id], { clientToken })
         ).get(visit.qb_appointment_id);
+        if (live?.hasFormSubmission || live?.formSubmissionId) intakeSubmitted = true;
         if (live && !live.open) consultationStatus = "closed";
       }
     }
@@ -340,6 +351,7 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
     consultationVisit: Boolean(
       currentMed?.subscriptionId && eligibility.visitSubscriptionIds.has(currentMed.subscriptionId),
     ),
+    intakeSubmitted,
     latestOrderClosed,
   };
 }
