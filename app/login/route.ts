@@ -34,7 +34,9 @@ export async function GET(request: NextRequest) {
       headers,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to load login";
-    return new NextResponse(`Error loading login: ${message}`, { status: 502 });
+    console.error("[login] failed to load login page:", error);
+    return new NextResponse("We couldn't load the login page. Please refresh and try again.", {
+      status: 502,
+    });
   }
 }

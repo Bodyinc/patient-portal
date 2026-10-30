@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { RequiredMark } from "@/components/required-mark";
 import { Label } from "@/components/ui/label";
 import { setInitialPassword } from "@/lib/actions/patient-auth";
 import { fieldControlClass } from "../../_lib/onboarding-theme";
@@ -95,7 +96,7 @@ function SetPasswordForm({ onSuccess }: { onSuccess: () => void }) {
       <form onSubmit={onSubmit} className="space-y-4 p-5">
         <div>
           <Label htmlFor="onb-pw" className="mb-2 block text-[13px] font-medium text-[#152A51]">
-            Password
+            Password <RequiredMark />
           </Label>
           <Input
             id="onb-pw"
@@ -112,7 +113,7 @@ function SetPasswordForm({ onSuccess }: { onSuccess: () => void }) {
         </div>
         <div>
           <Label htmlFor="onb-pw2" className="mb-2 block text-[13px] font-medium text-[#152A51]">
-            Confirm Password
+            Confirm Password <RequiredMark />
           </Label>
           <Input
             id="onb-pw2"

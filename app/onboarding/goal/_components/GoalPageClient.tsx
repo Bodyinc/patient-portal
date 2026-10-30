@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { saveIntakeCategory } from "@/lib/actions/intake";
+import { userFacingMessage } from "@/lib/user-message";
 import { intakeQueryKeys } from "@/lib/intake/query-keys";
 import type { CategoryDto } from "@/lib/intake/types";
 
@@ -124,20 +125,16 @@ export default function GoalPageClient({ initialCategories, initialError }: Goal
         requiresQuestionnaire: result.data.requiresQuestionnaire,
       });
     } catch (err) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : typeof err === "string"
-            ? err
-            : "Unable to save your goal. Please try again.";
-      toast.error(message);
+      toast.error(userFacingMessage(err, "We couldn't save your goal. Please try again."));
       pushOnboardingRoute(router, "/onboarding/goal");
     }
   }
 
   const showError = isError || Boolean(initialError && categories.length === 0);
-  const errorMessage =
-    error instanceof Error ? error.message : initialError || "Unable to load goals right now.";
+  const errorMessage = userFacingMessage(
+    error,
+    initialError || "We couldn't load goals. Please refresh and try again.",
+  );
 
   return (
     <OnboardingStepLayout

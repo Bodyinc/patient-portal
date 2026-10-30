@@ -1,4 +1,5 @@
 import { requirePatientSession } from "@/lib/auth/require-patient";
+import { userFacingMessage } from "@/lib/user-message";
 import { fetchBillingPageData } from "@/lib/billing/service-data";
 import { getPatientDisplayIdentity } from "@/lib/profile/identity";
 import { getReferralSummary } from "@/lib/referrals";
@@ -78,7 +79,7 @@ export default async function BillingPage({
     return (
       <main className="min-w-0 flex-1 bg-white p-4">
         <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error instanceof Error ? error.message : "Unable to load billing data."}
+          {userFacingMessage(error, "We couldn't load billing. Please refresh and try again.")}
         </div>
       </main>
     );

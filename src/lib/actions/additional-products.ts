@@ -13,6 +13,7 @@ import type {
   PackageDto,
 } from "@/lib/intake/types";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { userFacingMessage } from "@/lib/user-message";
 import type { Json } from "@/lib/supabase/types";
 
 function parseFeatures(value: Json): string[] {
@@ -53,7 +54,15 @@ async function loadBlockedMedicineIds(medicineId: string) {
     .select("medicine_a_id, medicine_b_id, relationship")
     .or(`medicine_a_id.eq.${medicineId},medicine_b_id.eq.${medicineId}`);
 
-  if (error) return { ok: false as const, message: error.message };
+  if (error) {
+    return {
+      ok: false as const,
+      message: userFacingMessage(
+        error.message,
+        "We couldn't load extra treatments. Please try again.",
+      ),
+    };
+  }
 
   const blocked = new Set<string>();
   for (const row of data ?? []) {
@@ -80,14 +89,28 @@ async function loadPrimaryMedicineId(sessionId: string, primaryCategoryId: strin
   }
 
   if (!withPrimary.error.message.includes("is_primary")) {
-    return { ok: false as const, message: withPrimary.error.message };
+    return {
+      ok: false as const,
+      message: userFacingMessage(
+        withPrimary.error.message,
+        "We couldn't load extra treatments. Please try again.",
+      ),
+    };
   }
 
   const fallback = await supabaseAdmin
     .from("intake_session_medicines")
     .select("medicine_id, category_id")
     .eq("session_id", sessionId);
-  if (fallback.error) return { ok: false as const, message: fallback.error.message };
+  if (fallback.error) {
+    return {
+      ok: false as const,
+      message: userFacingMessage(
+        fallback.error.message,
+        "We couldn't load extra treatments. Please try again.",
+      ),
+    };
+  }
 
   const match = (fallback.data ?? []).find((row) => row.category_id === primaryCategoryId);
   return { ok: true as const, medicineId: match?.medicine_id ?? null };

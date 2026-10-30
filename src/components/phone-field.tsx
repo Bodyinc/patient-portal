@@ -11,6 +11,8 @@ type PhoneFieldProps = {
   className?: string;
   selectClassName?: string;
   inputClassName?: string;
+  ariaInvalid?: boolean;
+  ariaRequired?: boolean;
 };
 
 export function PhoneField({
@@ -21,6 +23,8 @@ export function PhoneField({
   className,
   selectClassName,
   inputClassName,
+  ariaInvalid,
+  ariaRequired,
 }: PhoneFieldProps) {
   const countryCode = phoneCountryCode || DEFAULT_PHONE_COUNTRY_CODE;
   const maxLength = phoneNationalLength(countryCode);
@@ -29,6 +33,7 @@ export function PhoneField({
     <div
       className={cn(
         "flex h-[45px] items-stretch overflow-hidden rounded-[14px] bg-[#E8EEED]",
+        ariaInvalid ? "ring-1 ring-inset ring-red-400" : "",
         className,
       )}
     >
@@ -56,6 +61,8 @@ export function PhoneField({
           inputClassName,
         )}
         aria-label="Phone number"
+        aria-invalid={ariaInvalid || undefined}
+        aria-required={ariaRequired || undefined}
       />
     </div>
   );

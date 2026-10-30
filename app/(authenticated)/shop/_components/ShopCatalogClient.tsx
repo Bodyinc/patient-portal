@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import type { PortalOfferDto } from "@/lib/offers/types";
 import { getShopCatalogFromService } from "@/lib/shop/client";
+import { userFacingMessage } from "@/lib/user-message";
 import type { ShopCategoryDto, ShopMedicinesListDto, ShopSortOption } from "@/lib/shop/types";
 import { buildShopHref } from "./shop-query";
 import ShopCategoryTabs from "./ShopCategoryTabs";
@@ -163,9 +164,10 @@ export default function ShopCatalogClient({
 
         {catalogQuery.isError ? (
           <div className="rounded-[16px] border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            {catalogQuery.error instanceof Error
-              ? catalogQuery.error.message
-              : "Unable to load shop catalog."}
+            {userFacingMessage(
+              catalogQuery.error,
+              "We couldn't load the shop. Please refresh and try again.",
+            )}
           </div>
         ) : list.items.length === 0 ? (
           <div className="rounded-[16px] border border-[#E8EEED] bg-[#F3F6F6] p-6 text-center text-sm text-[#152A51]/70">

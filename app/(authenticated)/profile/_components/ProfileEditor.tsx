@@ -11,16 +11,25 @@ import {
   uploadProfileAvatar,
   type EditableProfileDto,
 } from "@/lib/actions/profile";
+import { RequiredMark } from "@/components/required-mark";
 import { ZipCodeInput } from "@/components/zip-code-input";
 import { PhoneField } from "@/components/phone-field";
 import { PROFILE_AVATAR_MAX_BYTES, PROFILE_AVATAR_MAX_LABEL } from "@/lib/profile/avatar";
+import {
+  isUsStateCode,
+  US_COUNTRY_CODE,
+  US_COUNTRY_NAME,
+  US_STATES,
+} from "@/lib/profile/us-states";
 import { isExternalMedicineImage } from "@/lib/intake/medicine-image";
+import OnboardingDobField from "../../../onboarding/_components/OnboardingDobField";
 import { fieldControlClass, fieldLabelClass } from "../../../onboarding/_lib/onboarding-theme";
 import {
   DEFAULT_PHONE_COUNTRY_CODE,
   digitsOnlyPhone,
   digitsOnlyZip,
   isValidNationalPhone,
+  OPTIONAL_DOB_SCHEMA,
 } from "@/lib/validation";
 
 function toPatientId(userId: string) {
@@ -28,12 +37,16 @@ function toPatientId(userId: string) {
   return `#BI-${compact.slice(0, 4)}`;
 }
 
+type ProfileFieldKey = Exclude<keyof EditableProfileDto, "id" | "avatarUrl">;
+
 type Field = {
-  key: Exclude<keyof EditableProfileDto, "id" | "avatarUrl">;
+  key: ProfileFieldKey;
   label: string;
   type?: "text" | "email" | "date";
-  kind?: "input" | "select-sex" | "phone";
+  kind?: "input" | "select-sex" | "select-state" | "phone" | "country" | "dob";
   readOnly?: boolean;
+  required?: boolean;
+  optional?: boolean;
   hint?: string;
   autoFocus?: boolean;
   action?: { label: string; href: string };
@@ -43,71 +56,135 @@ function Section({
   title,
   fields,
   form,
+  errors,
   onChange,
 }: {
   title: string;
   fields: Field[];
   form: EditableProfileDto;
-  onChange: (key: Exclude<keyof EditableProfileDto, "id" | "avatarUrl">, value: string) => void;
+  errors: Partial<Record<ProfileFieldKey, string>>;
+  onChange: (key: ProfileFieldKey, value: string) => void;
 }) {
   return (
     <section className="rounded-[24px] border border-[#E8EEED] bg-white p-4 sm:p-6">
       <h2 className="text-[26px] font-medium tracking-[-0.3px] text-[#152A51]">{title}</h2>
       <div className="mt-3 h-px bg-[#E8EEED]" />
       <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6">
-        {fields.map((field) => (
-          <div key={field.key} className="space-y-2.5">
-            <div className="flex items-center justify-between gap-2">
-              <label className={fieldLabelClass}>{field.label}</label>
-              {field.action ? (
-                <Link
-                  href={field.action.href}
-                  className="text-[12px] font-medium text-[#152A51] underline underline-offset-2"
+        {fields.map((field) => {
+          const message = errors[field.key];
+          const invalidClass = message ? "ring-1 ring-inset ring-red-400" : "";
+          return (
+            <div key={field.key} className="space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <label className={fieldLabelClass} htmlFor={`profile-${field.key}`}>
+                  {field.label} {field.required ? <RequiredMark /> : null}
+                  {field.optional ? (
+                    <span className="font-normal text-[#152A51]/50"> (optional)</span>
+                  ) : null}
+                </label>
+                {field.action ? (
+                  <Link
+                    href={field.action.href}
+                    className="text-[12px] font-medium text-[#152A51] underline underline-offset-2"
+                  >
+                    {field.action.label}
+                  </Link>
+                ) : null}
+              </div>
+              {field.kind === "select-sex" ? (
+                <select
+                  id={`profile-${field.key}`}
+                  value={form.sex ?? ""}
+                  onChange={(e) => onChange("sex", e.target.value)}
+                  aria-invalid={message ? true : undefined}
+                  className={`w-full ${fieldControlClass} ${invalidClass}`}
                 >
-                  {field.action.label}
-                </Link>
-              ) : null}
+                  <option value="">Select gender</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                </select>
+              ) : field.kind === "select-state" ? (
+                <select
+                  id={`profile-${field.key}`}
+                  value={isUsStateCode(form.stateCode) ? form.stateCode.toUpperCase() : ""}
+                  onChange={(e) => onChange("stateCode", e.target.value)}
+                  aria-required={field.required}
+                  aria-invalid={message ? true : undefined}
+                  className={`w-full ${fieldControlClass} ${invalidClass}`}
+                >
+                  <option value="">Select state</option>
+                  {US_STATES.map((state) => (
+                    <option key={state.code} value={state.code}>
+                      {state.name}
+                    </option>
+                  ))}
+                </select>
+              ) : field.kind === "country" ? (
+                <input
+                  id={`profile-${field.key}`}
+                  value={US_COUNTRY_NAME}
+                  readOnly
+                  disabled
+                  aria-readonly="true"
+                  className={`w-full ${fieldControlClass} cursor-not-allowed`}
+                />
+              ) : field.kind === "dob" ? (
+                <OnboardingDobField
+                  id={`profile-${field.key}`}
+                  value={form.dob}
+                  onChange={(iso) => onChange("dob", iso)}
+                  inputClassName={`${fieldControlClass} ${invalidClass}`}
+                />
+              ) : field.kind === "phone" ? (
+                <PhoneField
+                  id={`profile-${field.key}`}
+                  phone={form.phone}
+                  phoneCountryCode={DEFAULT_PHONE_COUNTRY_CODE}
+                  onPhoneChange={(phone) => onChange("phone", phone)}
+                  ariaInvalid={Boolean(message)}
+                  ariaRequired={field.required}
+                />
+              ) : field.key === "postalCode" ? (
+                <ZipCodeInput
+                  id={`profile-${field.key}`}
+                  value={form.postalCode}
+                  onChange={(value) => onChange("postalCode", value)}
+                  aria-required={field.required}
+                  aria-invalid={message ? true : undefined}
+                  className={`w-full ${fieldControlClass} ${invalidClass}`}
+                />
+              ) : (
+                <input
+                  id={`profile-${field.key}`}
+                  type={field.type ?? "text"}
+                  value={(form[field.key] as string) ?? ""}
+                  onChange={(e) => onChange(field.key, e.target.value)}
+                  readOnly={field.readOnly}
+                  disabled={field.readOnly}
+                  autoFocus={field.autoFocus}
+                  required={field.required}
+                  aria-required={field.required}
+                  aria-invalid={message ? true : undefined}
+                  autoComplete={
+                    field.key === "streetAddress"
+                      ? "address-line1"
+                      : field.key === "apartment"
+                        ? "address-line2"
+                        : field.key === "city"
+                          ? "address-level2"
+                          : undefined
+                  }
+                  className={`w-full ${fieldControlClass} ${invalidClass} ${
+                    field.readOnly ? "cursor-not-allowed opacity-60" : ""
+                  }`}
+                />
+              )}
+              {message ? <p className="text-[12px] text-red-600">{message}</p> : null}
+              {field.hint ? <p className="text-[12px] text-[#152A51]/50">{field.hint}</p> : null}
             </div>
-            {field.kind === "select-sex" ? (
-              <select
-                value={form.sex ?? ""}
-                onChange={(e) => onChange("sex", e.target.value)}
-                className={`w-full ${fieldControlClass}`}
-              >
-                <option value="">Select gender</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="other">Other</option>
-              </select>
-            ) : field.kind === "phone" ? (
-              <PhoneField
-                id="phone"
-                phone={form.phone}
-                phoneCountryCode={DEFAULT_PHONE_COUNTRY_CODE}
-                onPhoneChange={(phone) => onChange("phone", phone)}
-              />
-            ) : field.key === "postalCode" ? (
-              <ZipCodeInput
-                value={form.postalCode}
-                onChange={(value) => onChange("postalCode", value)}
-                className={`w-full ${fieldControlClass}`}
-              />
-            ) : (
-              <input
-                type={field.type ?? "text"}
-                value={(form[field.key] as string) ?? ""}
-                onChange={(e) => onChange(field.key, e.target.value)}
-                readOnly={field.readOnly}
-                disabled={field.readOnly}
-                autoFocus={field.autoFocus}
-                className={`w-full ${fieldControlClass} ${
-                  field.readOnly ? "cursor-not-allowed opacity-60" : ""
-                }`}
-              />
-            )}
-            {field.hint ? <p className="text-[12px] text-[#152A51]/50">{field.hint}</p> : null}
-          </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
@@ -130,12 +207,19 @@ export default function ProfileEditor({ initialProfile }: { initialProfile: Edit
   const [avatarPreview, setAvatarPreview] = useState(initialProfile.avatarUrl);
   const [saving, startSaveTransition] = useTransition();
   const [uploadingAvatar, startUploadTransition] = useTransition();
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<ProfileFieldKey, string>>>({});
 
   const patientId = useMemo(() => toPatientId(form.id), [form.id]);
   const fullName = form.fullName.trim() || "—";
   const external = avatarPreview ? isExternalMedicineImage(avatarPreview) : false;
 
-  function updateField(key: Exclude<keyof EditableProfileDto, "id" | "avatarUrl">, value: string) {
+  function updateField(key: ProfileFieldKey, value: string) {
+    setFieldErrors((current) => {
+      if (!current[key]) return current;
+      const nextErrors = { ...current };
+      delete nextErrors[key];
+      return nextErrors;
+    });
     const next =
       key === "postalCode"
         ? digitsOnlyZip(value)
@@ -189,8 +273,26 @@ export default function ProfileEditor({ initialProfile }: { initialProfile: Edit
   }
 
   function onSave() {
+    const nextErrors: Partial<Record<ProfileFieldKey, string>> = {};
+    if (!form.fullName.trim()) nextErrors.fullName = "Enter your full name.";
     if (!isValidNationalPhone(form.phone, DEFAULT_PHONE_COUNTRY_CODE)) {
-      toast.error("Enter a valid 10-digit phone number");
+      nextErrors.phone = "Enter a valid 10-digit phone number.";
+    }
+    if (form.dob.trim()) {
+      const dob = OPTIONAL_DOB_SCHEMA.safeParse(form.dob);
+      if (!dob.success) {
+        nextErrors.dob = dob.error.issues[0]?.message ?? "Enter a valid date of birth.";
+      }
+    }
+    if (!form.streetAddress.trim()) nextErrors.streetAddress = "Enter your street address.";
+    if (!form.city.trim()) nextErrors.city = "Enter your city.";
+    if (!isUsStateCode(form.stateCode)) nextErrors.stateCode = "Select your state.";
+    if (!digitsOnlyZip(form.postalCode)) nextErrors.postalCode = "Enter your ZIP code.";
+
+    setFieldErrors(nextErrors);
+    const firstError = Object.values(nextErrors).find(Boolean);
+    if (firstError) {
+      toast.error(firstError);
       return;
     }
 
@@ -205,7 +307,7 @@ export default function ProfileEditor({ initialProfile }: { initialProfile: Edit
         apartment: form.apartment,
         city: form.city,
         postalCode: form.postalCode,
-        country: form.country,
+        country: US_COUNTRY_CODE,
         avatarUrl: form.avatarUrl,
       });
 
@@ -279,17 +381,19 @@ export default function ProfileEditor({ initialProfile }: { initialProfile: Edit
         <Section
           title="General Information"
           form={form}
+          errors={fieldErrors}
           onChange={updateField}
           fields={[
-            { key: "fullName", label: "Full Name", autoFocus: true },
+            { key: "fullName", label: "Full Name", autoFocus: true, required: true },
             { key: "sex", label: "Gender", kind: "select-sex" },
-            { key: "dob", label: "Date of Birth", type: "date" },
+            { key: "dob", label: "Date of Birth", kind: "dob" },
           ]}
         />
 
         <Section
           title="Contact Information"
           form={form}
+          errors={fieldErrors}
           onChange={updateField}
           fields={[
             {
@@ -297,23 +401,31 @@ export default function ProfileEditor({ initialProfile }: { initialProfile: Edit
               label: "Email Address",
               type: "email",
               readOnly: true,
+              required: true,
               action: { label: "Change email", href: "/profile/change-email" },
             },
-            { key: "phone", label: "Phone Number", kind: "phone" },
+            { key: "phone", label: "Phone Number", kind: "phone", required: true },
           ]}
         />
 
         <Section
           title="Address Information"
           form={form}
+          errors={fieldErrors}
           onChange={updateField}
           fields={[
-            { key: "streetAddress", label: "Street Address" },
-            { key: "apartment", label: "Apartment Number" },
-            { key: "city", label: "City" },
-            { key: "stateCode", label: "State" },
-            { key: "postalCode", label: "ZIP Code" },
-            { key: "country", label: "Country" },
+            { key: "streetAddress", label: "Street Address", required: true },
+            { key: "apartment", label: "Apartment Number", optional: true },
+            { key: "city", label: "City", required: true },
+            { key: "stateCode", label: "State", kind: "select-state", required: true },
+            { key: "postalCode", label: "ZIP Code", required: true },
+            {
+              key: "country",
+              label: "Country",
+              kind: "country",
+              required: true,
+              hint: "We only ship within the United States.",
+            },
           ]}
         />
 

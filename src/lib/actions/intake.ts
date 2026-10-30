@@ -42,6 +42,8 @@ import { normalizeQuestionType, parseDisqualifyRules } from "@/lib/intake/questi
 import { resolveMedicineImageSrc } from "@/lib/intake/medicine-image";
 import { formatPortalDate } from "@/lib/date-format";
 import { formatOrderId } from "@/lib/orders/order-id";
+import { isUsStateCode } from "@/lib/profile/us-states";
+import { userFacingMessage } from "@/lib/user-message";
 import { classifyPatientEmail } from "@/lib/auth/patient-email";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
@@ -220,7 +222,11 @@ async function loadQuestionnaireDto(
     .maybeSingle();
 
   if (error) {
-    return { ok: false, code: "fetch_error", message: error.message };
+    return {
+      ok: false,
+      code: "fetch_error",
+      message: userFacingMessage(error.message, "We couldn't complete that. Please try again."),
+    };
   }
   if (!questionnaire) {
     return { ok: true, data: null };
@@ -413,7 +419,14 @@ export async function getMedicinesForCategory(
   ]);
 
   if (linksResult.error) {
-    return { ok: false, code: "fetch_error", message: linksResult.error.message };
+    return {
+      ok: false,
+      code: "fetch_error",
+      message: userFacingMessage(
+        linksResult.error.message,
+        "We couldn't load this. Please refresh and try again.",
+      ),
+    };
   }
 
   const links = linksResult.data ?? [];
@@ -459,7 +472,14 @@ export async function getMedicinesForCategory(
   ]);
 
   if (medsError) {
-    return { ok: false, code: "fetch_error", message: medsError.message };
+    return {
+      ok: false,
+      code: "fetch_error",
+      message: userFacingMessage(
+        medsError.message,
+        "We couldn't load treatments. Please refresh and try again.",
+      ),
+    };
   }
 
   const variantsByMedicineId = new Map<string, IntakeVariantOption[]>();
@@ -507,7 +527,11 @@ export async function saveIntakeCategory(
 > {
   const sessionResult = await requireIntakeSession();
   if ("error" in sessionResult) {
-    return { ok: false, code: "session_error", message: sessionResult.error };
+    return {
+      ok: false,
+      code: "session_error",
+      message: userFacingMessage(sessionResult.error, "Your session expired. Please start again."),
+    };
   }
 
   const sessionId = sessionResult.session.id;
@@ -541,7 +565,11 @@ export async function saveIntakeCategory(
   });
 
   if (error) {
-    return { ok: false, code: "save_error", message: error.message };
+    return {
+      ok: false,
+      code: "save_error",
+      message: userFacingMessage(error.message, "We couldn't complete that. Please try again."),
+    };
   }
 
   const requiresQuestionnaire = await categoryHasActiveQuestionnaire(category.id);
@@ -557,7 +585,10 @@ export async function saveIntakeCategory(
 }
 
 const demographicsSchema = z.object({
-  stateCode: z.string().trim().min(2, "Select your state").max(2, "Select your state"),
+  stateCode: z
+    .string()
+    .trim()
+    .refine((value) => isUsStateCode(value), "Select your state"),
   sex: z.enum(["male", "female", "other"], { error: "Select your sex" }),
   dob: DOB_SCHEMA,
 });
@@ -567,7 +598,11 @@ export async function saveIntakeDemographics(
 ): Promise<IntakeActionResult<{ sessionId: string }>> {
   const sessionResult = await requireIntakeSession();
   if ("error" in sessionResult) {
-    return { ok: false, code: "session_error", message: sessionResult.error };
+    return {
+      ok: false,
+      code: "session_error",
+      message: userFacingMessage(sessionResult.error, "Your session expired. Please start again."),
+    };
   }
 
   const parsed = demographicsSchema.safeParse(input);
@@ -590,7 +625,11 @@ export async function saveIntakeDemographics(
     .eq("id", sessionResult.session.id);
 
   if (error) {
-    return { ok: false, code: "save_error", message: error.message };
+    return {
+      ok: false,
+      code: "save_error",
+      message: userFacingMessage(error.message, "We couldn't complete that. Please try again."),
+    };
   }
 
   return { ok: true, data: { sessionId: sessionResult.session.id } };
@@ -613,7 +652,11 @@ export async function saveIntakeBmi(
 ): Promise<IntakeActionResult<{ bmi: number; eligibility: EligibilityResultDto }>> {
   const sessionResult = await requireIntakeSession();
   if ("error" in sessionResult) {
-    return { ok: false, code: "session_error", message: sessionResult.error };
+    return {
+      ok: false,
+      code: "session_error",
+      message: userFacingMessage(sessionResult.error, "Your session expired. Please start again."),
+    };
   }
 
   const parsed = bmiSchema.safeParse(input);
@@ -639,7 +682,11 @@ export async function saveIntakeBmi(
     .eq("id", sessionResult.session.id);
 
   if (error) {
-    return { ok: false, code: "save_error", message: error.message };
+    return {
+      ok: false,
+      code: "save_error",
+      message: userFacingMessage(error.message, "We couldn't complete that. Please try again."),
+    };
   }
 
   const eligibility = await evaluateEligibilityForSession(
@@ -661,7 +708,11 @@ export async function saveIntakeMedicine(
 ): Promise<IntakeActionResult<{ medicineId: string }>> {
   const sessionResult = await requireIntakeSession();
   if ("error" in sessionResult) {
-    return { ok: false, code: "session_error", message: sessionResult.error };
+    return {
+      ok: false,
+      code: "session_error",
+      message: userFacingMessage(sessionResult.error, "Your session expired. Please start again."),
+    };
   }
 
   // Goal page also navigates before saveIntakeCategory finishes. Recover from that race when
@@ -711,7 +762,11 @@ export async function saveIntakeMedicine(
   );
 
   if (error) {
-    return { ok: false, code: "save_error", message: error.message };
+    return {
+      ok: false,
+      code: "save_error",
+      message: userFacingMessage(error.message, "We couldn't complete that. Please try again."),
+    };
   }
 
   // Attach (or re-attach) session questionnaire / eligibility rows to the selected
@@ -742,7 +797,11 @@ export async function saveIntakeContact(
 ): Promise<IntakeActionResult<{ sessionId: string }>> {
   const sessionResult = await requireIntakeSession();
   if ("error" in sessionResult) {
-    return { ok: false, code: "session_error", message: sessionResult.error };
+    return {
+      ok: false,
+      code: "session_error",
+      message: userFacingMessage(sessionResult.error, "Your session expired. Please start again."),
+    };
   }
 
   const parsed = contactSchema.safeParse(input);
@@ -788,7 +847,11 @@ export async function saveIntakeContact(
     .eq("id", sessionResult.session.id);
 
   if (error) {
-    return { ok: false, code: "save_error", message: error.message };
+    return {
+      ok: false,
+      code: "save_error",
+      message: userFacingMessage(error.message, "We couldn't complete that. Please try again."),
+    };
   }
 
   return { ok: true, data: { sessionId: sessionResult.session.id } };
@@ -849,13 +912,19 @@ const addressSchema = z
     const required: [keyof typeof data, string][] = [
       ["billingStreetAddress", "Enter your billing address"],
       ["billingCity", "Enter your billing city"],
-      ["billingStateCode", "Select your billing state"],
       ["billingPostalCode", "Enter a billing ZIP code of up to 6 digits"],
     ];
     for (const [key, message] of required) {
       if (!String(data[key] ?? "").trim()) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: [key], message });
       }
+    }
+    if (!isUsStateCode(data.billingStateCode)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["billingStateCode"],
+        message: "Select your billing state",
+      });
     }
   });
 
@@ -864,7 +933,11 @@ export async function saveIntakeAddress(
 ): Promise<IntakeActionResult<{ sessionId: string }>> {
   const sessionResult = await requireIntakeSession();
   if ("error" in sessionResult) {
-    return { ok: false, code: "session_error", message: sessionResult.error };
+    return {
+      ok: false,
+      code: "session_error",
+      message: userFacingMessage(sessionResult.error, "Your session expired. Please start again."),
+    };
   }
 
   const parsed = addressSchema.safeParse(input);
@@ -898,7 +971,11 @@ export async function saveIntakeAddress(
     .eq("id", sessionResult.session.id);
 
   if (error) {
-    return { ok: false, code: "save_error", message: error.message };
+    return {
+      ok: false,
+      code: "save_error",
+      message: userFacingMessage(error.message, "We couldn't complete that. Please try again."),
+    };
   }
 
   return { ok: true, data: { sessionId: sessionResult.session.id } };
@@ -915,7 +992,14 @@ export async function getQuestionnaireForCategory(
     .maybeSingle();
 
   if (categoryError) {
-    return { ok: false, code: "fetch_error", message: categoryError.message };
+    return {
+      ok: false,
+      code: "fetch_error",
+      message: userFacingMessage(
+        categoryError.message,
+        "We couldn't load this. Please refresh and try again.",
+      ),
+    };
   }
   if (!category) {
     return { ok: true, data: null };
@@ -927,7 +1011,14 @@ export async function getQuestionnaireForCategory(
     .eq("category_id", category.id);
 
   if (questionnaireLinkError) {
-    return { ok: false, code: "fetch_error", message: questionnaireLinkError.message };
+    return {
+      ok: false,
+      code: "fetch_error",
+      message: userFacingMessage(
+        questionnaireLinkError.message,
+        "We couldn't load the questionnaire. Please refresh and try again.",
+      ),
+    };
   }
 
   const questionnaireIds = (questionnaireLinks ?? []).map((l) => l.questionnaire_id);
@@ -959,7 +1050,14 @@ export async function getCategoryRequiresQuestionnaire(
     .maybeSingle();
 
   if (categoryError) {
-    return { ok: false, code: "fetch_error", message: categoryError.message };
+    return {
+      ok: false,
+      code: "fetch_error",
+      message: userFacingMessage(
+        categoryError.message,
+        "We couldn't load this. Please refresh and try again.",
+      ),
+    };
   }
   if (!category) {
     return { ok: true, data: false };
@@ -980,7 +1078,11 @@ export async function saveQuestionnaireResponses(
 ): Promise<IntakeActionResult<{ saved: number; eligibility: EligibilityResultDto }>> {
   const sessionResult = await requireIntakeSession();
   if ("error" in sessionResult) {
-    return { ok: false, code: "session_error", message: sessionResult.error };
+    return {
+      ok: false,
+      code: "session_error",
+      message: userFacingMessage(sessionResult.error, "Your session expired. Please start again."),
+    };
   }
 
   const sessionId = sessionResult.session.id;
@@ -1019,7 +1121,11 @@ export async function saveQuestionnaireResponses(
   const { error } = await supabaseAdmin.from("intake_session_questionnaire_responses").insert(rows);
 
   if (error) {
-    return { ok: false, code: "save_error", message: error.message };
+    return {
+      ok: false,
+      code: "save_error",
+      message: userFacingMessage(error.message, "We couldn't complete that. Please try again."),
+    };
   }
 
   const eligibility = await evaluateEligibilityForSession(sessionResult.session, medicineId);
@@ -1106,7 +1212,11 @@ export async function evaluateMedicineEligibility(
 ): Promise<IntakeActionResult<EligibilityResultDto>> {
   const sessionResult = await requireIntakeSession();
   if ("error" in sessionResult) {
-    return { ok: false, code: "session_error", message: sessionResult.error };
+    return {
+      ok: false,
+      code: "session_error",
+      message: userFacingMessage(sessionResult.error, "Your session expired. Please start again."),
+    };
   }
 
   const data = await evaluateEligibilityForSession(sessionResult.session, medicineId);
@@ -1172,7 +1282,11 @@ export async function getPackagesForMedicine(
   }
 
   if (error) {
-    return { ok: false, code: "fetch_error", message: error.message };
+    return {
+      ok: false,
+      code: "fetch_error",
+      message: userFacingMessage(error.message, "We couldn't complete that. Please try again."),
+    };
   }
 
   return {
@@ -1197,7 +1311,11 @@ export async function saveSelectedPlan(
 ): Promise<IntakeActionResult<{ sessionId: string }>> {
   const sessionResult = await requireIntakeSession();
   if ("error" in sessionResult) {
-    return { ok: false, code: "session_error", message: sessionResult.error };
+    return {
+      ok: false,
+      code: "session_error",
+      message: userFacingMessage(sessionResult.error, "Your session expired. Please start again."),
+    };
   }
 
   // Goal/medications pages navigate before their saves finish. If the patient continues
@@ -1240,7 +1358,11 @@ export async function saveSelectedPlan(
     .eq("id", sessionResult.session.id);
 
   if (error) {
-    return { ok: false, code: "save_error", message: error.message };
+    return {
+      ok: false,
+      code: "save_error",
+      message: userFacingMessage(error.message, "We couldn't complete that. Please try again."),
+    };
   }
 
   await supabaseAdmin

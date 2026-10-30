@@ -4,6 +4,7 @@ import { unstable_cache } from "next/cache";
 import { cache } from "react";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { userFacingMessage } from "@/lib/user-message";
 import type { CategoryDto, IntakeActionResult } from "@/lib/intake/types";
 
 function resolveCategoryImageSrc(
@@ -105,7 +106,7 @@ export const fetchActiveCategories = cache(async (): Promise<IntakeActionResult<
     return {
       ok: false,
       code: "fetch_error",
-      message: error instanceof Error ? error.message : "Unable to load goals.",
+      message: userFacingMessage(error, "We couldn't load goals. Please refresh and try again."),
     };
   }
 });

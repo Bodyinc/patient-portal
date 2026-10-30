@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { Tables } from "@/lib/supabase/types";
+import { userFacingMessage } from "@/lib/user-message";
 
 export const INTAKE_SESSION_COOKIE = "bodyinc-intake-token";
 export const INTAKE_SESSION_MAX_AGE = 7 * 24 * 60 * 60;
@@ -42,15 +43,21 @@ export async function resolveIntakeSession(
     .maybeSingle();
 
   if (error) {
-    return { session: null, error: error.message };
+    return {
+      session: null,
+      error: userFacingMessage(
+        error.message,
+        "We couldn't start your session. Please refresh and try again.",
+      ),
+    };
   }
 
   if (!data) {
-    return { session: null, error: "Session not found" };
+    return { session: null, error: "Your session expired. Please start again." };
   }
 
   if (new Date(data.expires_at) <= new Date()) {
-    return { session: null, error: "Session expired" };
+    return { session: null, error: "Your session expired. Please start again." };
   }
 
   const isActive =
@@ -59,7 +66,7 @@ export async function resolveIntakeSession(
     (options?.allowCompleted && data.status === "completed");
 
   if (!isActive) {
-    return { session: null, error: "Session is no longer active" };
+    return { session: null, error: "Your session expired. Please start again." };
   }
 
   return { session: data, error: null };
@@ -70,12 +77,14 @@ export async function requireIntakeSession(): Promise<
 > {
   const token = await getSessionTokenFromCookie();
   if (!token) {
-    return { error: "No intake session" };
+    return { error: "Your session expired. Please start again." };
   }
 
   const { session, error } = await resolveIntakeSession(token);
   if (!session || error) {
-    return { error: error ?? "Invalid session" };
+    return {
+      error: userFacingMessage(error, "Your session expired. Please start again."),
+    };
   }
 
   return { session };
@@ -93,7 +102,12 @@ export async function createIntakeSession(): Promise<
     .single();
 
   if (error || !data) {
-    return { error: error?.message ?? "Could not create intake session" };
+    return {
+      error: userFacingMessage(
+        error?.message,
+        "We couldn't start your session. Please refresh and try again.",
+      ),
+    };
   }
 
   await setSessionTokenCookie(token);

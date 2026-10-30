@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
+import { userFacingMessage } from "@/lib/user-message";
 import { getShopServiceMode } from "@/lib/shop/service-config";
 import { getShopCheckoutOrderByIdData } from "@/lib/shop/service-data";
 import { toErrorResponse, toSuccessResponse } from "@/lib/shop/service-response";
@@ -42,7 +43,7 @@ export async function GET(request: Request, context: { params: Promise<{ orderId
     const response = toErrorResponse<ShopCheckoutOrderPayload>({
       error: {
         code: "not_found",
-        message: error instanceof Error ? error.message : "Order not found.",
+        message: userFacingMessage(error, "We couldn't find that order."),
       },
       correlationId,
       mode,

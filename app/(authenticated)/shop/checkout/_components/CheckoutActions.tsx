@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 
+import { RequiredMark } from "@/components/required-mark";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import Link from "next/link";
@@ -56,7 +57,7 @@ export default function CheckoutActions({
             Privacy Policy
           </Link>
           . I understand my subscription will automatically renew until canceled, and I authorize
-          recurring payments with my selected payment method.
+          recurring payments with my selected payment method. <RequiredMark />
         </span>
       </label>
 

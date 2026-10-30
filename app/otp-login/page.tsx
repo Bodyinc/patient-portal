@@ -13,6 +13,7 @@ import AuthPageShell, {
 } from "@/components/AuthPageShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { RequiredMark } from "@/components/required-mark";
 import { Label } from "@/components/ui/label";
 import { checkPatientEmail, sendPatientLoginOtp } from "@/lib/actions/patient-auth";
 import { wrongPortalMessage } from "@/lib/auth/constants";
@@ -83,7 +84,7 @@ export default function OtpLoginPage() {
       <form onSubmit={onSubmit} className="space-y-6">
         <div className="space-y-2">
           <Label htmlFor="otp-email" className="text-[14px] font-semibold text-[#152A51]">
-            Email Address
+            Email Address <RequiredMark />
           </Label>
           <Input
             id="otp-email"

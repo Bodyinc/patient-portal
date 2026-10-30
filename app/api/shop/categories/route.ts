@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getShopCategories } from "@/lib/actions/shop";
+import { userFacingMessage } from "@/lib/user-message";
 import { getShopServiceMode, parseShopServiceMode } from "@/lib/shop/service-config";
 import { fetchShopCategoriesData } from "@/lib/shop/service-data";
 import { toErrorResponse, toSuccessResponse } from "@/lib/shop/service-response";
@@ -81,7 +82,10 @@ export async function GET(request: Request) {
     const response = toErrorResponse<ShopCategoriesPayload>({
       error: {
         code: "fetch_error",
-        message: error instanceof Error ? error.message : "Unable to fetch categories.",
+        message: userFacingMessage(
+          error,
+          "We couldn't load the shop. Please refresh and try again.",
+        ),
       },
       correlationId,
       mode,

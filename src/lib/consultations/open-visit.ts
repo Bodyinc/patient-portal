@@ -3,6 +3,7 @@
 import { toast } from "sonner";
 
 import { startConsultation } from "@/lib/consultations/actions";
+import { userFacingMessage } from "@/lib/user-message";
 
 function writeTab(tab: Window, html: string) {
   try {
@@ -73,8 +74,10 @@ export async function openConsultationInNewTab(subscriptionId: string): Promise<
     sendTabToUrl(tab, result.embedUrl);
     return true;
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unable to start this consultation right now.";
+    const message = userFacingMessage(
+      error,
+      "We couldn't start this consultation. Please try again.",
+    );
     closePendingTab(tab, message);
     toast.error(message);
     return false;

@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { saveIntakeMedicine } from "@/lib/actions/intake";
+import { userFacingMessage } from "@/lib/user-message";
 
 import MedicationCard from "../_components/MedicationCard";
 import MedicationDetailsDialog from "../_components/MedicationDetailsDialog";
@@ -134,7 +135,10 @@ export default function MedicationsPage() {
             ) : isError ? (
               <div className="col-span-full text-center">
                 <p className="text-sm text-red-600">
-                  {error instanceof Error ? error.message : "Could not load medications."}
+                  {userFacingMessage(
+                    error,
+                    "We couldn't load treatments. Please refresh and try again.",
+                  )}
                 </p>
                 <button
                   type="button"

@@ -1,5 +1,7 @@
 import { resolveMedicineImageSrc } from "@/lib/intake/medicine-image";
 import { formatOrderId } from "@/lib/orders/order-id";
+import { missingOrderDetailsMessage } from "@/lib/profile/shipping-address";
+import { userFacingMessage } from "@/lib/user-message";
 import {
   fromPriceDollars,
   planSubtitleFromDuration,
@@ -33,7 +35,11 @@ export async function fetchShopCategoriesData(): Promise<ShopCategoryDto[]> {
     .eq("is_active", true)
     .order("sort_order", { ascending: true });
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    throw new Error(
+      userFacingMessage(error.message, "We couldn't load the shop. Please refresh and try again."),
+    );
+  }
 
   return (data ?? []).map((category) => ({
     id: category.id,
@@ -122,7 +128,11 @@ export async function fetchShopCatalogData(options: {
   query = query.order("id", { ascending: true });
 
   const { data: medicines, error, count } = await query.range(start, end);
-  if (error) throw new Error(error.message);
+  if (error) {
+    throw new Error(
+      userFacingMessage(error.message, "We couldn't load the shop. Please refresh and try again."),
+    );
+  }
 
   const validMeds = medicines ?? [];
   const medicineIds = validMeds.map((medicine) => medicine.id);
@@ -341,13 +351,31 @@ export async function createShopCheckoutOrderData(options: {
 }): Promise<ShopCheckoutOrderDto> {
   const { userId, input } = options;
 
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("full_name, phone, state_code, street_address, city, postal_code")
+    .eq("id", userId)
+    .maybeSingle();
+  const missingDetails = missingOrderDetailsMessage(
+    {
+      fullName: profile?.full_name,
+      phone: profile?.phone,
+      stateCode: profile?.state_code,
+      streetAddress: profile?.street_address,
+      city: profile?.city,
+      postalCode: profile?.postal_code,
+    },
+    "profile",
+  );
+  if (missingDetails) throw new Error(missingDetails);
+
   const { data: medicine } = await supabaseAdmin
     .from("medicines")
     .select("id, name, short_description, image_url")
     .eq("id", input.medicineId)
     .maybeSingle();
 
-  if (!medicine) throw new Error("Medicine not found.");
+  if (!medicine) throw new Error("That treatment is no longer available.");
 
   const { data: selectedPackage } = input.packageId
     ? await supabaseAdmin
@@ -380,7 +408,11 @@ export async function createShopCheckoutOrderData(options: {
     .select("*")
     .single();
 
-  if (orderError || !order) throw new Error(orderError?.message ?? "Unable to create order.");
+  if (orderError || !order) {
+    throw new Error(
+      userFacingMessage(orderError?.message, "We couldn't start your order. Please try again."),
+    );
+  }
 
   const { error: itemError } = await supabaseAdmin.from("shop_checkout_order_items").insert({
     order_id: order.id,
@@ -394,7 +426,11 @@ export async function createShopCheckoutOrderData(options: {
     line_total: input.total,
   });
 
-  if (itemError) throw new Error(itemError.message);
+  if (itemError) {
+    throw new Error(
+      userFacingMessage(itemError.message, "We couldn't start your order. Please try again."),
+    );
+  }
 
   await supabaseAdmin.from("shop_checkout_events").insert({
     order_id: order.id,
@@ -438,7 +474,9 @@ export async function getShopCheckoutOrderByIdData(options: {
     .eq("user_id", userId)
     .maybeSingle();
 
-  if (error || !order) throw new Error("Order not found.");
+  if (error || !order) {
+    throw new Error(userFacingMessage(error?.message, "We couldn't find that order."));
+  }
 
   const [{ data: medicine }, { data: selectedPackage }] = await Promise.all([
     supabaseAdmin.from("medicines").select("name").eq("id", order.medicine_id).maybeSingle(),

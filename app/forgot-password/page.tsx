@@ -11,6 +11,7 @@ import AuthPageShell, {
 } from "@/components/AuthPageShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { RequiredMark } from "@/components/required-mark";
 import { Label } from "@/components/ui/label";
 import { sendPatientPasswordReset } from "@/lib/actions/patient-auth";
 
@@ -65,7 +66,7 @@ export default function ForgotPasswordPage() {
                   htmlFor="fp-email"
                   className="mb-2 block text-[14px] font-semibold text-[#152A51]"
                 >
-                  Email Address
+                  Email Address <RequiredMark />
                 </Label>
 
                 <Input

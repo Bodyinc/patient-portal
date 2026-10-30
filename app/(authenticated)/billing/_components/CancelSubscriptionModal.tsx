@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import { RequiredMark } from "@/components/required-mark";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -16,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { CANCELLATION_REASONS, type CancellationReasonId } from "@/lib/billing/cancel-reasons";
+import { userFacingMessage } from "@/lib/user-message";
 import { formatPortalDate } from "@/lib/date-format";
 import { cn } from "@/lib/utils";
 
@@ -88,7 +90,7 @@ export default function CancelSubscriptionModal({
         router.push("/billing?cancelled=1");
         router.refresh();
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Unable to cancel subscription.");
+        setError(userFacingMessage(err, "We couldn't cancel that subscription. Please try again."));
       }
     });
   }
@@ -119,7 +121,8 @@ export default function CancelSubscriptionModal({
               Help Us Improve
             </DialogTitle>
             <DialogDescription className="mt-2 text-sm text-[#152A51]/70 sm:text-base">
-              Help us improve by sharing why you&apos;re cancelling.
+              Help us improve by sharing why you&apos;re cancelling. Choose at least one reason{" "}
+              <RequiredMark />
             </DialogDescription>
             <p className="mt-1 text-xs text-[#152A51]/60">{medicineName}</p>
             <p className="mt-3 rounded-md border border-[#E8EEED] bg-[#F3F6F6] px-3 py-2 text-left text-xs leading-relaxed text-[#152A51]/75">

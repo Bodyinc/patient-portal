@@ -51,6 +51,16 @@ export const US_STATES = [
   { code: "WY", name: "Wyoming" },
 ] as const;
 
+export const US_COUNTRY_CODE = "US";
+export const US_COUNTRY_NAME = "United States";
+
+const US_STATE_CODES = new Set<string>(US_STATES.map((state) => state.code));
+
+export function isUsStateCode(code: string | null | undefined): boolean {
+  if (!code) return false;
+  return US_STATE_CODES.has(code.trim().toUpperCase());
+}
+
 export function getStateName(code: string | null | undefined): string {
   if (!code) return "";
   const trimmed = code.trim().toUpperCase();

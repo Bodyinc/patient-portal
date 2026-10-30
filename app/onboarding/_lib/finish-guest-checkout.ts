@@ -1,6 +1,7 @@
 "use client";
 
 import { completePostCheckoutSignIn } from "@/lib/actions/patient-auth";
+import { userFacingMessage } from "@/lib/user-message";
 import { createClient } from "@/lib/supabase/client";
 
 export type FinishGuestCheckoutResult = { ok: true } | { ok: false; message: string };
@@ -24,7 +25,7 @@ export async function finishGuestCheckoutSession(): Promise<FinishGuestCheckoutR
   if (error) {
     return {
       ok: false,
-      message: error.message || "Could not start your session. Please try logging in.",
+      message: userFacingMessage(error.message, "We couldn't sign you in. Please try logging in."),
     };
   }
 

@@ -8,6 +8,7 @@ import { z } from "zod";
 
 import Link from "next/link";
 
+import { RequiredMark } from "@/components/required-mark";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { saveIntakeContact } from "@/lib/actions/intake";
@@ -70,15 +71,6 @@ export default function PersonalInfoPage() {
       fullName: parsed.data.fullName,
       email: parsed.data.email,
     };
-
-    if (
-      state.fullName === contact.fullName &&
-      state.email.toLowerCase() === contact.email.toLowerCase()
-    ) {
-      const next = getNextStepPath("/onboarding/personal-info", { ...state, ...contact });
-      if (next) pushOnboardingRoute(router, next);
-      return;
-    }
 
     setSaving(true);
 
@@ -143,7 +135,7 @@ export default function PersonalInfoPage() {
 
         <div className="space-y-4">
           <Label htmlFor="fullName" className={fieldLabelClass}>
-            Full name
+            Full name <RequiredMark />
           </Label>
           <Input
             id="fullName"
@@ -158,7 +150,7 @@ export default function PersonalInfoPage() {
         <div className="grid gap-6 sm:grid-cols-2 sm:gap-4">
           <div className="space-y-4">
             <Label htmlFor="email" className={fieldLabelClass}>
-              Email address
+              Email address <RequiredMark />
             </Label>
             <Input
               id="email"
@@ -178,7 +170,7 @@ export default function PersonalInfoPage() {
 
           <div className="space-y-4">
             <Label htmlFor="confirmEmail" className={fieldLabelClass}>
-              Confirm email
+              Confirm email <RequiredMark />
             </Label>
             <Input
               id="confirmEmail"

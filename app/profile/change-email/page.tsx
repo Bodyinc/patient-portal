@@ -13,9 +13,11 @@ import AuthPageShell, {
 } from "@/components/AuthPageShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { RequiredMark } from "@/components/required-mark";
 import { Label } from "@/components/ui/label";
 import { InputOTP, InputOTPSlot } from "@/components/ui/input-otp";
 import { OTP_LENGTH, wrongPortalMessage } from "@/lib/auth/constants";
+import { userFacingMessage } from "@/lib/user-message";
 import {
   changeCheckoutEmail,
   checkPatientEmail,
@@ -127,7 +129,7 @@ export default function ProfileChangeEmailPage() {
     try {
       const { error } = await verifyEmailOtp(supabase, currentEmail, otp);
       if (error) {
-        toast.error(error.message);
+        toast.error(userFacingMessage(error.message, "That code didn't match. Please try again."));
         return;
       }
       setOtp("");
@@ -199,7 +201,7 @@ export default function ProfileChangeEmailPage() {
     try {
       const { error } = await verifyEmailOtp(supabase, newEmail, otp);
       if (error) {
-        toast.error(error.message);
+        toast.error(userFacingMessage(error.message, "That code didn't match. Please try again."));
         return;
       }
       await reconcileCheckoutEmail();
@@ -289,7 +291,7 @@ export default function ProfileChangeEmailPage() {
             />
             <div className="space-y-2 text-left">
               <Label htmlFor="new-email" className="text-[14px] font-semibold text-[#152A51]">
-                New email address
+                New email address <RequiredMark />
               </Label>
               <Input
                 id="new-email"

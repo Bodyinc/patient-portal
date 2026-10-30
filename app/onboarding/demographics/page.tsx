@@ -15,6 +15,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { saveIntakeDemographics } from "@/lib/actions/intake";
+import { isUsStateCode } from "@/lib/profile/us-states";
 import { DOB_SCHEMA } from "@/lib/validation";
 
 import OnboardingDobField from "../_components/OnboardingDobField";
@@ -28,7 +29,7 @@ import {
 import { useOnboarding } from "../_lib/onboarding-store";
 
 const demographicsSchema = z.object({
-  state: z.string().min(1, "Select your state"),
+  state: z.string().refine((value) => isUsStateCode(value), "Select your state"),
   sex: z.enum(["male", "female", "other"], { error: "Select your sex" }),
   dob: DOB_SCHEMA,
 });
@@ -75,33 +76,23 @@ export default function DemographicsPage() {
     const nextState = { ...state, ...patch };
     const next = getNextStepPath("/onboarding/demographics", nextState);
 
-    if (
-      state.state === parsed.data.state &&
-      state.sex === parsed.data.sex &&
-      state.dob === parsed.data.dob
-    ) {
-      if (next) pushOnboardingRoute(router, next);
-      return;
-    }
-
     setSaving(true);
     try {
-      const savePromise = saveIntakeDemographics({
+      const result = await saveIntakeDemographics({
         stateCode: parsed.data.state,
         sex: parsed.data.sex,
         dob: parsed.data.dob,
       });
+      if (!result.ok) {
+        setSaving(false);
+        toast.error(result.message);
+        return;
+      }
       updateState(patch);
       if (next) pushOnboardingRoute(router, next);
-
-      const result = await savePromise;
-      if (!result.ok) {
-        toast.error(result.message);
-        pushOnboardingRoute(router, "/onboarding/demographics");
-      }
     } catch {
+      setSaving(false);
       toast.error("Unable to save your details. Please try again.");
-      pushOnboardingRoute(router, "/onboarding/demographics");
     }
   }
 

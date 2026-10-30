@@ -1,5 +1,6 @@
 "use client";
 
+import { RequiredMark } from "@/components/required-mark";
 import { cn } from "@/lib/utils";
 
 type TermsCheckboxProps = {
@@ -51,7 +52,8 @@ export default function TermsCheckbox({ checked, invalid, onChange }: TermsCheck
             onClick={(e) => e.stopPropagation()}
           >
             Privacy Policy
-          </a>
+          </a>{" "}
+          <RequiredMark />
         </span>
       </label>
       {invalid ? (

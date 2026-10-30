@@ -1,4 +1,5 @@
 import { requirePatientSession } from "@/lib/auth/require-patient";
+import { userFacingMessage } from "@/lib/user-message";
 import { listMyInquiries } from "@/lib/actions/feedback";
 
 import InquiriesPageClient from "./_components/InquiriesPageClient";
@@ -21,7 +22,10 @@ export default async function InquiriesPage() {
     return (
       <main className="min-w-0 flex-1 bg-white p-4">
         <div className="rounded-[16px] border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error instanceof Error ? error.message : "Unable to load your inquiries."}
+          {userFacingMessage(
+            error,
+            "We couldn't load your inquiries. Please refresh and try again.",
+          )}
         </div>
       </main>
     );

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { requirePatientSession } from "@/lib/auth/require-patient";
+import { userFacingMessage } from "@/lib/user-message";
 import { getManualRefillBlock } from "@/lib/orders/refill-eligibility";
 import { getPatientDisplayIdentity } from "@/lib/profile/identity";
 import { fetchShopCheckoutBootstrapData } from "@/lib/shop/service-data";
@@ -122,7 +123,7 @@ export default async function ShopCheckoutPage({
     return (
       <main className="mx-auto flex w-full max-w-full flex-1 flex-col overflow-x-hidden px-4 py-4 sm:px-6 lg:h-full lg:min-h-0 lg:overflow-hidden lg:px-1">
         <div className="rounded-[16px] border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error instanceof Error ? error.message : "Unable to load checkout data."}
+          {userFacingMessage(error, "We couldn't load checkout. Please refresh and try again.")}
         </div>
       </main>
     );

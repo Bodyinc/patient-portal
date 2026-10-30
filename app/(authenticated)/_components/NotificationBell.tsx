@@ -13,20 +13,6 @@ import { cn } from "@/lib/utils";
 
 const SEEN_AT_KEY = "patient_notifications_seen_at";
 
-function formatRelativeTime(iso: string): string {
-  const then = new Date(iso).getTime();
-  const now = Date.now();
-  const diffSec = Math.max(0, Math.round((now - then) / 1000));
-  if (diffSec < 60) return "Just now";
-  const diffMin = Math.round(diffSec / 60);
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHr = Math.round(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}h ago`;
-  const diffDay = Math.round(diffHr / 24);
-  if (diffDay < 7) return `${diffDay}d ago`;
-  return formatPortalDate(iso);
-}
-
 function readSeenAt(): number {
   if (typeof window === "undefined") return 0;
   const raw = window.localStorage.getItem(SEEN_AT_KEY);
@@ -140,7 +126,7 @@ export default function NotificationBell({
                           <p className="mt-0.5 truncate text-xs text-[#152A51]/70">{item.body}</p>
                         </div>
                         <span className="shrink-0 text-[11px] text-[#152A51]/50">
-                          {formatRelativeTime(item.createdAt)}
+                          {formatPortalDate(item.createdAt)}
                         </span>
                       </div>
                     </Link>

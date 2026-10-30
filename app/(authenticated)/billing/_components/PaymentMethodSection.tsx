@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { getStripeJs, paymentErrorMessage } from "@/lib/stripe/client";
+import { userFacingMessage } from "@/lib/user-message";
 
 function UpdateCardForm({ onDone }: { onDone: () => void }) {
   const stripe = useStripe();
@@ -114,7 +115,7 @@ export default function PaymentMethodSection({ cardLabel, cardExpiry }: PaymentM
       }
       setClientSecret(payload.clientSecret);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to start card update.");
+      toast.error(userFacingMessage(error, "We couldn't start the card update. Please try again."));
       setOpen(false);
     } finally {
       setLoading(false);

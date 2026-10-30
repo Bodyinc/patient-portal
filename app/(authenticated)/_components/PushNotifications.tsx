@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { removePushSubscription, savePushSubscription, sendTestPush } from "@/lib/actions/push";
+import { userFacingMessage } from "@/lib/user-message";
 import { Switch } from "@/components/ui/switch";
 
 const DISMISS_KEY = "bodyinc_push_prompt_dismissed";
@@ -115,7 +116,7 @@ export function PushSettingsCard() {
         next ? "Notifications turned on for this device." : "Notifications turned off.",
       );
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not update notifications.");
+      toast.error(userFacingMessage(error, "We couldn't update notifications. Please try again."));
       await refresh();
     } finally {
       setBusy(false);
@@ -205,7 +206,7 @@ export function PushEnableBanner() {
       toast.success("Notifications turned on for this device.");
       setVisible(false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not enable notifications.");
+      toast.error(userFacingMessage(error, "We couldn't turn on notifications. Please try again."));
     } finally {
       setBusy(false);
     }

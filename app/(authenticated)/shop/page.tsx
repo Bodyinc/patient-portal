@@ -1,4 +1,5 @@
 import { requirePatientSession } from "@/lib/auth/require-patient";
+import { userFacingMessage } from "@/lib/user-message";
 import { listAutopayMedicineIds } from "@/lib/orders/refill-eligibility";
 import { fetchActivePortalOffer } from "@/lib/offers/service-data";
 import { getPatientDisplayIdentity } from "@/lib/profile/identity";
@@ -80,7 +81,7 @@ export default async function ShopPage({
     return (
       <main className="min-w-0 flex-1 p-4">
         <div className="rounded-[16px] border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error instanceof Error ? error.message : "Unable to load shop data."}
+          {userFacingMessage(error, "We couldn't load the shop. Please refresh and try again.")}
         </div>
       </main>
     );

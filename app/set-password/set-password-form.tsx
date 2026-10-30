@@ -11,6 +11,7 @@ import AuthPageShell, {
 } from "@/components/AuthPageShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { RequiredMark } from "@/components/required-mark";
 import { Label } from "@/components/ui/label";
 import { setInitialPassword } from "@/lib/actions/patient-auth";
 
@@ -56,7 +57,7 @@ export function SetPasswordForm({ next }: { next: string }) {
         <form onSubmit={onSubmit} className="space-y-5 text-left">
           <div>
             <Label htmlFor="sp" className="mb-2 block text-[14px] font-semibold text-[#152A51]">
-              Password
+              Password <RequiredMark />
             </Label>
 
             <Input
@@ -75,7 +76,7 @@ export function SetPasswordForm({ next }: { next: string }) {
 
           <div>
             <Label htmlFor="sp2" className="mb-2 block text-[14px] font-semibold text-[#152A51]">
-              Confirm Password
+              Confirm Password <RequiredMark />
             </Label>
 
             <Input

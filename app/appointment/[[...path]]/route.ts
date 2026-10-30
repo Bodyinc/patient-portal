@@ -61,7 +61,9 @@ export async function GET(
       headers,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to load consultation";
-    return new NextResponse(`Error loading consultation: ${message}`, { status: 502 });
+    console.error("[appointment] failed to load consultation:", error);
+    return new NextResponse("We couldn't load this consultation. Please refresh and try again.", {
+      status: 502,
+    });
   }
 }

@@ -1,6 +1,7 @@
 "use server";
 
 import { checkoutCoverageLabel, consultationAnchorId } from "@/lib/checkout/group";
+import { userFacingMessage } from "@/lib/user-message";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -276,7 +277,13 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
       .order("started_at", { ascending: true })) as typeof allRowsResult;
   }
   if (allRowsResult.error && !/patient_consultations/i.test(allRowsResult.error.message)) {
-    return { ok: false, message: allRowsResult.error.message };
+    return {
+      ok: false,
+      message: userFacingMessage(
+        allRowsResult.error.message,
+        "We couldn't load your consultations. Please refresh and try again.",
+      ),
+    };
   }
   const allRows = (allRowsResult.data ?? []).map((row) => ({
     ...row,

@@ -10,6 +10,7 @@ import {
   saveAdditionalProducts,
 } from "@/lib/actions/additional-products";
 import { formatFromPrice } from "@/lib/pricing";
+import { userFacingMessage } from "@/lib/user-message";
 import type { AddonGoalDto, AddonProductDto, CategoryDto } from "@/lib/intake/types";
 import { cn } from "@/lib/utils";
 
@@ -228,9 +229,10 @@ export default function AdditionalProductsPage() {
           ) : optionsQuery.isError ? (
             <div className="text-center">
               <p className="text-sm text-red-600">
-                {optionsQuery.error instanceof Error
-                  ? optionsQuery.error.message
-                  : "Could not load goals."}
+                {userFacingMessage(
+                  optionsQuery.error,
+                  "We couldn't load extra treatments. Please refresh and try again.",
+                )}
               </p>
               <button
                 type="button"

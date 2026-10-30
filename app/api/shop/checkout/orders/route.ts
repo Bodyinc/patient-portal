@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
+import { userFacingMessage } from "@/lib/user-message";
 import { getShopServiceMode } from "@/lib/shop/service-config";
 import { createShopCheckoutOrderData } from "@/lib/shop/service-data";
 import { toErrorResponse, toSuccessResponse } from "@/lib/shop/service-response";
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
 
   if (!user) {
     const response = toErrorResponse<ShopCheckoutOrderPayload>({
-      error: { code: "unauthorized", message: "Authentication required." },
+      error: { code: "unauthorized", message: "Sign in to continue." },
       correlationId,
       mode,
       startedAt,
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
     const response = toErrorResponse<ShopCheckoutOrderPayload>({
       error: {
         code: "create_error",
-        message: error instanceof Error ? error.message : "Unable to create order.",
+        message: userFacingMessage(error, "We couldn't start your order. Please try again."),
       },
       correlationId,
       mode,

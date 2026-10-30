@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { saveIntakeAddress } from "@/lib/actions/intake";
+import { isUsStateCode } from "@/lib/profile/us-states";
 import {
   DEFAULT_PHONE_COUNTRY_CODE,
   PHONE_COUNTRY_CODE_SCHEMA,
@@ -82,13 +83,19 @@ const addressSchema = z
     const required: [keyof typeof data, string][] = [
       ["billingStreetAddress", "Enter your billing address"],
       ["billingCity", "Enter your billing city"],
-      ["billingStateCode", "Select your billing state"],
       ["billingPostalCode", "Enter a billing ZIP code of up to 6 digits"],
     ];
     for (const [key, message] of required) {
       if (!String(data[key] ?? "").trim()) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: [key], message });
       }
+    }
+    if (!isUsStateCode(data.billingStateCode)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["billingStateCode"],
+        message: "Select your billing state",
+      });
     }
   });
 
@@ -163,37 +170,20 @@ export default function DeliveryAddressPage() {
     const patch = parsed.data;
     const next = getNextStepPath("/onboarding/delivery-address", { ...state, ...patch });
 
-    if (
-      state.streetAddress === patch.streetAddress &&
-      state.apartment === patch.apartment &&
-      digitsOnlyZip(state.postalCode) === patch.postalCode &&
-      state.city === patch.city &&
-      state.phone === patch.phone &&
-      state.phoneCountryCode === patch.phoneCountryCode &&
-      state.billingSameAsShipping === patch.billingSameAsShipping &&
-      state.smsConsent === patch.smsConsent &&
-      state.marketingConsent === patch.marketingConsent &&
-      (patch.billingSameAsShipping ||
-        (state.billingStreetAddress === patch.billingStreetAddress &&
-          state.billingApartment === patch.billingApartment &&
-          digitsOnlyZip(state.billingPostalCode) === patch.billingPostalCode &&
-          state.billingCity === patch.billingCity &&
-          state.billingStateCode === patch.billingStateCode))
-    ) {
-      if (next) pushOnboardingRoute(router, next);
-      return;
-    }
-
     setSaving(true);
-    const savePromise = saveIntakeAddress(patch);
-    updateState(patch);
-    if (next) pushOnboardingRoute(router, next);
+    try {
+      const result = await saveIntakeAddress(patch);
+      if (!result.ok) {
+        setSaving(false);
+        toast.error(result.message);
+        return;
+      }
 
-    const result = await savePromise;
-
-    if (!result.ok) {
-      toast.error(result.message);
-      pushOnboardingRoute(router, "/onboarding/delivery-address");
+      updateState(patch);
+      if (next) pushOnboardingRoute(router, next);
+    } catch {
+      setSaving(false);
+      toast.error("We couldn't save your address. Please try again.");
     }
   }
 
@@ -297,7 +287,7 @@ export default function DeliveryAddressPage() {
               </div>
               <div className="space-y-4">
                 <Label htmlFor="billingApartment" className={fieldLabelClass}>
-                  Apartment number
+                  Apartment number <span className="font-normal text-[#152A51]/50">(optional)</span>
                 </Label>
                 <Input
                   id="billingApartment"
