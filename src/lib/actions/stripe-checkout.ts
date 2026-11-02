@@ -6,7 +6,11 @@ import { missingOrderDetailsMessage } from "@/lib/profile/shipping-address";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { userFacingMessage } from "@/lib/user-message";
 import { createGuestStripeCustomer } from "@/lib/stripe/customers";
-import { createSubscriptionForPrice, ensureNoActiveDuplicate } from "@/lib/stripe/subscriptions";
+import {
+  createSubscriptionForPrice,
+  ensureNoActiveDuplicate,
+  prepareCheckoutSubscription,
+} from "@/lib/stripe/subscriptions";
 import { resolveCheckoutDiscount } from "@/lib/stripe/promos";
 import { getPlatformSettings, effectiveShippingCents } from "@/lib/settings/platform-settings";
 
@@ -87,12 +91,23 @@ export async function createOnboardingSubscription(
     return { ok: false, message: "This plan is not available for purchase yet." };
   }
 
-  // Void any prior incomplete subscription for this session so the fresh one reflects
-  // current pricing/fees; block if it was already paid.
+  // Same browser keeps this intake. If they left on payment_pending without paying,
+  // reopen that card form. "Already purchased" only applies once money was collected.
+  // An email that already has an account is rejected earlier, on the contact step.
   if (session.stripe_subscription_id) {
+    const prior = await prepareCheckoutSubscription({
+      subscriptionId: session.stripe_subscription_id,
+      packageId: pkg.id,
+    });
+    if (prior.action === "paid") {
+      return { ok: true, paid: true, clientSecret: null };
+    }
+    if (prior.action === "resume") {
+      return { ok: true, paid: false, clientSecret: prior.clientSecret };
+    }
     const { alreadyPaid } = await ensureNoActiveDuplicate(session.stripe_subscription_id);
     if (alreadyPaid) {
-      return { ok: false, message: "This plan has already been purchased." };
+      return { ok: true, paid: true, clientSecret: null };
     }
   }
 
@@ -201,9 +216,18 @@ export async function createOnboardingSubscription(
     .update({
       stripe_customer_id: customerId,
       stripe_subscription_id: subscriptionId,
-      status: "payment_pending",
     })
     .eq("id", session.id);
+
+  // Opening the card form is not a completed purchase. Never downgrade a session
+  // the webhook already marked completed while this request was in flight.
+  if (!paid) {
+    await supabaseAdmin
+      .from("intake_sessions")
+      .update({ status: "payment_pending" })
+      .eq("id", session.id)
+      .neq("status", "completed");
+  }
 
   const { data: subRow } = await supabaseAdmin
     .from("subscriptions")

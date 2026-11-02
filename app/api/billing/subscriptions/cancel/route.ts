@@ -8,8 +8,8 @@ import {
 } from "@/lib/billing/cancel-reasons";
 import type Stripe from "stripe";
 import { createClient } from "@/lib/supabase/server";
-import { userFacingMessage } from "@/lib/user-message";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { laterIso, patientCancelError } from "@/lib/billing/subscription-cancel";
 import { cancelSubscriptionAtPeriodEnd } from "@/lib/stripe/subscriptions";
 import { sendTransactionalEmail } from "@/lib/email/send";
 import { cancellationScheduledEmail } from "@/lib/email/lifecycle-emails";
@@ -79,7 +79,8 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (subError) {
-    return NextResponse.json({ error: subError.message }, { status: 500 });
+    console.error("[billing] cancel load failed:", subError.message);
+    return NextResponse.json({ error: patientCancelError(subError.message) }, { status: 500 });
   }
   if (!subscription) {
     return NextResponse.json({ error: "Subscription not found." }, { status: 404 });
@@ -118,26 +119,28 @@ export async function POST(request: Request) {
       });
 
     if (feedbackError) {
-      return NextResponse.json({ error: feedbackError.message }, { status: 500 });
+      // The renewal is already stopped in Stripe. Losing the reason must not
+      // show the patient a failure or leave the cancel button active.
+      console.error("[billing] cancellation feedback insert failed:", feedbackError.message);
     }
 
     const periodEndTs =
       (updated as { current_period_end?: number }).current_period_end ??
       updated.items?.data?.[0]?.current_period_end;
-    const currentPeriodEnd = periodEndTs
-      ? new Date(periodEndTs * 1000).toISOString()
-      : subscription.current_period_end;
+    const stripePeriodEnd = periodEndTs ? new Date(periodEndTs * 1000).toISOString() : null;
+    const currentPeriodEnd = laterIso(subscription.current_period_end, stripePeriodEnd);
 
     const { error: updateError } = await supabaseAdmin
       .from("subscriptions")
       .update({
         cancel_at_period_end: true,
-        current_period_end: currentPeriodEnd,
+        ...(currentPeriodEnd ? { current_period_end: currentPeriodEnd } : {}),
       })
       .eq("id", subscription.id);
 
     if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 });
+      console.error("[billing] cancel status save failed:", updateError.message);
+      return NextResponse.json({ error: patientCancelError(updateError.message) }, { status: 500 });
     }
 
     try {
@@ -174,9 +177,10 @@ export async function POST(request: Request) {
       currentPeriodEnd,
     });
   } catch (error) {
+    console.error("[billing] cancel subscription failed:", error);
     return NextResponse.json(
       {
-        error: userFacingMessage(error, "We couldn't cancel that subscription. Please try again."),
+        error: patientCancelError(error),
       },
       { status: 500 },
     );

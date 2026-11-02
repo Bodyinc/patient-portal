@@ -78,7 +78,16 @@ export default function ShopProductCard({
     </div>
   ) : null;
 
-  const cardImageBlock = <MedicineProductImage src={imageSrc} alt={item.name} />;
+  const cardImageBlock = (
+    <button
+      type="button"
+      onClick={() => setOpen(true)}
+      aria-label={`View details for ${item.name}`}
+      className="block w-full cursor-pointer border-0 bg-transparent p-0 text-left"
+    >
+      <MedicineProductImage src={imageSrc} alt="" />
+    </button>
+  );
 
   return (
     <>

@@ -232,6 +232,10 @@ export default function BillingCheckoutPage() {
 
     const sessionResult = await finishGuestCheckoutSession();
     if (!sessionResult.ok) {
+      finishedWithoutCard.current = false;
+      setFinishWithoutCard(false);
+      setPaymentError(sessionResult.message);
+      setPaymentLoading(false);
       toast.error(sessionResult.message);
       return;
     }

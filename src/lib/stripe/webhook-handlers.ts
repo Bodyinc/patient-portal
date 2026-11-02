@@ -22,6 +22,7 @@ import {
   patientEmailByStripeCustomer,
   patientEmailByUserId,
 } from "@/lib/email/recipients";
+import { subscriptionWillCancel } from "@/lib/billing/subscription-cancel";
 import { maybeConvertReferral } from "@/lib/referrals";
 import { incrementPromoRedemption } from "@/lib/stripe/promos";
 import { recordInvoiceWalletDebit } from "@/lib/wallet";
@@ -68,6 +69,17 @@ function invoicePaymentIntentId(invoice: Stripe.Invoice): string | null {
   const pi = (invoice as unknown as { payment_intent?: string | { id?: string } }).payment_intent;
   if (typeof pi === "string") return pi;
   return pi?.id ?? null;
+}
+
+function invoiceIntakeSessionId(invoice: Stripe.Invoice): string | null {
+  const anyInv = invoice as unknown as {
+    parent?: { subscription_details?: { metadata?: Record<string, string> | null } };
+    subscription_details?: { metadata?: Record<string, string> | null };
+  };
+  const meta =
+    anyInv.parent?.subscription_details?.metadata ?? anyInv.subscription_details?.metadata ?? null;
+  const id = meta?.intake_session_id?.trim();
+  return id || null;
 }
 
 function customerId(source: { customer?: string | { id?: string } | null }): string | null {
@@ -167,7 +179,7 @@ async function upsertSubscription(sub: Stripe.Subscription): Promise<void> {
     stripe_price_id: priceId,
     status: sub.status,
     current_period_end: periodEndIso(sub),
-    cancel_at_period_end: sub.cancel_at_period_end ?? false,
+    cancel_at_period_end: subscriptionWillCancel(sub),
   };
 
   const { data: updated } = await supabaseAdmin
@@ -239,7 +251,7 @@ async function handleInvoicePaid(
   await recordPayment(
     {
       user_id: subRow?.user_id ?? null,
-      session_id: subRow?.session_id ?? null,
+      session_id: subRow?.session_id ?? invoiceIntakeSessionId(invoice),
       plan_id: subRow?.package_id ?? null,
       stripe_subscription_id: subId,
       stripe_invoice_id: invoice.id,
@@ -294,11 +306,19 @@ async function handleInvoicePaid(
     });
   }
 
-  if (subRow?.session_id) {
+  const sessionId = subRow?.session_id ?? invoiceIntakeSessionId(invoice);
+  if (sessionId) {
+    if (subRow && !subRow.session_id) {
+      await supabaseAdmin
+        .from("subscriptions")
+        .update({ session_id: sessionId })
+        .eq("id", subRow.id);
+    }
     await supabaseAdmin
       .from("intake_sessions")
       .update({ status: "completed" })
-      .eq("id", subRow.session_id);
+      .eq("id", sessionId)
+      .in("status", ["in_progress", "payment_pending"]);
   }
 
   // Order creation is handled by the DB trigger trg_create_medication_order on payments insert
