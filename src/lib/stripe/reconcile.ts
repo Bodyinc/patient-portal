@@ -6,6 +6,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { recordPayment } from "./record-payment";
 import { ensureCheckoutAddons } from "@/lib/checkout/provision-addons";
 import { sendOrderConfirmationEmail } from "@/lib/email/order-confirmation";
+import { subscriptionWillCancel } from "@/lib/billing/subscription-cancel";
 import { maybeConvertReferral } from "@/lib/referrals";
 import { recordInvoiceWalletDebit } from "@/lib/wallet";
 import type { Json } from "@/lib/supabase/types";
@@ -149,7 +150,7 @@ export async function reconcileSubscription(stripeSubscriptionId: string): Promi
     stripe_price_id: priceId,
     status: sub.status,
     current_period_end: periodEndIso(sub),
-    cancel_at_period_end: sub.cancel_at_period_end ?? false,
+    cancel_at_period_end: subscriptionWillCancel(sub),
   };
 
   const { data: updated } = await supabaseAdmin

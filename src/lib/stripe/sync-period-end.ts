@@ -1,5 +1,6 @@
 import "server-only";
 
+import { subscriptionWillCancel } from "@/lib/billing/subscription-cancel";
 import { stripe } from "@/lib/stripe/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -39,7 +40,7 @@ function needsLivePeriodCheck(storedEnd: string | null, durationMonths: number):
 export async function maybeSyncSubscriptionPeriodEnds(userId: string): Promise<void> {
   const { data: subs, error } = await supabaseAdmin
     .from("subscriptions")
-    .select("id, stripe_subscription_id, package_id, current_period_end")
+    .select("id, stripe_subscription_id, package_id, current_period_end, cancel_at_period_end")
     .eq("user_id", userId)
     .in("status", ACTIVE_STATUSES)
     .not("stripe_subscription_id", "is", null)
@@ -60,6 +61,7 @@ export async function maybeSyncSubscriptionPeriodEnds(userId: string): Promise<v
 
   for (const sub of subs) {
     if (!sub.stripe_subscription_id || !sub.package_id) continue;
+    if (sub.cancel_at_period_end) continue;
     const pkg = pkgById.get(sub.package_id);
     if (!pkg) continue;
     if (!needsLivePeriodCheck(sub.current_period_end, pkg.duration_months)) continue;
@@ -94,12 +96,29 @@ export async function maybeSyncSubscriptionPeriodEnds(userId: string): Promise<v
         continue;
       }
 
+      if (subscriptionWillCancel(stripeSub)) {
+        await supabaseAdmin
+          .from("subscriptions")
+          .update({ cancel_at_period_end: true })
+          .eq("id", sub.id);
+        continue;
+      }
+
       // Release a deferred next-cycle schedule so the period can be extended now.
+      // A schedule already set to cancel is the patient's cancellation — leave it.
       const existingSchedule = anySub.schedule;
       if (existingSchedule) {
         const sid = typeof existingSchedule === "string" ? existingSchedule : existingSchedule.id;
         if (sid) {
           try {
+            const schedule = await stripe.subscriptionSchedules.retrieve(sid);
+            if (schedule.end_behavior === "cancel") {
+              await supabaseAdmin
+                .from("subscriptions")
+                .update({ cancel_at_period_end: true })
+                .eq("id", sub.id);
+              continue;
+            }
             await stripe.subscriptionSchedules.release(sid);
           } catch {
             // Already released — continue.
@@ -108,6 +127,13 @@ export async function maybeSyncSubscriptionPeriodEnds(userId: string): Promise<v
       }
 
       const fresh = await stripe.subscriptions.retrieve(sub.stripe_subscription_id);
+      if (subscriptionWillCancel(fresh)) {
+        await supabaseAdmin
+          .from("subscriptions")
+          .update({ cancel_at_period_end: true })
+          .eq("id", sub.id);
+        continue;
+      }
       const schedule = await stripe.subscriptionSchedules.create({
         from_subscription: sub.stripe_subscription_id,
       });

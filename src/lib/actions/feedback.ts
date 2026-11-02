@@ -61,6 +61,41 @@ async function requireUser() {
   return user;
 }
 
+type InquiryAccessRow = {
+  user_id: string | null;
+  email: string | null;
+  intake_session_id: string | null;
+};
+
+/** Same visibility as the inquiries list: owner, matching email, or claimed intake. */
+async function patientOwnsInquiry(
+  row: InquiryAccessRow,
+  user: { id: string; email?: string | null },
+): Promise<boolean> {
+  if (row.user_id === user.id) return true;
+  if (row.user_id) return false;
+
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("email")
+    .eq("id", user.id)
+    .maybeSingle();
+  const emails = [user.email, profile?.email]
+    .map((value) => value?.trim().toLowerCase())
+    .filter((value): value is string => Boolean(value));
+  const rowEmail = row.email?.trim().toLowerCase() ?? "";
+  if (rowEmail && emails.includes(rowEmail)) return true;
+
+  if (!row.intake_session_id) return false;
+  const { data: session } = await supabaseAdmin
+    .from("intake_sessions")
+    .select("id")
+    .eq("id", row.intake_session_id)
+    .eq("claimed_by_user_id", user.id)
+    .maybeSingle();
+  return Boolean(session);
+}
+
 async function loadIntakeSessionFromCookie() {
   const token = await getSessionTokenFromCookie();
   if (!token) return null;
@@ -300,7 +335,7 @@ export async function replyToInquiry(
 
   const { data: row, error: loadErr } = await supabaseAdmin
     .from("patient_feedback")
-    .select("id, user_id, email, full_name, message, status")
+    .select("id, user_id, email, full_name, message, status, intake_session_id")
     .eq("id", parsed.data.id)
     .maybeSingle();
   if (loadErr) {
@@ -311,7 +346,7 @@ export async function replyToInquiry(
       message: "Could not send your reply. Please try again.",
     };
   }
-  if (!row || row.user_id !== user.id) {
+  if (!row || !(await patientOwnsInquiry(row, user))) {
     return { ok: false, code: "not_found", message: "Inquiry not found." };
   }
   if (!canPatientReply(row.status)) {
@@ -344,6 +379,7 @@ export async function replyToInquiry(
       status: "open",
       updated_at: now,
       resolved_at: null,
+      ...(row.user_id ? {} : { user_id: user.id }),
     })
     .eq("id", row.id);
   if (updErr) {
@@ -387,10 +423,10 @@ export async function confirmInquirySolved(id: string): Promise<FeedbackActionRe
 
   const { data: row, error: loadErr } = await supabaseAdmin
     .from("patient_feedback")
-    .select("id, user_id, status")
+    .select("id, user_id, email, status, intake_session_id")
     .eq("id", parsed.data)
     .maybeSingle();
-  if (loadErr || !row || row.user_id !== user.id) {
+  if (loadErr || !row || !(await patientOwnsInquiry(row, user))) {
     return { ok: false, code: "not_found", message: "Inquiry not found." };
   }
   if (!canPatientConfirm(row.status)) {
@@ -404,7 +440,12 @@ export async function confirmInquirySolved(id: string): Promise<FeedbackActionRe
   const now = new Date().toISOString();
   const { error } = await supabaseAdmin
     .from("patient_feedback")
-    .update({ status: "resolved", updated_at: now, resolved_at: now })
+    .update({
+      status: "resolved",
+      updated_at: now,
+      resolved_at: now,
+      ...(row.user_id ? {} : { user_id: user.id }),
+    })
     .eq("id", row.id);
   if (error) {
     console.error("[feedback] confirm failed:", error);

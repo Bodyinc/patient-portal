@@ -32,14 +32,22 @@ function InquiryCard({ inquiry }: { inquiry: PatientInquiry }) {
     inquiry.status === "needs_info" || inquiry.status === "awaiting_confirmation",
   );
   const [reply, setReply] = useState("");
+  const [replyError, setReplyError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const allowReply = canPatientReply(inquiry.status);
   const allowConfirm = canPatientConfirm(inquiry.status);
 
   function submitReply() {
+    const body = reply.trim();
+    if (body.length < 10) {
+      setReplyError("Please write at least 10 characters so we can follow up.");
+      return;
+    }
+    setReplyError(null);
     startTransition(async () => {
-      const result = await replyToInquiry({ id: inquiry.id, body: reply });
+      const result = await replyToInquiry({ id: inquiry.id, body });
       if (!result.ok) {
+        setReplyError(result.message);
         toast.error(result.message);
         return;
       }
@@ -149,7 +157,10 @@ function InquiryCard({ inquiry }: { inquiry: PatientInquiry }) {
               <textarea
                 id={`reply-${inquiry.id}`}
                 value={reply}
-                onChange={(event) => setReply(event.target.value)}
+                onChange={(event) => {
+                  setReply(event.target.value);
+                  if (replyError) setReplyError(null);
+                }}
                 rows={3}
                 minLength={10}
                 maxLength={2000}
@@ -162,11 +173,12 @@ function InquiryCard({ inquiry }: { inquiry: PatientInquiry }) {
                 }
                 className="mb-3 w-full resize-none rounded-[14px] border-0 bg-[#E8EEED] px-3 py-2.5 text-[14px] leading-snug text-[#152A51] outline-none placeholder:text-[#152A51]/40"
               />
+              {replyError ? <p className="mb-2 text-[13px] text-red-600">{replyError}</p> : null}
               <button
                 type="button"
-                disabled={pending || reply.trim().length < 10}
+                disabled={pending}
                 onClick={submitReply}
-                className="h-[42px] rounded-full bg-[#E3E084] px-5 text-[14px] font-medium text-[#152A51] hover:bg-[#D9D674] disabled:opacity-60"
+                className="h-[42px] cursor-pointer rounded-full bg-[#E3E084] px-5 text-[14px] font-medium text-[#152A51] hover:bg-[#D9D674] disabled:opacity-60"
               >
                 {pending ? "Sending…" : "Send reply"}
               </button>
