@@ -990,10 +990,13 @@ export default function QuickbloxConsultationRoom({
         return;
       }
       try {
-        const qbModule = await import("quickblox");
-        const QuickBlox =
-          qbModule.default?.QuickBlox || qbModule.QuickBlox || qbModule.default || qbModule;
-        const qbInstance = typeof QuickBlox === "function" ? new QuickBlox() : QuickBlox;
+        // Load browser-safe QuickBlox SDK bundle from npm package (avoids Node-only child_process)
+        const qbModule = (await import("quickblox/quickblox.min.js" as string)) as {
+          default?: { QuickBlox?: new () => QuickBloxClient };
+          QuickBlox?: new () => QuickBloxClient;
+        };
+        const QuickBlox = qbModule.default?.QuickBlox || qbModule.QuickBlox;
+        const qbInstance = QuickBlox ? new QuickBlox() : (window.QB as unknown as QuickBloxClient);
         window.QB = qbInstance as unknown as QuickBloxClient;
         if (mounted) {
           setSdkReady(true);
