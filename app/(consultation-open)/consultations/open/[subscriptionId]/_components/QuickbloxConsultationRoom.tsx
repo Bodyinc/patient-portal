@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import Script from "next/script";
 import { useRouter } from "next/navigation";
 import {
   Send,
@@ -981,12 +980,33 @@ export default function QuickbloxConsultationRoom({
     }
   }, [sdkReady, initQuickBlox]);
 
-  // Fallback check if window.QB was already available
+  // Dynamically load QuickBlox SDK directly from installed npm package
   useEffect(() => {
-    if (typeof window !== "undefined" && window.QB && !sdkReady) {
-      setSdkReady(true);
+    let mounted = true;
+    async function loadQuickBlox() {
+      if (typeof window === "undefined") return;
+      if (window.QB) {
+        setSdkReady(true);
+        return;
+      }
+      try {
+        const qbModule = await import("quickblox");
+        const QuickBlox =
+          qbModule.default?.QuickBlox || qbModule.QuickBlox || qbModule.default || qbModule;
+        const qbInstance = typeof QuickBlox === "function" ? new QuickBlox() : QuickBlox;
+        window.QB = qbInstance as unknown as QuickBloxClient;
+        if (mounted) {
+          setSdkReady(true);
+        }
+      } catch (err) {
+        console.error("[QuickbloxConsultationRoom] Failed to load QuickBlox SDK:", err);
+      }
     }
-  }, [sdkReady]);
+    void loadQuickBlox();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Send message in chat
   const handleSendMessage = (e?: React.FormEvent) => {
@@ -1154,16 +1174,6 @@ export default function QuickbloxConsultationRoom({
 
   return (
     <div className="flex h-full w-full min-h-0 flex-1 flex-col overflow-hidden bg-[#F9FBFA] text-[#152A51]">
-      {/* Load QuickBlox standalone script from public directory */}
-      <Script
-        src="/quickblox.min.js"
-        strategy="afterInteractive"
-        onLoad={() => {
-          console.log("[QuickbloxConsultationRoom] /quickblox.min.js loaded successfully");
-          setSdkReady(true);
-        }}
-      />
-
       {/* Consultation Navigation Header */}
       <header className="flex h-16 shrink-0 items-center justify-between border-b border-[#E8EEED] bg-white px-4 sm:px-6">
         <div className="flex items-center gap-3">

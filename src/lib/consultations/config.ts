@@ -7,18 +7,6 @@ export function isEligibleSubscriptionStatus(
 }
 
 export function getQuickbloxConfig() {
-  let apiUrl = (process.env.QUICKBLOX_API_URL ?? "https://api.quickblox.com").replace(/\/$/, "");
-  if (apiUrl.includes("api-bodyinc.quickblox.com")) {
-    apiUrl = "https://api.quickblox.com";
-  }
-
-  let clientAppUrl = (
-    process.env.QUICKBLOX_CLIENT_APP_URL ?? "https://client.quickblox.com"
-  ).replace(/\/$/, "");
-  if (clientAppUrl.includes("client-bodyinc.quickblox.com")) {
-    clientAppUrl = "https://client.quickblox.com";
-  }
-
   const providerEmail = process.env.QUICKBLOX_PROVIDER_EMAIL?.trim() || "admin@quickblox.com";
   const providerPassword = process.env.QUICKBLOX_PROVIDER_PASSWORD?.trim() || "Password2026";
   const apiKey = process.env.QUICKBLOX_API_KEY?.trim() || "";
@@ -45,8 +33,6 @@ export function getQuickbloxConfig() {
     "ack_UzqY8uy_UqMnkY3wyMpQ";
 
   return {
-    apiUrl,
-    clientAppUrl,
     providerEmail,
     providerPassword,
     apiKey,

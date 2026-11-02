@@ -30,6 +30,7 @@ export type QbAppointment = {
 
 const SESSION_TTL_MS = 90 * 60 * 1000;
 const LOGIN_LOCK_MS = 30 * 60 * 1000;
+const QB_API_ENDPOINT = "https://api.quickblox.com";
 
 const clientSessionCache = new Map<string, { token: string; userId: number; expiresAt: number }>();
 const loginLockUntil = new Map<string, number>();
@@ -141,7 +142,7 @@ async function createQbRestSession(userCreds?: { email?: string; password?: stri
   const signature = createHmac("sha1", cfg.authSecret).update(sortedParams).digest("hex");
   message.signature = signature;
 
-  const res = await fetch(`${cfg.apiUrl}/session.json`, {
+  const res = await fetch(`${QB_API_ENDPOINT}/session.json`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -181,9 +182,8 @@ async function createQbRestUser(params: {
   password: string;
   fullName: string;
 }): Promise<number | null> {
-  const cfg = getQuickbloxConfig();
   try {
-    const res = await fetch(`${cfg.apiUrl}/users.json`, {
+    const res = await fetch(`${QB_API_ENDPOINT}/users.json`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -219,8 +219,7 @@ async function createQbRestDialog(params: {
   name: string;
   providerId: number;
 }): Promise<{ _id: string; xmpp_room_jid?: string }> {
-  const cfg = getQuickbloxConfig();
-  const res = await fetch(`${cfg.apiUrl}/chat/Dialog.json`, {
+  const res = await fetch(`${QB_API_ENDPOINT}/chat/Dialog.json`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -443,7 +442,7 @@ export async function fetchQuickbloxUserName(userId: number): Promise<string | n
       email: cfg.providerEmail,
       password: cfg.providerPassword,
     });
-    const res = await fetch(`${cfg.apiUrl}/users/${userId}.json`, {
+    const res = await fetch(`${QB_API_ENDPOINT}/users/${userId}.json`, {
       method: "GET",
       headers: {
         "QB-Token": adminSession.token,
