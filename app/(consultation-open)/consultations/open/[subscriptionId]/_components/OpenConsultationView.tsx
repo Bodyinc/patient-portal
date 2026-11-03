@@ -70,7 +70,7 @@ export default function OpenConsultationView({ subscriptionId }: OpenConsultatio
     } finally {
       setLoading(false);
     }
-  }, [subscriptionId, router]);
+  }, [subscriptionId]);
 
   useEffect(() => {
     void initConsultation();
@@ -98,7 +98,7 @@ export default function OpenConsultationView({ subscriptionId }: OpenConsultatio
     }, 8000);
 
     return () => clearInterval(interval);
-  }, [isFinished, loading, error, subscriptionId, router]);
+  }, [isFinished, loading, error, subscriptionId]);
 
   // Handle completion of Jotform intake step
   const handleIntakeComplete = useCallback(
