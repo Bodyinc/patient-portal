@@ -308,6 +308,14 @@ export async function sendUnsentOrderStatusEmails(opts?: {
         console.warn("[email] order status skipped: no recipient yet", event.id);
       } else {
         const extraPay = extraPayByRequest.get(event.request_id);
+        if (
+          event.status === "awaiting_additional_payment" &&
+          !(extraPay && extraPay.amount_cents > 0)
+        ) {
+          await markEmailSent(PATIENT_STATUS_REMINDER, event.id, "");
+          sentKeys.add(`${event.id}|`);
+          continue;
+        }
         const needsConsultation = Boolean(
           request?.requires_consultation ||
           (request?.medicine_id && consultationByMedicineId.get(request.medicine_id)),

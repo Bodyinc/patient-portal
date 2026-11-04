@@ -248,7 +248,10 @@ export async function fetchPatientOrders(userId: string): Promise<PatientOrderDt
       planName: (r.package_id && pkgMap.get(r.package_id)) || null,
       kind: r.kind,
       status: r.status,
-      statusLabel: patientStatusLabel(r.status),
+      statusLabel:
+        r.status === "awaiting_additional_payment" && !(pay && pay.amount_cents > 0)
+          ? "Prescription under review"
+          : patientStatusLabel(r.status),
       isRejected: r.status === "rejected" || r.status === "cancelled",
       createdAt: r.created_at,
       trackingNumber: r.tracking_number,
