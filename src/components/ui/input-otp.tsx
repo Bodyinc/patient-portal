@@ -6,12 +6,18 @@ import { Minus } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
+/** Emails space the digits for reading. Pasting that string must still fill the boxes. */
+function digitsFromPastedOtp(pasted: string) {
+  return pasted.replace(/\D/g, "");
+}
+
 const InputOTP = React.forwardRef<
   React.ElementRef<typeof OTPInput>,
   React.ComponentPropsWithoutRef<typeof OTPInput>
->(({ className, containerClassName, ...props }, ref) => (
+>(({ className, containerClassName, pasteTransformer, ...props }, ref) => (
   <OTPInput
     ref={ref}
+    pasteTransformer={pasteTransformer ?? digitsFromPastedOtp}
     containerClassName={cn(
       "flex items-center gap-2 has-[:disabled]:opacity-50",
       containerClassName,
