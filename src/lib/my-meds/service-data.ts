@@ -4,6 +4,7 @@ import { ensureCheckoutAddons } from "@/lib/checkout/provision-addons";
 import { sendOrderConfirmationEmail } from "@/lib/email/order-confirmation";
 import { resolveMedicineImageSrc } from "@/lib/intake/medicine-image";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { sharedCheckoutTracking } from "@/lib/orders/shared-tracking";
 import { fetchPatientOrders } from "@/lib/orders/service-data";
 import { healAndFetchPendingAdditionalPayments } from "@/lib/orders/additional-payment";
 import { maybeReconcileIncompleteSubscription } from "@/lib/stripe/reconcile";
@@ -172,6 +173,30 @@ function mapPastMedication(subscription: SubscriptionRow): MyMedsPastMedicationD
   };
 }
 
+function withSharedCheckoutTracking(
+  meds: MyMedsCurrentMedicationDto[],
+): MyMedsCurrentMedicationDto[] {
+  const byGroup = new Map<string, MyMedsCurrentMedicationDto[]>();
+  for (const med of meds) {
+    if (!med.checkoutGroupId) continue;
+    const list = byGroup.get(med.checkoutGroupId) ?? [];
+    list.push(med);
+    byGroup.set(med.checkoutGroupId, list);
+  }
+
+  const sharedByGroup = new Map<string, string>();
+  for (const [groupId, list] of byGroup) {
+    const shared = sharedCheckoutTracking(list.map((med) => med.trackingNumber));
+    if (shared) sharedByGroup.set(groupId, shared);
+  }
+
+  return meds.map((med) => {
+    const shared = med.checkoutGroupId ? sharedByGroup.get(med.checkoutGroupId) : null;
+    if (!shared || med.trackingNumber) return med;
+    return { ...med, trackingNumber: shared };
+  });
+}
+
 function byCheckoutRole(a: SubscriptionRow, b: SubscriptionRow) {
   const rank = (row: SubscriptionRow) => (row.is_checkout_primary === false ? 1 : 0);
   const role = rank(a) - rank(b);
@@ -208,7 +233,9 @@ export async function fetchActiveMedications(
     rows.map((row) => row.id),
   );
 
-  return rows.map((row) => mapActiveMedication(row, orderStatusBySubscription.get(row.id) ?? null));
+  return withSharedCheckoutTracking(
+    rows.map((row) => mapActiveMedication(row, orderStatusBySubscription.get(row.id) ?? null)),
+  );
 }
 
 async function latestOrderStatusBySubscription(
@@ -387,8 +414,10 @@ export async function fetchMyMedsPageData(
     userId,
     activeRows.map((row) => row.id),
   );
-  const activeMedications = activeRows.map((row) =>
-    mapActiveMedication(row, orderStatusBySubscription.get(row.id) ?? null),
+  const activeMedications = withSharedCheckoutTracking(
+    activeRows.map((row) =>
+      mapActiveMedication(row, orderStatusBySubscription.get(row.id) ?? null),
+    ),
   );
 
   const activeMedicineIds = new Set(

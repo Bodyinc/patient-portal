@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { formatOrderId } from "@/lib/orders/order-id";
+import { sharedCheckoutTracking } from "./shared-tracking";
 import {
   buildTimeline,
   isConsultationApproved,
@@ -113,13 +114,7 @@ function groupCheckoutOrders(
       ),
     ];
     const statuses = new Set(ordered.map((order) => order.status));
-    const tracks = [
-      ...new Set(
-        ordered
-          .map((order) => order.trackingNumber)
-          .filter((value): value is string => Boolean(value)),
-      ),
-    ];
+    const sharedTracking = sharedCheckoutTracking(ordered.map((order) => order.trackingNumber));
     const pending = ordered.find((order) => order.pendingPayment);
     grouped.push({
       ...primary,
@@ -127,12 +122,15 @@ function groupCheckoutOrders(
       medicineName: names.join(", "),
       planName: plans.length > 0 ? plans.join(", ") : null,
       statusLabel: statuses.size === 1 ? primary.statusLabel : "Multiple updates",
-      trackingNumber: tracks.length === 1 ? tracks[0] : null,
+      trackingNumber: sharedTracking,
       requiresConsultation: ordered.some((order) => order.requiresConsultation),
       isRejected: ordered.every((order) => order.isRejected),
       pendingPayment: pending?.pendingPayment ?? null,
       payRequestId: pending?.id ?? null,
-      lines: ordered.map(toOrderLine),
+      lines: ordered.map((order) => {
+        const line = toOrderLine(order);
+        return sharedTracking ? { ...line, trackingNumber: sharedTracking } : line;
+      }),
     });
   }
 

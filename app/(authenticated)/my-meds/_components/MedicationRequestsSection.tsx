@@ -309,8 +309,8 @@ export default function MedicationRequestsSection({
       ) : null}
 
       <Dialog open={!!active} onOpenChange={(o) => !o && setActive(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[min(90dvh,760px)] w-[calc(100%-1.5rem)] max-w-md flex-col gap-4 overflow-hidden">
+          <DialogHeader className="shrink-0 pr-6">
             <DialogTitle className="text-[#152A51]">
               {active?.medicationName}
               {active?.orderNumber ? (
@@ -327,77 +327,79 @@ export default function MedicationRequestsSection({
           </DialogHeader>
 
           {active ? (
-            active.isRejected ? (
-              <p className="rounded-[14px] bg-red-50 p-3 text-sm text-red-700">
-                This order was rejected and the payment refunded.
-              </p>
-            ) : (
-              <div className="pt-1">
-                {active.pendingPaymentCents && payRequestId(active) ? (
-                  <div className="mb-4 flex items-center justify-between gap-3 rounded-[14px] border border-[#E8EEED] bg-[#FFF6D6] p-3">
-                    <span className="text-sm text-[#786C46]">
-                      {money(active.pendingPaymentCents)} due to continue
-                    </span>
-                    <Link
-                      href={`/orders/${payRequestId(active)}/pay`}
-                      className="rounded-full bg-[#152A51] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#152A51]/90"
-                    >
-                      Pay now
-                    </Link>
-                  </div>
-                ) : null}
-
-                {active.lines.length > 1 ? (
-                  <div className="space-y-3">
-                    {active.lines.map((line) => (
-                      <OrderLineDetail key={line.id} line={line} />
-                    ))}
-                  </div>
-                ) : (
-                  <OrderTimeline steps={active.timeline} />
-                )}
-
-                {active.lines.length > 1 ? null : active.consultationApproved ? (
-                  <p className="mt-1 text-sm font-medium text-[#34845F]">Consultation approved</p>
-                ) : null}
-
-                {active.lines.length <= 1 && active.trackingNumber ? (
-                  <div className="mt-1">
-                    <TrackingIdValue trackingNumber={active.trackingNumber} />
-                  </div>
-                ) : null}
-
-                {active.lines.length <= 1 && active.prescription ? (
-                  <div className="mt-3 rounded-[14px] border border-[#E8EEED] bg-[#F3F6F6] p-3">
-                    <div className="text-sm font-medium text-[#152A51]">Prescription</div>
-                    <div className="text-sm text-[#152A51]/80">
-                      {active.prescription.medicineName}
-                    </div>
-                    {active.prescription.directions ? (
-                      <div className="text-xs text-[#152A51]/70">
-                        {active.prescription.directions}
-                      </div>
-                    ) : null}
-                    <div className="mt-2 flex items-center gap-2">
+            <div className="max-h-[calc(90dvh-12rem)] overflow-y-auto overscroll-contain pr-1">
+              {active.isRejected ? (
+                <p className="rounded-[14px] bg-red-50 p-3 text-sm text-red-700">
+                  This order was rejected and the payment refunded.
+                </p>
+              ) : (
+                <div className="pt-1">
+                  {active.pendingPaymentCents && payRequestId(active) ? (
+                    <div className="mb-4 flex items-center justify-between gap-3 rounded-[14px] border border-[#E8EEED] bg-[#FFF6D6] p-3">
+                      <span className="text-sm text-[#786C46]">
+                        {money(active.pendingPaymentCents)} due to continue
+                      </span>
                       <Link
-                        href={`/prescriptions/${active.prescription.id}`}
-                        target="_blank"
-                        className="rounded-full border border-[#152A51] px-3 py-1.5 text-sm font-medium text-[#152A51] hover:bg-white"
-                      >
-                        View
-                      </Link>
-                      <Link
-                        href={`/prescriptions/${active.prescription.id}?download=1`}
-                        target="_blank"
+                        href={`/orders/${payRequestId(active)}/pay`}
                         className="rounded-full bg-[#152A51] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#152A51]/90"
                       >
-                        Download
+                        Pay now
                       </Link>
                     </div>
-                  </div>
-                ) : null}
-              </div>
-            )
+                  ) : null}
+
+                  {active.lines.length > 1 ? (
+                    <div className="space-y-3">
+                      {active.lines.map((line) => (
+                        <OrderLineDetail key={line.id} line={line} />
+                      ))}
+                    </div>
+                  ) : (
+                    <OrderTimeline steps={active.timeline} />
+                  )}
+
+                  {active.lines.length > 1 ? null : active.consultationApproved ? (
+                    <p className="mt-1 text-sm font-medium text-[#34845F]">Consultation approved</p>
+                  ) : null}
+
+                  {active.lines.length <= 1 && active.trackingNumber ? (
+                    <div className="mt-1">
+                      <TrackingIdValue trackingNumber={active.trackingNumber} />
+                    </div>
+                  ) : null}
+
+                  {active.lines.length <= 1 && active.prescription ? (
+                    <div className="mt-3 rounded-[14px] border border-[#E8EEED] bg-[#F3F6F6] p-3">
+                      <div className="text-sm font-medium text-[#152A51]">Prescription</div>
+                      <div className="text-sm text-[#152A51]/80">
+                        {active.prescription.medicineName}
+                      </div>
+                      {active.prescription.directions ? (
+                        <div className="text-xs text-[#152A51]/70">
+                          {active.prescription.directions}
+                        </div>
+                      ) : null}
+                      <div className="mt-2 flex items-center gap-2">
+                        <Link
+                          href={`/prescriptions/${active.prescription.id}`}
+                          target="_blank"
+                          className="rounded-full border border-[#152A51] px-3 py-1.5 text-sm font-medium text-[#152A51] hover:bg-white"
+                        >
+                          View
+                        </Link>
+                        <Link
+                          href={`/prescriptions/${active.prescription.id}?download=1`}
+                          target="_blank"
+                          className="rounded-full bg-[#152A51] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#152A51]/90"
+                        >
+                          Download
+                        </Link>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+            </div>
           ) : null}
         </DialogContent>
       </Dialog>
