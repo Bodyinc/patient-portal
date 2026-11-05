@@ -27,6 +27,11 @@ export type Database = {
           decision_at: string | null;
           decision_note: string | null;
           stripe_refund_id: string | null;
+          life_file_order_id: string | null;
+          life_file_status: string | null;
+          life_file_error: string | null;
+          life_file_pharmacy_id: string | null;
+          life_file_submitted_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -50,6 +55,11 @@ export type Database = {
           decision_at?: string | null;
           decision_note?: string | null;
           stripe_refund_id?: string | null;
+          life_file_order_id?: string | null;
+          life_file_status?: string | null;
+          life_file_error?: string | null;
+          life_file_pharmacy_id?: string | null;
+          life_file_submitted_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -73,6 +83,11 @@ export type Database = {
           decision_at?: string | null;
           decision_note?: string | null;
           stripe_refund_id?: string | null;
+          life_file_order_id?: string | null;
+          life_file_status?: string | null;
+          life_file_error?: string | null;
+          life_file_pharmacy_id?: string | null;
+          life_file_submitted_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };

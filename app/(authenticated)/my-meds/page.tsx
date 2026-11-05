@@ -1,3 +1,5 @@
+import { after } from "next/server";
+
 import { requirePatientSession } from "@/lib/auth/require-patient";
 import { userFacingMessage } from "@/lib/user-message";
 import {
@@ -39,7 +41,7 @@ export default async function MyMedsPage({
   if (resolvedSearchParams.payment_intent) {
     await fulfillAdditionalPaymentByIntentId(resolvedSearchParams.payment_intent);
   }
-  await dispatchUnsentPaidUpgrades(user.id);
+  after(() => dispatchUnsentPaidUpgrades(user.id));
 
   try {
     const [data, referral, offer, identity] = await Promise.all([

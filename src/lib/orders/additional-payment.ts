@@ -3,6 +3,7 @@ import "server-only";
 import type Stripe from "stripe";
 
 import { additionalPaymentReceivedEmail } from "@/lib/email/lifecycle-emails";
+import { submitRequestToLifeFile } from "@/lib/lifefile/submit.server";
 import { sendOnce } from "@/lib/email/idempotency";
 import { sendUnsentOrderStatusEmails } from "@/lib/email/reminders";
 import { appUrl, patientEmailByUserId } from "@/lib/email/recipients";
@@ -352,12 +353,12 @@ async function prescribeRequestAfterAdditionalPayment(requestId: string): Promis
   });
 }
 
-async function markSentToPharmacy(requestId: string): Promise<void> {
+async function markSentToPharmacy(requestId: string, note: string): Promise<void> {
   const { data: updated } = await supabaseAdmin
     .from("medication_requests")
     .update({ status: "sent_to_pharmacy", updated_at: new Date().toISOString() })
     .eq("id", requestId)
-    .eq("status", "prescribed")
+    .in("status", ["prescribed", "sent_to_pharmacy"])
     .select("id");
   if (!updated?.length) return;
 
@@ -368,18 +369,24 @@ async function markSentToPharmacy(requestId: string): Promise<void> {
     .eq("status", "sent_to_pharmacy")
     .limit(1)
     .maybeSingle();
-  if (existingEvent) return;
+  if (existingEvent) {
+    await supabaseAdmin
+      .from("medication_request_events")
+      .update({ note })
+      .eq("id", existingEvent.id);
+    return;
+  }
 
   await supabaseAdmin.from("medication_request_events").insert({
     request_id: requestId,
     status: "sent_to_pharmacy",
     actor_role: "system",
-    note: "Additional payment received. Sent to pharmacy.",
+    note,
   });
 }
 
-// Both steps stay in the patient portal. Nothing is sent to the provider app.
-// An unpaid difference blocks both, so the order cannot show as sent while Pay now is still up.
+// An unpaid difference blocks fulfillment. Once it is paid, submit the same LifeFile
+// order the admin app sends, and only then mark the request sent to the pharmacy.
 async function prescribeAndSendToPharmacy(requestId: string): Promise<void> {
   const { data: stillPending } = await supabaseAdmin
     .from("additional_payments")
@@ -390,7 +397,27 @@ async function prescribeAndSendToPharmacy(requestId: string): Promise<void> {
   if (stillPending) return;
 
   await prescribeRequestAfterAdditionalPayment(requestId);
-  await markSentToPharmacy(requestId);
+
+  const { data: req } = await supabaseAdmin
+    .from("medication_requests")
+    .select(
+      "id, status, provider_id, user_id, medicine_id, variant_id, life_file_order_id, life_file_status",
+    )
+    .eq("id", requestId)
+    .maybeSingle();
+  if (!req) return;
+  if (req.life_file_order_id && req.life_file_status && req.life_file_status !== "failed") {
+    await markSentToPharmacy(requestId, `Life File order ID: ${req.life_file_order_id}`);
+    return;
+  }
+
+  try {
+    const lf = await submitRequestToLifeFile(supabaseAdmin, req, { allowRetry: true });
+    const pharmacy = lf.pharmacyName ? ` (${lf.pharmacyName})` : "";
+    await markSentToPharmacy(requestId, `Life File order ID: ${lf.lifeFileOrderId}${pharmacy}`);
+  } catch (error) {
+    console.error("[lifefile] additional payment submission failed:", error);
+  }
 }
 
 async function notifyAdditionalPaymentReceived(
@@ -479,22 +506,28 @@ export async function dispatchUnsentPaidUpgrades(userId: string): Promise<void> 
   const requestIds = [...new Set(pays.map((row) => row.request_id))];
   const { data: requests } = await supabaseAdmin
     .from("medication_requests")
-    .select("id, status")
+    .select("id, status, life_file_order_id, life_file_status")
     .in("id", requestIds);
-  const unsent = new Set(
+  const needsLifeFile = new Set(
     (requests ?? [])
-      .filter(
-        (row) =>
-          !["sent_to_pharmacy", "dispatched", "delivered", "rejected", "cancelled"].includes(
-            row.status,
-          ),
-      )
+      .filter((row) => {
+        if (["dispatched", "delivered", "rejected", "cancelled"].includes(row.status)) return false;
+        const submitted = Boolean(
+          row.life_file_order_id && row.life_file_status && row.life_file_status !== "failed",
+        );
+        if (submitted) return false;
+        return (
+          row.status === "sent_to_pharmacy" ||
+          row.status === "prescribed" ||
+          row.status === "approved"
+        );
+      })
       .map((row) => row.id),
   );
 
   for (const row of pays) {
-    if (!unsent.has(row.request_id)) continue;
-    unsent.delete(row.request_id);
+    if (!needsLifeFile.has(row.request_id)) continue;
+    needsLifeFile.delete(row.request_id);
     await prescribeAndSendToPharmacy(row.request_id);
   }
 }
