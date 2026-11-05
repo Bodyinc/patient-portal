@@ -453,7 +453,7 @@ export default function QuickbloxConsultationRoom({
 
   const [providerInRoom, setProviderInRoom] = useState(false);
   // Claimed in the portal, or already present in the QuickBlox room.
-  const providerReady = Boolean(sdkConfig.dialogId && (sdkConfig.caseAssigned || providerInRoom));
+  const providerReady = Boolean(sdkConfig.dialogId && sdkConfig.caseAssigned && providerInRoom);
   const canMessage = providerReady && connected;
   const resolveUserNamesRef = useRef(resolveUserNames);
   resolveUserNamesRef.current = resolveUserNames;

@@ -98,9 +98,15 @@ export function orderStatusEmail(params: {
     statusBody = `Your clinician updated your <strong>${params.medicineName}</strong> treatment. An additional payment of <strong>${amount}</strong> is required before your prescription can continue. Please complete payment to avoid delays.`;
   }
 
+  const payInstructions =
+    params.status === "awaiting_additional_payment"
+      ? `<p>To pay, sign in to your patient portal and open Dashboard or My Meds. The amount due is waiting for you there.</p>`
+      : "";
+
   const body = [
     `<p>Hi ${firstName(params.fullName)},</p>`,
     `<p>${statusBody}</p>`,
+    payInstructions,
     orderDetails,
     emailButton(ctaLabel, params.ctaUrl),
   ].join("");

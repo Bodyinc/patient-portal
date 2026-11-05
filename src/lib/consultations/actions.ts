@@ -1,6 +1,6 @@
 "use server";
 
-import { checkoutCoverageLabel, consultationAnchorId } from "@/lib/checkout/group";
+import { consultationAnchorId, orderCoverageLabel } from "@/lib/checkout/group";
 import { userFacingMessage } from "@/lib/user-message";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -349,12 +349,15 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
         .select("id, provider_id")
         .eq("user_id", user.id)
         .in("subscription_id", [...subscriptionIds]);
-      return data ?? [];
+      return { requests: data ?? [], subscriptionIds: [...subscriptionIds] };
     })(),
   ]);
 
+  const orderRequests = medicationRequests.requests;
+  const orderSubscriptionIds = medicationRequests.subscriptionIds;
+
   // A checkout can have several medication requests. Claiming any of them assigns the visit.
-  const caseAssigned = (medicationRequests ?? []).some((row) => Boolean(row.provider_id));
+  const caseAssigned = orderRequests.some((row) => Boolean(row.provider_id));
 
   const email = (profile?.email || user.email || "").trim().toLowerCase();
   if (!email) return { ok: false, message: "Your account is missing an email address." };
@@ -386,11 +389,8 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
   const weightKg = (intake as { weight_kg?: number | null })?.weight_kg || null;
   const planMedicineName =
     (subscription as { medicines?: { name?: string } | null }).medicines?.name ?? "treatment";
-  const coverage = await checkoutCoverageLabel(
-    (subscription as { session_id?: string | null }).session_id,
-    planMedicineName,
-  );
-  const medicineName = coverage.count > 1 ? coverage.label : planMedicineName;
+  const coverage = await orderCoverageLabel(subscription.id, planMedicineName);
+  const medicineName = coverage.label;
 
   try {
     const client = await clientSessionForUser({
@@ -461,8 +461,8 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
           }
         }
       }
-      if (!isFinished && medicationRequests.length > 0) {
-        const requestIds = medicationRequests.map((row) => row.id).filter(Boolean);
+      if (!isFinished && orderRequests.length > 0) {
+        const requestIds = orderRequests.map((row) => row.id).filter(Boolean);
         if (requestIds.length > 0) {
           const { data: events } = await supabaseAdmin
             .from("medication_request_events")
@@ -670,7 +670,7 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
         email,
         fullName,
         subscriptionId: subscription.id,
-        medicineId: subscription.medicine_id,
+        subscriptionIds: orderSubscriptionIds,
         medicineName,
       });
 
@@ -749,7 +749,7 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
       email,
       fullName,
       subscriptionId: subscription.id,
-      medicineId: subscription.medicine_id,
+      subscriptionIds: orderSubscriptionIds,
       medicineName,
     });
 
@@ -1093,7 +1093,7 @@ async function sendConsultationStartedEmail(params: {
   email: string;
   fullName: string;
   subscriptionId: string;
-  medicineId: string | null;
+  subscriptionIds: string[];
   medicineName: string;
 }) {
   try {
@@ -1110,7 +1110,7 @@ async function sendConsultationStartedEmail(params: {
     const hubUrl = adminAppUrl();
     const providers = await assignedProvidersForPatient({
       userId: params.userId,
-      medicineId: params.medicineId,
+      subscriptionIds: params.subscriptionIds,
     });
     const emailed = new Set<string>([params.email.toLowerCase()]);
 
