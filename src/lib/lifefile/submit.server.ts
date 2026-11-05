@@ -376,7 +376,7 @@ async function resolveLifeFileRouting(
 
   return {
     pharmacyId: pharmacy.id,
-    pharmacyName: pharmacy.name,
+    pharmacyName: pharmacy.name ?? null,
     lfProductId,
     providerLifeFileId: null,
     credentialNpi: null,
