@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { formatOrderId } from "@/lib/orders/order-id";
+import { sharedCheckoutTracking } from "./shared-tracking";
 import {
   buildTimeline,
   isConsultationApproved,
@@ -113,13 +114,7 @@ function groupCheckoutOrders(
       ),
     ];
     const statuses = new Set(ordered.map((order) => order.status));
-    const tracks = [
-      ...new Set(
-        ordered
-          .map((order) => order.trackingNumber)
-          .filter((value): value is string => Boolean(value)),
-      ),
-    ];
+    const sharedTracking = sharedCheckoutTracking(ordered.map((order) => order.trackingNumber));
     const pending = ordered.find((order) => order.pendingPayment);
     grouped.push({
       ...primary,
@@ -127,12 +122,15 @@ function groupCheckoutOrders(
       medicineName: names.join(", "),
       planName: plans.length > 0 ? plans.join(", ") : null,
       statusLabel: statuses.size === 1 ? primary.statusLabel : "Multiple updates",
-      trackingNumber: tracks.length === 1 ? tracks[0] : null,
+      trackingNumber: sharedTracking,
       requiresConsultation: ordered.some((order) => order.requiresConsultation),
       isRejected: ordered.every((order) => order.isRejected),
       pendingPayment: pending?.pendingPayment ?? null,
       payRequestId: pending?.id ?? null,
-      lines: ordered.map(toOrderLine),
+      lines: ordered.map((order) => {
+        const line = toOrderLine(order);
+        return sharedTracking ? { ...line, trackingNumber: sharedTracking } : line;
+      }),
     });
   }
 
@@ -241,6 +239,16 @@ export async function fetchPatientOrders(userId: string): Promise<PatientOrderDt
 
     const rx = rxByReq.get(r.id);
     const pay = payByReq.get(r.id);
+    const paymentStillDue = Boolean(pay && pay.amount_cents > 0);
+    // The charge and the order status are stored separately. While the difference
+    // is unpaid, the patient should see the payment step, not a later pharmacy step.
+    const displayStatus = paymentStillDue ? "awaiting_additional_payment" : r.status;
+    const timelineAt = new Map(atByStatus);
+    if (paymentStillDue) {
+      for (const key of ["approved", "prescribed", "sent_to_pharmacy", "dispatched", "delivered"]) {
+        timelineAt.delete(key);
+      }
+    }
 
     return {
       id: r.id,
@@ -249,8 +257,11 @@ export async function fetchPatientOrders(userId: string): Promise<PatientOrderDt
       medicineName: (r.medicine_id && medMap.get(r.medicine_id)) || "Medication",
       planName: (r.package_id && pkgMap.get(r.package_id)) || null,
       kind: r.kind,
-      status: r.status,
-      statusLabel: patientStatusLabel(r.status),
+      status: displayStatus,
+      statusLabel:
+        displayStatus === "awaiting_additional_payment" && !paymentStillDue
+          ? "Prescription under review"
+          : patientStatusLabel(displayStatus),
       isRejected: r.status === "rejected" || r.status === "cancelled",
       createdAt: r.created_at,
       trackingNumber: r.tracking_number,
@@ -261,9 +272,9 @@ export async function fetchPatientOrders(userId: string): Promise<PatientOrderDt
           ? []
           : buildTimeline({
               requiresConsultation: r.requires_consultation,
-              currentStatus: r.status,
+              currentStatus: displayStatus,
               occurred,
-              atByStatus,
+              atByStatus: timelineAt,
             }),
       prescription: rx
         ? {

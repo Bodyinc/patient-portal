@@ -4,6 +4,7 @@ import { ensureCheckoutAddons } from "@/lib/checkout/provision-addons";
 import { sendOrderConfirmationEmail } from "@/lib/email/order-confirmation";
 import { resolveMedicineImageSrc } from "@/lib/intake/medicine-image";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { sharedCheckoutTracking } from "@/lib/orders/shared-tracking";
 import { fetchPatientOrders } from "@/lib/orders/service-data";
 import { healAndFetchPendingAdditionalPayments } from "@/lib/orders/additional-payment";
 import { maybeReconcileIncompleteSubscription } from "@/lib/stripe/reconcile";
@@ -115,10 +116,22 @@ function statusLabelForPast(status: string): string {
   return "Ended";
 }
 
+type TreatmentOverride = {
+  medicineId: string;
+  packageId: string | null;
+  variantId: string | null;
+  medicationName: string;
+  currentPlan: string;
+  variantName: string | null;
+  dosage: string;
+  imageSrc: string;
+};
+
 type LatestOrderSnapshot = {
   status: string;
   trackingNumber: string | null;
   requiresConsultation: boolean;
+  treatment: TreatmentOverride | null;
 };
 
 function mapActiveMedication(
@@ -127,20 +140,40 @@ function mapActiveMedication(
 ): MyMedsCurrentMedicationDto {
   const medicine = subscription.medicines ?? null;
   const pkg = subscription.packages ?? null;
+  const subscriptionVariantId = pkg?.medicine_variants?.id ?? pkg?.variant_id ?? null;
+  const treatment = order?.treatment;
+  const showChangedTreatment = Boolean(
+    treatment &&
+    (treatment.medicineId !== subscription.medicine_id ||
+      (treatment.packageId && treatment.packageId !== subscription.package_id) ||
+      (treatment.variantId && treatment.variantId !== subscriptionVariantId)),
+  );
 
   return {
     subscriptionId: subscription.id,
     checkoutGroupId: subscription.checkout_group_id ?? null,
-    medicineId: subscription.medicine_id,
-    packageId: subscription.package_id ?? pkg?.id ?? null,
-    variantId: pkg?.medicine_variants?.id ?? pkg?.variant_id ?? null,
-    medicationName: medicine?.name ?? "Active Medication",
-    currentPlan: pkg?.name ?? "Treatment Plan",
+    medicineId: showChangedTreatment ? treatment!.medicineId : subscription.medicine_id,
+    packageId: showChangedTreatment
+      ? (treatment!.packageId ?? subscription.package_id ?? pkg?.id ?? null)
+      : (subscription.package_id ?? pkg?.id ?? null),
+    variantId: showChangedTreatment
+      ? (treatment!.variantId ?? subscriptionVariantId)
+      : subscriptionVariantId,
+    medicationName: showChangedTreatment
+      ? treatment!.medicationName
+      : (medicine?.name ?? "Active Medication"),
+    currentPlan: showChangedTreatment ? treatment!.currentPlan : (pkg?.name ?? "Treatment Plan"),
     quantitySupply: formatQuantitySupply(pkg?.duration_months),
-    dosage: parseDosage(medicine?.important_info ?? null),
-    variantName: pkg?.medicine_variants?.name?.trim() || null,
+    dosage: showChangedTreatment
+      ? treatment!.dosage
+      : parseDosage(medicine?.important_info ?? null),
+    variantName: showChangedTreatment
+      ? treatment!.variantName
+      : pkg?.medicine_variants?.name?.trim() || null,
     nextRefillDate: subscription.current_period_end,
-    imageSrc: resolveMedicineImageSrc(medicine?.image_url ?? null),
+    imageSrc: showChangedTreatment
+      ? treatment!.imageSrc
+      : resolveMedicineImageSrc(medicine?.image_url ?? null),
     canRequestRefill: canRequestManualRefill({
       autoPay: !subscription.cancel_at_period_end,
       orderStatus: order?.status ?? null,
@@ -170,6 +203,30 @@ function mapPastMedication(subscription: SubscriptionRow): MyMedsPastMedicationD
     endedAt: subscription.current_period_end ?? subscription.updated_at,
     statusLabel: statusLabelForPast(subscription.status),
   };
+}
+
+function withSharedCheckoutTracking(
+  meds: MyMedsCurrentMedicationDto[],
+): MyMedsCurrentMedicationDto[] {
+  const byGroup = new Map<string, MyMedsCurrentMedicationDto[]>();
+  for (const med of meds) {
+    if (!med.checkoutGroupId) continue;
+    const list = byGroup.get(med.checkoutGroupId) ?? [];
+    list.push(med);
+    byGroup.set(med.checkoutGroupId, list);
+  }
+
+  const sharedByGroup = new Map<string, string>();
+  for (const [groupId, list] of byGroup) {
+    const shared = sharedCheckoutTracking(list.map((med) => med.trackingNumber));
+    if (shared) sharedByGroup.set(groupId, shared);
+  }
+
+  return meds.map((med) => {
+    const shared = med.checkoutGroupId ? sharedByGroup.get(med.checkoutGroupId) : null;
+    if (!shared || med.trackingNumber) return med;
+    return { ...med, trackingNumber: shared };
+  });
 }
 
 function byCheckoutRole(a: SubscriptionRow, b: SubscriptionRow) {
@@ -208,7 +265,9 @@ export async function fetchActiveMedications(
     rows.map((row) => row.id),
   );
 
-  return rows.map((row) => mapActiveMedication(row, orderStatusBySubscription.get(row.id) ?? null));
+  return withSharedCheckoutTracking(
+    rows.map((row) => mapActiveMedication(row, orderStatusBySubscription.get(row.id) ?? null)),
+  );
 }
 
 async function latestOrderStatusBySubscription(
@@ -220,20 +279,83 @@ async function latestOrderStatusBySubscription(
 
   const { data, error } = await supabaseAdmin
     .from("medication_requests")
-    .select("subscription_id, status, tracking_number, requires_consultation, created_at")
+    .select(
+      "subscription_id, status, tracking_number, requires_consultation, created_at, medicine_id, variant_id, package_id",
+    )
     .eq("user_id", userId)
     .in("subscription_id", ids)
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(error.message);
 
-  const latest = new Map<string, LatestOrderSnapshot>();
+  const closed = new Set(["rejected", "cancelled"]);
+  const latestRows: NonNullable<typeof data> = [];
+  const seen = new Set<string>();
   for (const row of data ?? []) {
-    if (!row.subscription_id || latest.has(row.subscription_id)) continue;
+    if (!row.subscription_id || seen.has(row.subscription_id)) continue;
+    seen.add(row.subscription_id);
+    latestRows.push(row);
+  }
+
+  const openRows = latestRows.filter((row) => !closed.has(row.status) && Boolean(row.medicine_id));
+  const medicineIds = [
+    ...new Set(openRows.map((row) => row.medicine_id).filter(Boolean)),
+  ] as string[];
+  const variantIds = [
+    ...new Set(openRows.map((row) => row.variant_id).filter(Boolean)),
+  ] as string[];
+  const packageIds = [
+    ...new Set(openRows.map((row) => row.package_id).filter(Boolean)),
+  ] as string[];
+
+  const [{ data: medicines }, { data: variants }, { data: packages }] = await Promise.all([
+    medicineIds.length
+      ? supabaseAdmin
+          .from("medicines")
+          .select("id, name, image_url, important_info")
+          .in("id", medicineIds)
+      : Promise.resolve({
+          data: [] as {
+            id: string;
+            name: string;
+            image_url: string | null;
+            important_info: Json | null;
+          }[],
+        }),
+    variantIds.length
+      ? supabaseAdmin.from("medicine_variants").select("id, name").in("id", variantIds)
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    packageIds.length
+      ? supabaseAdmin.from("packages").select("id, name").in("id", packageIds)
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+  ]);
+
+  const medicineById = new Map((medicines ?? []).map((row) => [row.id, row]));
+  const variantById = new Map((variants ?? []).map((row) => [row.id, row.name]));
+  const packageById = new Map((packages ?? []).map((row) => [row.id, row.name]));
+
+  const latest = new Map<string, LatestOrderSnapshot>();
+  for (const row of latestRows) {
+    if (!row.subscription_id) continue;
+    const medicine = row.medicine_id ? medicineById.get(row.medicine_id) : undefined;
+    const treatment: TreatmentOverride | null =
+      medicine && !closed.has(row.status)
+        ? {
+            medicineId: medicine.id,
+            packageId: row.package_id,
+            variantId: row.variant_id,
+            medicationName: medicine.name,
+            currentPlan: (row.package_id && packageById.get(row.package_id)) || "Treatment Plan",
+            variantName: (row.variant_id && variantById.get(row.variant_id)?.trim()) || null,
+            dosage: parseDosage(medicine.important_info),
+            imageSrc: resolveMedicineImageSrc(medicine.image_url),
+          }
+        : null;
     latest.set(row.subscription_id, {
       status: row.status,
       trackingNumber: row.tracking_number,
       requiresConsultation: row.requires_consultation,
+      treatment,
     });
   }
   return latest;
@@ -387,8 +509,10 @@ export async function fetchMyMedsPageData(
     userId,
     activeRows.map((row) => row.id),
   );
-  const activeMedications = activeRows.map((row) =>
-    mapActiveMedication(row, orderStatusBySubscription.get(row.id) ?? null),
+  const activeMedications = withSharedCheckoutTracking(
+    activeRows.map((row) =>
+      mapActiveMedication(row, orderStatusBySubscription.get(row.id) ?? null),
+    ),
   );
 
   const activeMedicineIds = new Set(
