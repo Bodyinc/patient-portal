@@ -2,8 +2,6 @@ import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
-import { loadCheckoutCart } from "@/lib/intake/session-cart";
-
 /** Subscription that owns the single consultation for this checkout. */
 export async function consultationAnchorId(subscriptionId: string): Promise<string> {
   const { data, error } = await supabaseAdmin
@@ -48,19 +46,57 @@ export async function isInitialAddonSubscription(
   return !prior;
 }
 
+function embeddedMedicineName(
+  medicines: { name?: string | null } | { name?: string | null }[] | null | undefined,
+): string | null {
+  const medicine = Array.isArray(medicines) ? medicines[0] : medicines;
+  const name = medicine?.name?.trim();
+  return name || null;
+}
+
 /**
- * Label for every product in the intake checkout.
- * A single product keeps the caller-supplied medicine name.
+ * Medicines in this purchase.
+ * A later shop order can reuse an older intake session so the provider can read
+ * the questionnaire. That session's cart is not this order.
  */
-export async function checkoutCoverageLabel(
-  sessionId: string | null | undefined,
+export async function orderCoverageLabel(
+  subscriptionId: string,
   fallback: string,
 ): Promise<{ label: string; count: number }> {
-  if (!sessionId) return { label: fallback, count: 1 };
+  const { data: subscription } = await supabaseAdmin
+    .from("subscriptions")
+    .select("id, checkout_group_id, is_checkout_primary, medicines(name)")
+    .eq("id", subscriptionId)
+    .maybeSingle();
 
-  const cart = await loadCheckoutCart(sessionId);
-  if (cart.length <= 1) return { label: fallback, count: cart.length || 1 };
+  if (!subscription) return { label: fallback, count: 1 };
 
-  const label = cart.map((line) => `${line.medicineName} (${line.categoryName})`).join(", ");
-  return { label, count: cart.length };
+  // The filtered sibling query's inferred row omits checkout_group_id, so type
+  // rows from the fields this label actually reads.
+  let rows: {
+    is_checkout_primary: boolean | null;
+    medicines: { name: string } | { name: string }[] | null;
+  }[] = [subscription];
+  if (subscription.checkout_group_id) {
+    const { data: siblings } = await supabaseAdmin
+      .from("subscriptions")
+      .select("id, checkout_group_id, is_checkout_primary, medicines(name)")
+      .eq("checkout_group_id", subscription.checkout_group_id);
+    if (siblings && siblings.length > 0) rows = siblings;
+  }
+
+  const names = [
+    ...new Set(
+      [...rows]
+        .sort(
+          (a, b) =>
+            (a.is_checkout_primary === false ? 1 : 0) - (b.is_checkout_primary === false ? 1 : 0),
+        )
+        .map((row) => embeddedMedicineName(row.medicines))
+        .filter((name): name is string => Boolean(name)),
+    ),
+  ];
+
+  if (names.length === 0) return { label: fallback, count: 1 };
+  return { label: names.join(", "), count: names.length };
 }

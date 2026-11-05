@@ -1,15 +1,17 @@
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
-import { DM_Sans } from "next/font/google";
+import localFont from "next/font/local";
 
 import { Providers } from "./providers";
 import { PwaRegister } from "./pwa-register";
 import "./globals.css";
 
-const dmSans = DM_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+const dmSans = localFont({
+  src: "./fonts/dm-sans-latin.woff2",
+  weight: "100 1000",
   display: "swap",
+  variable: "--font-dm-sans",
+  fallback: ["ui-sans-serif", "system-ui", "sans-serif"],
 });
 
 const benignErrorGuardScript = `
@@ -63,7 +65,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning className={dmSans.className}>
+    <html lang="en" suppressHydrationWarning className={`${dmSans.variable} ${dmSans.className}`}>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

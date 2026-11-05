@@ -137,49 +137,31 @@ export async function providerEmailByUserId(providerId: string | null | undefine
   return patientEmailByUserId(providerId);
 }
 
-/** Practitioners currently assigned to this patient's medication request(s). */
+/** Practitioners assigned to this order. Other orders for the same patient are not included. */
 export async function assignedProvidersForPatient(params: {
   userId: string;
-  medicineId?: string | null;
+  subscriptionIds: string[];
 }): Promise<{ id: string; email: string; fullName: string | null }[]> {
-  let query = supabaseAdmin
+  const subscriptionIds = [...new Set(params.subscriptionIds.filter(Boolean))];
+  if (subscriptionIds.length === 0) return [];
+
+  const { data, error } = await supabaseAdmin
     .from("medication_requests")
     .select("provider_id")
     .eq("user_id", params.userId)
+    .in("subscription_id", subscriptionIds)
     .not("provider_id", "is", null);
 
-  if (params.medicineId) query = query.eq("medicine_id", params.medicineId);
-
-  const { data, error } = await query;
   if (error) {
     console.error("[email] assigned providers lookup failed:", error);
     return [];
   }
 
-  let ids = [
+  const ids = [
     ...new Set(
       (data ?? []).map((row) => row.provider_id).filter((id): id is string => Boolean(id)),
     ),
   ];
-
-  if (ids.length === 0 && params.medicineId) {
-    const fallback = await supabaseAdmin
-      .from("medication_requests")
-      .select("provider_id")
-      .eq("user_id", params.userId)
-      .not("provider_id", "is", null);
-    if (fallback.error) {
-      console.error("[email] assigned providers fallback failed:", fallback.error);
-      return [];
-    }
-    ids = [
-      ...new Set(
-        (fallback.data ?? [])
-          .map((row) => row.provider_id)
-          .filter((id): id is string => Boolean(id)),
-      ),
-    ];
-  }
 
   if (ids.length === 0) return [];
 
