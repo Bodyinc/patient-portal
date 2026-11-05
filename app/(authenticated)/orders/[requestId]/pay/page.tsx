@@ -1,14 +1,9 @@
 import Link from "next/link";
+
 import { requirePatientSession } from "@/lib/auth/require-patient";
 import { createAdditionalPaymentIntent } from "@/lib/orders/additional-payment";
 import { getPatientDisplayIdentity } from "@/lib/profile/identity";
 import AdditionalPaymentForm from "./_components/AdditionalPaymentForm";
-
-function money(cents: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
-    (cents ?? 0) / 100,
-  );
-}
 
 export default async function AdditionalPaymentPage({
   params,
@@ -44,14 +39,14 @@ export default async function AdditionalPaymentPage({
               <p className="text-sm text-[#152A51]/70">
                 {intent.reason ?? `Price difference for ${intent.medicineName}`}
               </p>
-              <p className="text-2xl font-bold text-[#152A51]">{money(intent.amountCents)}</p>
-              <p className="text-xs text-[#152A51]/60">
-                Once this is paid, your prescription will be generated and sent for fulfillment.
-              </p>
             </div>
             <AdditionalPaymentForm
+              requestId={requestId}
               clientSecret={intent.clientSecret}
               amountCents={intent.amountCents}
+              originalAmountCents={intent.originalAmountCents}
+              discountCents={intent.discountCents}
+              promoLabel={intent.promoLabel}
             />
           </>
         )}

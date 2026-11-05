@@ -239,6 +239,16 @@ export async function fetchPatientOrders(userId: string): Promise<PatientOrderDt
 
     const rx = rxByReq.get(r.id);
     const pay = payByReq.get(r.id);
+    const paymentStillDue = Boolean(pay && pay.amount_cents > 0);
+    // The charge and the order status are stored separately. While the difference
+    // is unpaid, the patient should see the payment step, not a later pharmacy step.
+    const displayStatus = paymentStillDue ? "awaiting_additional_payment" : r.status;
+    const timelineAt = new Map(atByStatus);
+    if (paymentStillDue) {
+      for (const key of ["approved", "prescribed", "sent_to_pharmacy", "dispatched", "delivered"]) {
+        timelineAt.delete(key);
+      }
+    }
 
     return {
       id: r.id,
@@ -247,11 +257,11 @@ export async function fetchPatientOrders(userId: string): Promise<PatientOrderDt
       medicineName: (r.medicine_id && medMap.get(r.medicine_id)) || "Medication",
       planName: (r.package_id && pkgMap.get(r.package_id)) || null,
       kind: r.kind,
-      status: r.status,
+      status: displayStatus,
       statusLabel:
-        r.status === "awaiting_additional_payment" && !(pay && pay.amount_cents > 0)
+        displayStatus === "awaiting_additional_payment" && !paymentStillDue
           ? "Prescription under review"
-          : patientStatusLabel(r.status),
+          : patientStatusLabel(displayStatus),
       isRejected: r.status === "rejected" || r.status === "cancelled",
       createdAt: r.created_at,
       trackingNumber: r.tracking_number,
@@ -262,9 +272,9 @@ export async function fetchPatientOrders(userId: string): Promise<PatientOrderDt
           ? []
           : buildTimeline({
               requiresConsultation: r.requires_consultation,
-              currentStatus: r.status,
+              currentStatus: displayStatus,
               occurred,
-              atByStatus,
+              atByStatus: timelineAt,
             }),
       prescription: rx
         ? {

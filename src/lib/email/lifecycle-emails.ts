@@ -162,11 +162,16 @@ export function additionalPaymentReceivedEmail(params: {
   const amount = formatAmount(params.amountCents, params.currency);
   const body = [
     `<p>Hi ${firstName(params.fullName)},</p>`,
-    `<p>We received your additional payment of <strong>${amount}</strong>. Your care team will continue reviewing your prescription.</p>`,
+    params.amountCents > 0
+      ? `<p>We received your additional payment of <strong>${amount}</strong>. Your prescription is being generated and sent to the pharmacy.</p>`
+      : `<p>Your promo covered this price difference. Your prescription is being generated and sent to the pharmacy.</p>`,
     emailButton("Track my order", params.myMedsUrl),
   ].join("");
   return {
-    subject: `Additional payment of ${amount} received`,
+    subject:
+      params.amountCents > 0
+        ? `Additional payment of ${amount} received`
+        : "Your prescription is being sent to the pharmacy",
     html: emailLayout("Payment received", body),
   };
 }
