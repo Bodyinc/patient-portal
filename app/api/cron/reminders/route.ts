@@ -4,8 +4,10 @@ import { EMAIL_TRANSPORT_HINT, isEmailTransportConfigured } from "@/lib/email/tr
 import { sendMissedOrderConfirmationEmails } from "@/lib/email/order-confirmation";
 import { sendMissedAdminNewRequestEmails } from "@/lib/email/admin-request-email";
 import { sendUnsentInquiryUpdateEmails } from "@/lib/email/inquiry-updates";
+import { promoteOpenTrialingAddons } from "@/lib/checkout/provision-addons";
 import {
   sendIncompleteOrderReminders,
+  sendMedicineChangeReminders,
   sendOrderStatusEmails,
   sendRefillReminders,
   sendTrackingIdEmails,
@@ -26,6 +28,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
+  let promotedAddons = 0;
+  try {
+    promotedAddons = await promoteOpenTrialingAddons();
+  } catch (error) {
+    console.error("[checkout] promote trialing addons failed:", error);
+  }
+
   // A bad login makes every send fail and the claim get released, so the local
   // 15s poll would retry the same mail forever. Skip until credentials are valid.
   if (!isEmailTransportConfigured()) {
@@ -33,7 +42,11 @@ export async function GET(request: Request) {
       transportWarningLogged = true;
       console.warn(`[email] reminders skipped — ${EMAIL_TRANSPORT_HINT}`);
     }
-    return NextResponse.json({ ok: true, skipped: "email transport not configured" });
+    return NextResponse.json({
+      ok: true,
+      skipped: "email transport not configured",
+      promotedAddons,
+    });
   }
 
   try {
@@ -42,6 +55,7 @@ export async function GET(request: Request) {
     const incompleteOrders = await sendIncompleteOrderReminders();
     const refills = await sendRefillReminders();
     const orderStatuses = await sendOrderStatusEmails();
+    const medicineChangeReminders = await sendMedicineChangeReminders();
     const trackingIds = await sendTrackingIdEmails();
     const orderConfirmations = await sendMissedOrderConfirmationEmails();
     const adminNewRequests = await sendMissedAdminNewRequestEmails();
@@ -51,10 +65,12 @@ export async function GET(request: Request) {
       incompleteOrders,
       refills,
       orderStatuses,
+      medicineChangeReminders,
       trackingIds,
       orderConfirmations,
       adminNewRequests,
       inquiryUpdates,
+      promotedAddons,
     });
   } catch (error) {
     return NextResponse.json(

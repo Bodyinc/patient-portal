@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getPatientDisplayIdentity } from "@/lib/profile/identity";
 import { getOrCreateStripeCustomer } from "@/lib/stripe/customers";
 import { formatSavedCardLabel, getDefaultPaymentMethod } from "@/lib/stripe/payment-methods";
+import { reconcileSubscription } from "@/lib/stripe/reconcile";
 import { createSubscriptionForPrice } from "@/lib/stripe/subscriptions";
 import { resolveCheckoutDiscount, incrementPromoRedemption } from "@/lib/stripe/promos";
 import { getManualRefillBlock } from "@/lib/orders/refill-eligibility";
@@ -181,24 +182,26 @@ export async function POST(request: Request) {
       });
     }
 
-    const { subscriptionId, clientSecret, paid } = await createSubscriptionForPrice({
-      customerId,
-      priceId: pkg.stripe_price_id,
-      description: subscriptionDescription,
-      oneTimeFees,
-      // Shop orders pay shipping on the first invoice and every renewal.
-      recurringShippingCents: shippingCents,
-      shippingOnFirstInvoice: true,
-      defaultPaymentMethodId: savedPaymentMethod?.id ?? null,
-      metadata: {
-        order_id: order.id,
-        user_id: user.id,
-        package_id: pkg.id,
-        medicine_id: medicineId,
-        ...(pkg.variant_id ? { variant_id: pkg.variant_id } : {}),
-        ...(variantName ? { variant_name: variantName } : {}),
+    const { subscriptionId, clientSecret, paid, invoiceSettled } = await createSubscriptionForPrice(
+      {
+        customerId,
+        priceId: pkg.stripe_price_id,
+        description: subscriptionDescription,
+        oneTimeFees,
+        // Shop orders pay shipping on the first invoice and every renewal.
+        recurringShippingCents: shippingCents,
+        shippingOnFirstInvoice: true,
+        defaultPaymentMethodId: savedPaymentMethod?.id ?? null,
+        metadata: {
+          order_id: order.id,
+          user_id: user.id,
+          package_id: pkg.id,
+          medicine_id: medicineId,
+          ...(pkg.variant_id ? { variant_id: pkg.variant_id } : {}),
+          ...(variantName ? { variant_name: variantName } : {}),
+        },
       },
-    });
+    );
 
     // These three writes are independent of each other — run them together.
     await Promise.all([
@@ -223,6 +226,18 @@ export async function POST(request: Request) {
         { onConflict: "stripe_subscription_id" },
       ),
     ]);
+
+    // A promo that covers the whole first invoice has no PaymentIntent, so invoice.paid
+    // can lag or never be what the provider is waiting on. Record the $0 payment and
+    // open the medication request now, the same way a fully waived additional payment does.
+    // The SetupIntent, when present, is only so the renewal card can still be saved.
+    if (invoiceSettled || paid) {
+      try {
+        await reconcileSubscription(subscriptionId);
+      } catch (error) {
+        console.error("[shop] settle zero-invoice checkout failed:", error);
+      }
+    }
 
     return NextResponse.json(
       {

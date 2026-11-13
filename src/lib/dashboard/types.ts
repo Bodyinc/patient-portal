@@ -21,6 +21,13 @@ export type DashboardTreatmentDto = {
   consultationApproved: boolean;
 };
 
+export type DashboardPendingConsentDto = {
+  requestId: string;
+  orderNumber: string;
+  medicineName: string;
+  creditCents: number;
+};
+
 export type DashboardPendingPaymentDto = {
   requestId: string;
   orderNumber: string;
@@ -40,6 +47,7 @@ export type DashboardPageDataDto = {
   /** Number of active/trialing/past_due subscriptions for “view all” hint. */
   activeTreatmentCount: number;
   pendingPayments: DashboardPendingPaymentDto[];
+  pendingConsents: DashboardPendingConsentDto[];
   consultationsEnabled: boolean;
   /** This treatment's checkout includes a medicine that requires a consultation. */
   consultationRequired: boolean;

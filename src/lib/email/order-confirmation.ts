@@ -216,8 +216,8 @@ export async function sendOrderConfirmationEmail(paymentId: string): Promise<boo
     return false;
   }
 
-  // Add-on subscriptions open on a $0 trial invoice. The receipt is the
-  // primary checkout payment, which already includes every medicine.
+  // An add-on's first invoice is $0. The receipt is the primary checkout payment,
+  // which already includes every medicine.
   if ((payment.amount_cents ?? 0) <= 0) return false;
 
   // One checkout sends one receipt, from the primary payment. An added

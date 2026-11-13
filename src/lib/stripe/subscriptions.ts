@@ -14,6 +14,11 @@ export type CreatedSubscription = {
   /** Null when the first invoice was already paid with a saved card. */
   clientSecret: string | null;
   paid: boolean;
+  /**
+   * The first invoice is already settled, including a promo that zeros it.
+   * A SetupIntent may still be returned so the patient can save a card for renewal.
+   */
+  invoiceSettled: boolean;
 };
 
 export async function createSubscriptionForPrice(params: {
@@ -111,19 +116,29 @@ export async function createSubscriptionForPrice(params: {
     });
   }
 
+  // A 100% promo can activate the subscription with a $0 invoice and still return a
+  // SetupIntent. The invoice is settled either way; the secret is only for the renewal card.
+  const invoiceSettled = invoiceSettledWithoutPayment(subscription);
+
   if (defaultPaymentMethodId) {
     const charged = await tryChargeSavedPaymentMethod({
       subscription,
       paymentMethodId: defaultPaymentMethodId,
     });
     if (charged.paid) {
-      return { subscriptionId: subscription.id, clientSecret: null, paid: true };
+      return {
+        subscriptionId: subscription.id,
+        clientSecret: null,
+        paid: true,
+        invoiceSettled: true,
+      };
     }
     if (charged.clientSecret) {
       return {
         subscriptionId: subscription.id,
         clientSecret: charged.clientSecret,
         paid: false,
+        invoiceSettled,
       };
     }
   }
@@ -132,13 +147,18 @@ export async function createSubscriptionForPrice(params: {
   // SetupIntent so the patient can save a card for the renewal.
   const clientSecret = extractClientSecret(subscription) ?? setupIntentClientSecret(subscription);
   if (!clientSecret) {
-    if (invoiceSettledWithoutPayment(subscription)) {
-      return { subscriptionId: subscription.id, clientSecret: null, paid: true };
+    if (invoiceSettled) {
+      return {
+        subscriptionId: subscription.id,
+        clientSecret: null,
+        paid: true,
+        invoiceSettled: true,
+      };
     }
     throw new Error("Stripe returned no client secret for the subscription's first invoice.");
   }
 
-  return { subscriptionId: subscription.id, clientSecret, paid: false };
+  return { subscriptionId: subscription.id, clientSecret, paid: false, invoiceSettled };
 }
 
 async function tryChargeSavedPaymentMethod(params: {
