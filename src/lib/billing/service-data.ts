@@ -207,7 +207,7 @@ function billingReason(rawEvent: Json | null): string | null {
   return typeof reason === "string" ? reason : null;
 }
 
-/** Add-on subscriptions open on a $0 trial invoice. The paid checkout invoice already covers them. */
+/** An add-on's first invoice is $0 because that period was already charged on the primary checkout. */
 async function omitAddonTrialInvoices(payments: PaymentRow[]): Promise<PaymentRow[]> {
   const stripeIds = [
     ...new Set(payments.map((payment) => payment.stripe_subscription_id).filter(Boolean)),

@@ -2,6 +2,10 @@ import "server-only";
 
 import { sessionRequiresConsultation } from "@/lib/consultations/eligibility";
 import { findCompletedIntakeSessionId } from "@/lib/intake/attach-intake";
+import {
+  initialShopOrderShouldWait,
+  prepareShopOrdersForIntake,
+} from "@/lib/orders/shop-intake-gate";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 type PaymentRow = {
@@ -20,6 +24,7 @@ type SubscriptionRow = {
   package_id: string | null;
   medicine_id: string | null;
   is_checkout_primary: boolean | null;
+  checkout_group_id: string | null;
 };
 
 async function resolveProviderId(params: {
@@ -110,12 +115,17 @@ export async function ensureMedicationOrderForPayment(params: {
       .select("id")
       .eq("stripe_invoice_id", payment.stripe_invoice_id)
       .maybeSingle();
-    if (existing) return;
+    if (existing) {
+      if (payment.user_id) await prepareShopOrdersForIntake(payment.user_id);
+      return;
+    }
   }
 
   const { data: sub } = await supabaseAdmin
     .from("subscriptions")
-    .select("id, user_id, session_id, package_id, medicine_id, is_checkout_primary")
+    .select(
+      "id, user_id, session_id, package_id, medicine_id, is_checkout_primary, checkout_group_id",
+    )
     .eq("stripe_subscription_id", payment.stripe_subscription_id)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -156,13 +166,30 @@ export async function ensureMedicationOrderForPayment(params: {
   const checkoutNeedsReview = coveredByPrimaryConsultation
     ? cartNeedsConsultation || Boolean(medicine.requires_consultation)
     : needsConsultation;
-  let status = checkoutNeedsReview ? "pending_review" : "approved";
-
-  const providerId = await resolveProviderId({
-    needsConsultation,
-    userId: subscription.user_id ?? payment.user_id,
-    sessionId: subscription.session_id ?? payment.session_id,
+  const userId = subscription.user_id ?? payment.user_id;
+  const ownSessionId = subscription.session_id ?? payment.session_id;
+  // Shop orders stay out of the claim queue until this purchase's intake is submitted.
+  // Onboarding already has that intake, so it can be reviewed immediately.
+  const awaitsIntake = await initialShopOrderShouldWait({
+    kind,
+    needsReview: checkoutNeedsReview,
+    sessionId: ownSessionId,
+    stripeSubscriptionId: payment.stripe_subscription_id,
+    checkoutGroupId: subscription.checkout_group_id,
   });
+  let status = awaitsIntake
+    ? "payment_completed"
+    : checkoutNeedsReview
+      ? "pending_review"
+      : "approved";
+
+  const providerId = awaitsIntake
+    ? null
+    : await resolveProviderId({
+        needsConsultation,
+        userId,
+        sessionId: ownSessionId,
+      });
 
   let variantId: string | null = null;
   if (subscription.package_id) {
@@ -174,9 +201,8 @@ export async function ensureMedicationOrderForPayment(params: {
     variantId = pkg?.variant_id ?? null;
   }
 
-  const userId = subscription.user_id ?? payment.user_id;
-  let sessionId = subscription.session_id ?? payment.session_id;
-  if (!sessionId && userId) {
+  let sessionId = ownSessionId;
+  if (!sessionId && userId && !awaitsIntake) {
     sessionId = await findCompletedIntakeSessionId(userId);
     if (sessionId) {
       await supabaseAdmin
@@ -228,11 +254,13 @@ export async function ensureMedicationOrderForPayment(params: {
     });
   }
 
-  await supabaseAdmin.from("medication_request_events").insert({
-    request_id: requestId,
-    status,
-    actor_role: "system",
-  });
+  if (status !== "payment_completed") {
+    await supabaseAdmin.from("medication_request_events").insert({
+      request_id: requestId,
+      status,
+      actor_role: "system",
+    });
+  }
 
   if (status === "approved") {
     await supabaseAdmin.from("prescriptions").insert({

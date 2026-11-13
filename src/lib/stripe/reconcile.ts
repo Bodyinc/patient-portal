@@ -56,6 +56,24 @@ function invoicePaymentIntentId(invoice: Stripe.Invoice): string | null {
   return pi?.id ?? null;
 }
 
+// A 100% promo pays nothing, so amount_paid stays 0. Stripe still activates the
+// subscription and zeros amount_due. Treat that as collected; waiting for a later
+// invoice.paid webhook is what left these orders off the provider list.
+function invoiceIsSettled(invoice: Stripe.Invoice, subscriptionStatus: string): boolean {
+  if (invoice.status === "paid" || (invoice.amount_paid ?? 0) > 0) return true;
+  if (
+    invoice.status === "void" ||
+    invoice.status === "uncollectible" ||
+    invoice.status === "draft"
+  ) {
+    return false;
+  }
+  return (
+    (invoice.amount_due ?? null) === 0 &&
+    (subscriptionStatus === "active" || subscriptionStatus === "trialing")
+  );
+}
+
 async function backfillOrphanStripeRows(userId: string, sessionId: string | null): Promise<void> {
   if (!sessionId) return;
   await supabaseAdmin
@@ -177,10 +195,7 @@ export async function reconcileSubscription(stripeSubscriptionId: string): Promi
   }
 
   const invoice = sub.latest_invoice;
-  const paid =
-    invoice &&
-    typeof invoice !== "string" &&
-    (invoice.status === "paid" || (invoice.amount_paid ?? 0) > 0);
+  const paid = invoice && typeof invoice !== "string" && invoiceIsSettled(invoice, sub.status);
 
   if (paid && typeof invoice !== "string") {
     const piId = invoicePaymentIntentId(invoice);

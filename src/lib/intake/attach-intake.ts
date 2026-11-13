@@ -4,8 +4,9 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 /**
  * Latest intake session for this patient that already has questionnaire answers.
- * Shop orders do not create an intake session, so the provider shows "Missing"
- * until the completed onboarding intake is attached to the order.
+ * Shop orders do not create an intake session. A previous questionnaire is attached
+ * only after this purchase's intake form is submitted, so the order is not treated
+ * as ready before then.
  */
 export async function findCompletedIntakeSessionId(userId: string): Promise<string | null> {
   const [{ data: subs }, { data: claimed }, { data: requests }] = await Promise.all([
@@ -48,23 +49,40 @@ export async function findCompletedIntakeSessionId(userId: string): Promise<stri
 
 /** Copy a completed intake onto paid orders that were placed without one. */
 export async function attachExistingIntakeToOpenOrders(userId: string): Promise<string | null> {
+  const {
+    prepareShopOrdersForIntake,
+    releaseReadyShopOrders,
+    shopSubscriptionIdsWithoutOwnIntake,
+  } = await import("@/lib/orders/shop-intake-gate");
+  await prepareShopOrdersForIntake(userId);
+  // A new shop order must not inherit an older questionnaire. That was marking
+  // the latest purchase's intake complete before the patient filled this form.
+  const blocked = new Set(await shopSubscriptionIdsWithoutOwnIntake(userId));
   const sessionId = await findCompletedIntakeSessionId(userId);
-  if (!sessionId) return null;
 
-  const now = new Date().toISOString();
-  await Promise.all([
-    supabaseAdmin
+  if (sessionId) {
+    const now = new Date().toISOString();
+    let requests = supabaseAdmin
       .from("medication_requests")
       .update({ session_id: sessionId, updated_at: now })
       .eq("user_id", userId)
-      .is("session_id", null),
-    supabaseAdmin
+      .is("session_id", null);
+    let subscriptions = supabaseAdmin
       .from("subscriptions")
       .update({ session_id: sessionId })
       .eq("user_id", userId)
       .is("session_id", null)
-      .in("status", ["active", "trialing"]),
-  ]);
+      .in("status", ["active", "trialing"]);
 
+    if (blocked.size > 0) {
+      const ids = `(${[...blocked].join(",")})`;
+      requests = requests.not("subscription_id", "in", ids);
+      subscriptions = subscriptions.not("id", "in", ids);
+    }
+
+    await Promise.all([requests, subscriptions]);
+  }
+
+  await releaseReadyShopOrders(userId);
   return sessionId;
 }

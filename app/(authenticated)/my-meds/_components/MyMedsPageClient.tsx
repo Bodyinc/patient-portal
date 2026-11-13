@@ -3,7 +3,9 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
-import AdditionalPaymentBanner from "@/components/AdditionalPaymentBanner";
+import AdditionalPaymentBanner, {
+  MedicineChangeConsentBanner,
+} from "@/components/AdditionalPaymentBanner";
 import type { PortalOfferDto } from "@/lib/offers/types";
 
 import CurrentMedicationCard, { ActiveMedicationsEmptyState } from "./CurrentMedicationCard";
@@ -80,11 +82,12 @@ export default function MyMedsPageClient({
 
       {paymentJustCompleted && !stillDue ? (
         <p className="rounded-[16px] border border-[#C8E6D0] bg-[#E0FAE8] px-4 py-3 text-sm text-[#34845F]">
-          Payment received. Your care team can now continue your prescription.
+          Payment received. The updated order is being sent to the pharmacy.
         </p>
       ) : null}
 
       <AdditionalPaymentBanner payments={data.pendingPayments} />
+      <MedicineChangeConsentBanner consents={data.pendingConsents} />
 
       <MyMedsReferralCard
         referralCode={referralCode}

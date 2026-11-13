@@ -92,6 +92,13 @@ export type MyMedsMedicationRequestsListDto = {
   query: string;
 };
 
+export type MyMedsPendingConsentDto = {
+  requestId: string;
+  orderNumber: string;
+  medicineName: string;
+  creditCents: number;
+};
+
 export type MyMedsPendingPaymentDto = {
   requestId: string;
   orderNumber: string;
@@ -105,4 +112,5 @@ export type MyMedsPageDataDto = {
   pastMedications: MyMedsPastMedicationDto[];
   requests: MyMedsMedicationRequestsListDto;
   pendingPayments: MyMedsPendingPaymentDto[];
+  pendingConsents: MyMedsPendingConsentDto[];
 };

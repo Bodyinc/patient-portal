@@ -7,6 +7,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sharedCheckoutTracking } from "@/lib/orders/shared-tracking";
 import { fetchPatientOrders } from "@/lib/orders/service-data";
 import { healAndFetchPendingAdditionalPayments } from "@/lib/orders/additional-payment";
+import { fetchPendingMedicineConsents } from "@/lib/orders/medicine-change";
 import { maybeReconcileIncompleteSubscription } from "@/lib/stripe/reconcile";
 import { canRequestManualRefill } from "@/lib/orders/refill-eligibility";
 import { isConsultationApproved } from "@/lib/orders/status";
@@ -110,11 +111,12 @@ function matchesRequestQuery(request: MyMedsMedicationRequestDto, query: string)
 
 function statusLabelForPast(status: string): string {
   if (status === "canceled" || status === "cancelled") return "Canceled";
-  if (status === "incomplete_expired") return "Expired";
   if (status === "unpaid") return "Ended";
-  if (status === "incomplete") return "Incomplete";
   return "Ended";
 }
+
+/** Checkout that never started. A provider medicine change can leave these behind. */
+const NEVER_STARTED_SUBSCRIPTION_STATUSES = new Set(["incomplete", "incomplete_expired"]);
 
 type TreatmentOverride = {
   medicineId: string;
@@ -473,22 +475,28 @@ export async function fetchMyMedsPageData(
     }
   }
 
-  const [didReconcile, pendingPayments, initialSubs, requests] = await Promise.all([
-    maybeReconcileIncompleteSubscription(userId),
-    healAndFetchPendingAdditionalPayments(userId).catch((err) => {
-      console.error("[additional_payments] My Meds load failed:", err);
-      return [];
-    }),
-    supabaseAdmin
-      .from("subscriptions")
-      .select(SUBSCRIPTION_SELECT)
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false }),
-    fetchMedicationRequests(userId, options),
-    maybeSyncSubscriptionPeriodEnds(userId).catch((err) => {
-      console.error("[subscriptions] my-meds period sync failed:", err);
-    }),
-  ]);
+  const [didReconcile, pendingPayments, pendingConsents, initialSubs, requests] = await Promise.all(
+    [
+      maybeReconcileIncompleteSubscription(userId),
+      healAndFetchPendingAdditionalPayments(userId).catch((err) => {
+        console.error("[additional_payments] My Meds load failed:", err);
+        return [];
+      }),
+      fetchPendingMedicineConsents(userId).catch((err) => {
+        console.error("[medicine-change] My Meds consent load failed:", err);
+        return [];
+      }),
+      supabaseAdmin
+        .from("subscriptions")
+        .select(SUBSCRIPTION_SELECT)
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false }),
+      fetchMedicationRequests(userId, options),
+      maybeSyncSubscriptionPeriodEnds(userId).catch((err) => {
+        console.error("[subscriptions] my-meds period sync failed:", err);
+      }),
+    ],
+  );
 
   const subscriptionsResult =
     didReconcile === true
@@ -518,12 +526,22 @@ export async function fetchMyMedsPageData(
   const activeMedicineIds = new Set(
     activeMedications.map((med) => med.medicineId).filter((id): id is string => Boolean(id)),
   );
+  // The active card already shows the medicine the provider switched to.
+  // The subscription row still names the previous medicine; that one is not a past treatment.
+  const replacedMedicineIds = new Set<string>();
+  for (const row of activeRows) {
+    const shown = activeMedications.find((med) => med.subscriptionId === row.id);
+    if (shown?.medicineId && row.medicine_id && shown.medicineId !== row.medicine_id) {
+      replacedMedicineIds.add(row.medicine_id);
+    }
+  }
 
-  const seenMedicineIds = new Set<string>(activeMedicineIds);
+  const seenMedicineIds = new Set<string>([...activeMedicineIds, ...replacedMedicineIds]);
   const pastMedications: MyMedsPastMedicationDto[] = [];
   // Prefer newest ended treatments first (updated_at), independent of created_at order above.
   const pastRows = [...rows]
     .filter((row) => !activeStatusSet.has(row.status))
+    .filter((row) => !NEVER_STARTED_SUBSCRIPTION_STATUSES.has(row.status))
     .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
 
   for (const row of pastRows) {
@@ -533,5 +551,5 @@ export async function fetchMyMedsPageData(
     pastMedications.push(mapPastMedication(row));
   }
 
-  return { activeMedications, pastMedications, requests, pendingPayments };
+  return { activeMedications, pastMedications, requests, pendingPayments, pendingConsents };
 }

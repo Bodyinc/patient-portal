@@ -260,7 +260,7 @@ export async function fetchPatientOrders(userId: string): Promise<PatientOrderDt
       status: displayStatus,
       statusLabel:
         displayStatus === "awaiting_additional_payment" && !paymentStillDue
-          ? "Prescription under review"
+          ? "Approve or reject"
           : patientStatusLabel(displayStatus),
       isRejected: r.status === "rejected" || r.status === "cancelled",
       createdAt: r.created_at,
