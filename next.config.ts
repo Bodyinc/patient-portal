@@ -22,9 +22,17 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["nodemailer", "web-push"],
   // nodemailer is in serverExternalPackages so Turbopack never bundles it
   // on the client. An empty turbopack config silences the webpack-conflict error.
-  turbopack: {},
+  turbopack: {
+    resolveAlias: {
+      quickblox: "quickblox/quickblox.min.js",
+    },
+  },
   webpack: (config, { isServer }) => {
     if (!isServer) {
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        quickblox: "quickblox/quickblox.min.js",
+      };
       config.resolve.fallback = {
         ...config.resolve.fallback,
         child_process: false,
@@ -61,6 +69,11 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
+      {
+        source: "/login",
+        destination: "/auth",
+        permanent: false,
+      },
       {
         source: "/onboarding/choose-medicine",
         destination: "/onboarding/medications",
