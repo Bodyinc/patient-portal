@@ -101,7 +101,9 @@ export default function PaymentModal({
               Payment details
             </DialogTitle>
             <DialogDescription className="mt-1 text-sm text-[#152A51]/70">
-              Enter your card to complete this subscription.
+              {isSetupIntentClientSecret(clientSecret)
+                ? "Today’s total is $0. Save a card for the next renewal."
+                : "Enter your card to complete this subscription."}
             </DialogDescription>
           </div>
 

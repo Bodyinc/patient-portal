@@ -94,3 +94,95 @@ export async function incrementPromoRedemption(promoId: string): Promise<void> {
     console.error("[promos] redemption increment failed:", error.message);
   }
 }
+
+/**
+ * Checkout used to apply promos only as a negative invoice line. The page showed $0 while
+ * Stripe still opened a PaymentIntent for the full plan (bank OTP for $181 with 100OFF).
+ * Attach a real Stripe promotion code so the first invoice amount_due matches the cart.
+ */
+export async function ensureStripePromotionCode(promo: PromoCodeRow): Promise<string> {
+  const { stripe } = await import("./server");
+
+  if (promo.stripe_promotion_code_id) {
+    try {
+      const existing = await stripe.promotionCodes.retrieve(promo.stripe_promotion_code_id);
+      if (existing.active) return existing.id;
+    } catch {
+      // Recreate below when the saved id is missing from this Stripe account.
+    }
+  }
+
+  async function rememberPromotionCode(promotionCodeId: string, couponId: string) {
+    await supabaseAdmin
+      .from("promo_codes")
+      .update({
+        stripe_promotion_code_id: promotionCodeId,
+        stripe_coupon_id: couponId,
+      })
+      .eq("id", promo.id);
+    return promotionCodeId;
+  }
+
+  const listed = await stripe.promotionCodes.list({
+    code: promo.code,
+    limit: 1,
+  });
+  const found = listed.data[0];
+  if (found?.active) {
+    const couponRef = found.promotion?.coupon;
+    const couponId = typeof couponRef === "string" ? couponRef : couponRef?.id;
+    if (!couponId) throw new Error("Stripe promotion code is missing its coupon.");
+    return rememberPromotionCode(found.id, couponId);
+  }
+
+  let couponId = promo.stripe_coupon_id;
+  if (couponId) {
+    try {
+      await stripe.coupons.retrieve(couponId);
+    } catch {
+      couponId = null;
+    }
+  }
+
+  if (!couponId) {
+    const duration =
+      promo.duration === "repeating" || promo.duration === "forever" ? promo.duration : "once";
+    const coupon = await stripe.coupons.create({
+      name: promo.code,
+      duration,
+      ...(duration === "repeating" && promo.duration_in_months
+        ? { duration_in_months: promo.duration_in_months }
+        : {}),
+      ...(promo.discount_type === "percent"
+        ? { percent_off: Number(promo.percent_off ?? 0) }
+        : {
+            amount_off: Number(promo.amount_off_cents ?? 0),
+            currency: (promo.currency || "usd").toLowerCase(),
+          }),
+    });
+    couponId = coupon.id;
+  }
+
+  try {
+    const promotionCode = await stripe.promotionCodes.create({
+      promotion: { type: "coupon", coupon: couponId },
+      code: promo.code,
+      ...(promo.max_redemptions != null ? { max_redemptions: promo.max_redemptions } : {}),
+      ...(promo.redeem_by
+        ? { expires_at: Math.floor(new Date(promo.redeem_by).getTime() / 1000) }
+        : {}),
+    });
+    return rememberPromotionCode(promotionCode.id, couponId);
+  } catch (error) {
+    // Another checkout may have created the same code; reuse it.
+    const again = await stripe.promotionCodes.list({ code: promo.code, limit: 1 });
+    const existing = again.data[0];
+    if (existing?.active) {
+      const couponRef = existing.promotion?.coupon;
+      const existingCoupon = typeof couponRef === "string" ? couponRef : couponRef?.id;
+      if (!existingCoupon) throw error;
+      return rememberPromotionCode(existing.id, existingCoupon);
+    }
+    throw error;
+  }
+}
