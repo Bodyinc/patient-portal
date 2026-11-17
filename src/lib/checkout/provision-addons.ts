@@ -12,16 +12,63 @@ function paymentMethodId(value: string | Stripe.PaymentMethod | null | undefined
   return typeof value === "string" ? value : (value.id ?? null);
 }
 
-function addMonths(from: Date, months: number): Date {
-  const next = new Date(from);
-  next.setMonth(next.getMonth() + months);
-  return next;
+/** First invoice of an add-on is already on the primary checkout, so it is covered once. */
+const ADDON_INCLUDED_COUPON_ID = "addon_first_period_included";
+
+function periodEndIso(sub: Stripe.Subscription): string | null {
+  const anySub = sub as unknown as {
+    current_period_end?: number;
+    trial_end?: number | null;
+    items?: { data?: Array<{ current_period_end?: number }> };
+  };
+  const ts =
+    anySub.current_period_end ??
+    anySub.items?.data?.[0]?.current_period_end ??
+    anySub.trial_end ??
+    null;
+  return ts ? new Date(ts * 1000).toISOString() : null;
+}
+
+function withinOnePricePeriod(anchorUnix: number, price: Stripe.Price): boolean {
+  const recurring = price.recurring;
+  if (!recurring) return false;
+  const count = recurring.interval_count || 1;
+  const limit = new Date();
+  if (recurring.interval === "month") limit.setUTCMonth(limit.getUTCMonth() + count);
+  else if (recurring.interval === "year") limit.setUTCFullYear(limit.getUTCFullYear() + count);
+  else if (recurring.interval === "week") limit.setUTCDate(limit.getUTCDate() + 7 * count);
+  else limit.setUTCDate(limit.getUTCDate() + count);
+  return anchorUnix * 1000 <= limit.getTime() + 24 * 60 * 60 * 1000;
+}
+
+async function firstPeriodIncludedCoupon(): Promise<string> {
+  try {
+    const coupon = await stripe.coupons.retrieve(ADDON_INCLUDED_COUPON_ID);
+    if (!coupon.deleted && coupon.percent_off === 100 && coupon.duration === "once") {
+      return coupon.id;
+    }
+  } catch (error) {
+    const missing =
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code?: string }).code === "resource_missing";
+    if (!missing) throw error;
+  }
+  const created = await stripe.coupons.create({
+    id: ADDON_INCLUDED_COUPON_ID,
+    percent_off: 100,
+    duration: "once",
+    name: "First period already paid",
+  });
+  return created.id;
 }
 
 /**
- * After the primary subscription's first invoice is paid, open a trialing
+ * After the primary subscription's first invoice is paid, open an active
  * subscription per add-on. The first period was already charged on the
- * primary invoice, so these subscriptions do not bill again until renewal.
+ * primary invoice, so that invoice is covered and the add-on bills again
+ * at renewal — the same active subscription as the primary plan.
  * They share the primary subscription's consultation.
  */
 export async function provisionAddonSubscriptions(params: {
@@ -60,7 +107,7 @@ export async function provisionAddonSubscriptions(params: {
   const defaultPaymentMethodId = paymentMethodId(subscription.default_payment_method);
   const { data: packages, error: packageError } = await supabaseAdmin
     .from("packages")
-    .select("id, medicine_id, variant_id, name, stripe_price_id, duration_months, medicines(name)")
+    .select("id, medicine_id, variant_id, name, stripe_price_id, medicines(name)")
     .in("id", packageIds);
 
   if (packageError) throw new Error(packageError.message);
@@ -82,16 +129,15 @@ export async function provisionAddonSubscriptions(params: {
       .maybeSingle();
     if (existing) continue;
 
-    const durationMonths = Math.max(1, pkg.duration_months ?? 1);
-    const trialEnd = Math.floor(addMonths(new Date(), durationMonths).getTime() / 1000);
     const medicineName =
       (pkg as { medicines?: { name: string } | null }).medicines?.name ?? "Treatment";
+    const couponId = await firstPeriodIncludedCoupon();
 
     const created = await stripe.subscriptions.create(
       {
         customer: customerId,
         items: [{ price: pkg.stripe_price_id }],
-        trial_end: trialEnd,
+        discounts: [{ coupon: couponId }],
         ...(defaultPaymentMethodId ? { default_payment_method: defaultPaymentMethodId } : {}),
         description: `${medicineName} · ${pkg.name ?? "Plan"}`,
         metadata: {
@@ -118,7 +164,7 @@ export async function provisionAddonSubscriptions(params: {
           package_id: pkg.id,
           medicine_id: pkg.medicine_id,
           status: created.status,
-          current_period_end: new Date(trialEnd * 1000).toISOString(),
+          current_period_end: periodEndIso(created),
           is_checkout_primary: false,
           checkout_group_id: primary.id,
         },
@@ -158,11 +204,158 @@ async function alignPrimaryConsultationFlag(
 }
 
 /**
+ * An add-on opened with a trial shows "trialing" while the primary plan is "active",
+ * even though both were paid on the same checkout. Replace that trial with an active
+ * subscription that still bills on the same date.
+ */
+async function promoteTrialingAddon(stripeSubscriptionId: string): Promise<boolean> {
+  const sub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+  if (sub.status !== "trialing" || sub.metadata?.role !== "addon") return false;
+  if (sub.metadata.superseded === "1" || sub.metadata.active_promote === "skipped") return false;
+
+  const anchor = sub.trial_end;
+  const priceRef = sub.items?.data?.[0]?.price;
+  const priceId = typeof priceRef === "string" ? priceRef : (priceRef?.id ?? null);
+  if (!anchor || anchor * 1000 < Date.now() + 60_000 || !priceId || !priceRef) return false;
+  const price = typeof priceRef === "string" ? await stripe.prices.retrieve(priceRef) : priceRef;
+  if (!withinOnePricePeriod(anchor, price)) {
+    if (sub.metadata.active_promote !== "skipped") {
+      await stripe.subscriptions.update(sub.id, {
+        metadata: { ...sub.metadata, active_promote: "skipped" },
+      });
+    }
+    return false;
+  }
+
+  const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
+  if (!customerId) return false;
+  const defaultPaymentMethodId = paymentMethodId(sub.default_payment_method);
+  const description = (sub as Stripe.Subscription & { description?: string | null }).description;
+
+  const created = await stripe.subscriptions.create(
+    {
+      customer: customerId,
+      items: [{ price: priceId }],
+      billing_cycle_anchor: anchor,
+      proration_behavior: "none",
+      ...(defaultPaymentMethodId ? { default_payment_method: defaultPaymentMethodId } : {}),
+      ...(description ? { description } : {}),
+      metadata: {
+        ...sub.metadata,
+        role: "addon",
+        replaces: sub.id,
+        active_promote: "",
+        superseded: "",
+      },
+    },
+    { idempotencyKey: `addon-active-${sub.id}` },
+  );
+
+  if (created.status !== "active") {
+    await stripe.subscriptions
+      .cancel(created.id, { invoice_now: false, prorate: false })
+      .catch((error) => {
+        console.error("[checkout] rollback addon promote failed:", error);
+      });
+    return false;
+  }
+
+  const { error: moveError } = await supabaseAdmin
+    .from("subscriptions")
+    .update({
+      stripe_subscription_id: created.id,
+      stripe_price_id: priceId,
+      status: created.status,
+      current_period_end: periodEndIso(created) ?? new Date(anchor * 1000).toISOString(),
+    })
+    .eq("stripe_subscription_id", sub.id);
+
+  if (moveError && !/duplicate|unique/i.test(moveError.message)) {
+    await stripe.subscriptions
+      .cancel(created.id, { invoice_now: false, prorate: false })
+      .catch((error) => {
+        console.error("[checkout] rollback addon promote failed:", error);
+      });
+    throw new Error(moveError.message);
+  }
+
+  const { data: saved } = await supabaseAdmin
+    .from("subscriptions")
+    .select("id")
+    .eq("stripe_subscription_id", created.id)
+    .maybeSingle();
+  if (!saved) {
+    await stripe.subscriptions
+      .cancel(created.id, { invoice_now: false, prorate: false })
+      .catch((error) => {
+        console.error("[checkout] rollback addon promote failed:", error);
+      });
+    return false;
+  }
+
+  await stripe.subscriptions.update(sub.id, {
+    metadata: { ...sub.metadata, superseded: "1" },
+  });
+  try {
+    await stripe.subscriptions.cancel(sub.id, { invoice_now: false, prorate: false });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/canceled|cancelled|no such subscription/i.test(message)) throw error;
+  }
+  return true;
+}
+
+export async function promoteTrialingAddonsForUser(userId: string): Promise<void> {
+  const { data, error } = await supabaseAdmin
+    .from("subscriptions")
+    .select("stripe_subscription_id")
+    .eq("user_id", userId)
+    .eq("is_checkout_primary", false)
+    .eq("status", "trialing")
+    .not("stripe_subscription_id", "is", null);
+  if (error || !data?.length) return;
+
+  for (const row of data) {
+    if (!row.stripe_subscription_id) continue;
+    try {
+      await promoteTrialingAddon(row.stripe_subscription_id);
+    } catch (promoteError) {
+      console.error("[checkout] promote trialing addon failed:", promoteError);
+    }
+  }
+}
+
+/** Daily pass so an add-on left on a trial becomes active without waiting for a portal visit. */
+export async function promoteOpenTrialingAddons(): Promise<number> {
+  const { data, error } = await supabaseAdmin
+    .from("subscriptions")
+    .select("stripe_subscription_id")
+    .eq("is_checkout_primary", false)
+    .eq("status", "trialing")
+    .not("stripe_subscription_id", "is", null)
+    .limit(25);
+  if (error || !data?.length) return 0;
+
+  let promoted = 0;
+  for (const row of data) {
+    if (!row.stripe_subscription_id) continue;
+    try {
+      if (await promoteTrialingAddon(row.stripe_subscription_id)) promoted += 1;
+    } catch (promoteError) {
+      console.error("[checkout] promote trialing addon failed:", promoteError);
+    }
+  }
+  return promoted;
+}
+
+/**
  * The paid checkout already stored every medicine on the intake session.
  * Open the same subscription + medication request the primary plan gets
  * for any add-on that is still missing.
  */
 export async function ensureCheckoutAddons(userId: string): Promise<void> {
+  await promoteTrialingAddonsForUser(userId);
+
   const { data: primaries, error } = await supabaseAdmin
     .from("subscriptions")
     .select("id, session_id, stripe_subscription_id")

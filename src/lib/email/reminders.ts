@@ -8,11 +8,13 @@ import { sendPushToUser } from "@/lib/push/send";
 import { sendTransactionalEmail } from "./send";
 import { incompleteOrderEmail, refillReminderEmail } from "./reminder-emails";
 import {
+  medicineChangeConsentEmail,
+  medicineChangePaymentEmail,
   orderStatusEmail,
   providerCaseAssignedEmail,
   trackingIdEmail,
 } from "./order-status-emails";
-import { alreadySentKeys, markEmailSent, sendOnce } from "./idempotency";
+import { alreadySentKeys, markEmailSent, sendOnce, wasEmailSent } from "./idempotency";
 import {
   adminAppUrl,
   adminNotifyEmail,
@@ -42,6 +44,12 @@ const ORDER_STATUS_EMAIL_STATUS_LIST = [
 
 /** Must match admin-hub `notifyPatientRequestEvent` so both apps share one claim. */
 const PATIENT_STATUS_REMINDER = "order_status";
+/** Shared with admin-hub `patient_plan_consent` so the patient gets one consent email. */
+const PLAN_CONSENT_PERIOD = "patient_plan_consent";
+/** One follow-up, 24 hours after the change. Shared with admin-hub. */
+const PLAN_CHANGE_REMINDER_PERIOD = "plan_change_reminder";
+const PLAN_CHANGE_REMINDER_AFTER_MS = 24 * 60 * 60 * 1000;
+const PLAN_CHANGE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 function shouldEmailPatientForEvent(status: string, actorRole: string | null): boolean {
   // DB trigger writes provider_assigned at pay time. Patient mail waits until an
@@ -224,7 +232,7 @@ export async function sendUnsentOrderStatusEmails(opts?: {
       ? supabaseAdmin
           .from("medication_requests")
           .select(
-            "id, user_id, session_id, medicine_id, provider_id, tracking_number, requires_consultation",
+            "id, user_id, session_id, medicine_id, provider_id, tracking_number, requires_consultation, plan_change_delta_cents",
           )
           .in("id", requestIds)
       : Promise.resolve({ data: [] }),
@@ -308,38 +316,61 @@ export async function sendUnsentOrderStatusEmails(opts?: {
         console.warn("[email] order status skipped: no recipient yet", event.id);
       } else {
         const extraPay = extraPayByRequest.get(event.request_id);
-        if (
-          event.status === "awaiting_additional_payment" &&
-          !(extraPay && extraPay.amount_cents > 0)
-        ) {
-          await markEmailSent(PATIENT_STATUS_REMINDER, event.id, "");
-          sentKeys.add(`${event.id}|`);
-          continue;
-        }
+        const paymentDue = Boolean(extraPay && extraPay.amount_cents > 0);
+        const awaitingConsent =
+          event.status === "awaiting_additional_payment" && !paymentDue && Boolean(request);
         const needsConsultation = Boolean(
           request?.requires_consultation ||
           (request?.medicine_id && consultationByMedicineId.get(request.medicine_id)),
         );
+        const reviewUrl = request ? `${appUrl()}/orders/${request.id}` : `${appUrl()}/my-meds`;
         const ctaUrl =
           event.status === "awaiting_additional_payment" && request
-            ? `${appUrl()}/orders/${request.id}/pay`
+            ? paymentDue
+              ? `${reviewUrl}/pay`
+              : `${reviewUrl}?action=approve`
             : event.status === "provider_assigned" && needsConsultation
               ? `${appUrl()}/consultations`
               : `${appUrl()}/my-meds`;
 
-        const mail = orderStatusEmail({
-          fullName: patient.fullName,
-          medicineName,
-          status: event.status,
-          orderNumber,
-          ctaUrl,
-          trackingNumber: request?.tracking_number,
-          amountCents: extraPay?.amount_cents,
-          currency: extraPay?.currency,
-          consultationApproved: Boolean(request?.requires_consultation),
-        });
+        const creditCents =
+          request?.plan_change_delta_cents != null && request.plan_change_delta_cents < 0
+            ? Math.abs(request.plan_change_delta_cents)
+            : 0;
+        const mail = awaitingConsent
+          ? medicineChangeConsentEmail({
+              fullName: patient.fullName,
+              medicineName,
+              orderNumber,
+              creditCents,
+              approveUrl: `${reviewUrl}?action=approve`,
+              rejectUrl: `${reviewUrl}?action=reject`,
+            })
+          : event.status === "awaiting_additional_payment" && paymentDue
+            ? medicineChangePaymentEmail({
+                fullName: patient.fullName,
+                medicineName,
+                orderNumber,
+                amountCents: extraPay!.amount_cents,
+                currency: extraPay!.currency,
+                payUrl: `${reviewUrl}/pay`,
+                declineUrl: `${reviewUrl}?action=decline`,
+              })
+            : orderStatusEmail({
+                fullName: patient.fullName,
+                medicineName,
+                status: event.status,
+                orderNumber,
+                ctaUrl,
+                trackingNumber: request?.tracking_number,
+                amountCents: extraPay?.amount_cents,
+                currency: extraPay?.currency,
+                consultationApproved: Boolean(request?.requires_consultation),
+              });
 
-        const claim = patientStatusClaimTarget(event.status, event.id, request?.id);
+        const claim = awaitingConsent
+          ? { targetId: request!.id, periodKey: PLAN_CONSENT_PERIOD }
+          : patientStatusClaimTarget(event.status, event.id, request?.id);
         const claimKey = `${claim.targetId}|${claim.periodKey}`;
 
         if (!mail) {
@@ -348,6 +379,10 @@ export async function sendUnsentOrderStatusEmails(opts?: {
         } else if (sentKeys.has(claimKey)) {
           await markEmailSent(PATIENT_STATUS_REMINDER, event.id, "");
           sentKeys.add(`${event.id}|`);
+        } else if (await wasEmailSent(PATIENT_STATUS_REMINDER, claim.targetId, claim.periodKey)) {
+          await markEmailSent(PATIENT_STATUS_REMINDER, event.id, "");
+          sentKeys.add(`${event.id}|`);
+          sentKeys.add(claimKey);
         } else if (
           await sendOnce(
             PATIENT_STATUS_REMINDER,
@@ -368,16 +403,20 @@ export async function sendUnsentOrderStatusEmails(opts?: {
           sentKeys.add(`${event.id}|`);
           sent += 1;
           if (request?.user_id) {
-            const pushUrl =
-              event.status === "awaiting_additional_payment"
+            const pushUrl = awaitingConsent
+              ? `/orders/${request.id}`
+              : paymentDue
                 ? `/orders/${request.id}/pay`
                 : event.status === "provider_assigned"
                   ? "/consultations"
                   : "/my-meds";
-            const pushTitle =
-              event.status === "provider_assigned"
-                ? "Practitioner assigned"
-                : patientStatusLabel(event.status);
+            const pushTitle = awaitingConsent
+              ? "Approve or reject this change"
+              : paymentDue
+                ? "Pay or decline this change"
+                : event.status === "provider_assigned"
+                  ? "Practitioner assigned"
+                  : patientStatusLabel(event.status);
             await sendPushToUser(request.user_id, {
               title: pushTitle,
               body: `${medicineName} · ${orderNumber}`,
@@ -444,6 +483,119 @@ export async function sendUnsentOrderStatusEmails(opts?: {
           sent += 1;
         }
       }
+    }
+  }
+
+  return { candidates: candidates.length, sent };
+}
+
+/** One reminder, 24 hours after a medicine change is still waiting on the patient. */
+export async function sendMedicineChangeReminders(now = new Date()): Promise<ReminderRunResult> {
+  const remindBy = new Date(
+    now.getTime() + (PLAN_CHANGE_WINDOW_MS - PLAN_CHANGE_REMINDER_AFTER_MS),
+  );
+  const { data, error } = await supabaseAdmin
+    .from("medication_requests")
+    .select("id, user_id, session_id, medicine_id, plan_change_deadline, plan_change_delta_cents")
+    .eq("status", "awaiting_additional_payment")
+    .not("plan_change_deadline", "is", null)
+    .lte("plan_change_deadline", remindBy.toISOString())
+    .gt("plan_change_deadline", now.toISOString())
+    .limit(100);
+  if (error) throw new Error(error.message);
+
+  const candidates = data ?? [];
+  const sentKeys = await alreadySentKeys(
+    PATIENT_STATUS_REMINDER,
+    candidates.map((row) => row.id),
+  );
+  const requestIds = candidates.map((row) => row.id);
+  const { data: payments } = requestIds.length
+    ? await supabaseAdmin
+        .from("additional_payments")
+        .select("request_id, amount_cents, currency")
+        .in("request_id", requestIds)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false })
+    : { data: [] };
+  const extraPayByRequest = new Map<string, { amount_cents: number; currency: string }>();
+  for (const row of payments ?? []) {
+    if (extraPayByRequest.has(row.request_id)) continue;
+    extraPayByRequest.set(row.request_id, {
+      amount_cents: row.amount_cents,
+      currency: row.currency ?? "usd",
+    });
+  }
+
+  const medicineIds = [
+    ...new Set(candidates.map((row) => row.medicine_id).filter(Boolean)),
+  ] as string[];
+  const userIds = [...new Set(candidates.map((row) => row.user_id).filter(Boolean))] as string[];
+  const sessionIds = [
+    ...new Set(candidates.map((row) => row.session_id).filter(Boolean)),
+  ] as string[];
+  const [{ data: medicines }, profileById, sessionById] = await Promise.all([
+    medicineIds.length
+      ? supabaseAdmin.from("medicines").select("id, name").in("id", medicineIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; name: string }> }),
+    patientEmailsByUserIds(userIds),
+    patientEmailsByIntakeSessionIds(sessionIds),
+  ]);
+  const medicineById = new Map((medicines ?? []).map((medicine) => [medicine.id, medicine.name]));
+
+  let sent = 0;
+  for (const request of candidates) {
+    if (sentKeys.has(`${request.id}|${PLAN_CHANGE_REMINDER_PERIOD}`)) continue;
+    const patient =
+      (request.user_id ? profileById.get(request.user_id) : undefined) ??
+      (request.session_id ? sessionById.get(request.session_id) : undefined) ??
+      null;
+    if (!patient?.email) continue;
+
+    const medicineName =
+      (request.medicine_id ? medicineById.get(request.medicine_id) : null) ?? "your treatment";
+    const orderNumber = formatOrderId(request.id);
+    const reviewUrl = `${appUrl()}/orders/${request.id}`;
+    const extraPay = extraPayByRequest.get(request.id);
+    const delta = request.plan_change_delta_cents ?? 0;
+    const paymentDue = Boolean(extraPay && extraPay.amount_cents > 0) || delta > 0;
+    const amountCents = extraPay && extraPay.amount_cents > 0 ? extraPay.amount_cents : delta;
+    const mail = paymentDue
+      ? medicineChangePaymentEmail({
+          fullName: patient.fullName,
+          medicineName,
+          orderNumber,
+          amountCents,
+          currency: extraPay?.currency,
+          payUrl: `${reviewUrl}/pay`,
+          declineUrl: `${reviewUrl}?action=decline`,
+          reminder: true,
+        })
+      : medicineChangeConsentEmail({
+          fullName: patient.fullName,
+          medicineName,
+          orderNumber,
+          creditCents: delta < 0 ? Math.abs(delta) : 0,
+          approveUrl: `${reviewUrl}?action=approve`,
+          rejectUrl: `${reviewUrl}?action=reject`,
+          reminder: true,
+        });
+
+    if (
+      await sendOnce(
+        PATIENT_STATUS_REMINDER,
+        request.id,
+        () =>
+          sendTransactionalEmail({
+            to: patient.email,
+            subject: mail.subject,
+            html: mail.html,
+          }),
+        PLAN_CHANGE_REMINDER_PERIOD,
+      )
+    ) {
+      sentKeys.add(`${request.id}|${PLAN_CHANGE_REMINDER_PERIOD}`);
+      sent += 1;
     }
   }
 

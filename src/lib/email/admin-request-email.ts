@@ -5,6 +5,7 @@ import { loadCheckoutCart } from "@/lib/intake/session-cart";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { formatOrderId } from "@/lib/orders/order-id";
 import { ensureMedicationOrderForPayment } from "@/lib/orders/ensure-medication-order";
+import { orderIsHeldForShopIntake } from "@/lib/orders/shop-intake-gate";
 import { markEmailSent, sendOnce } from "./idempotency";
 import { adminAppUrl, adminRecipientEmails, patientEmailByUserId } from "./recipients";
 import { sendTransactionalEmail } from "./send";
@@ -170,6 +171,9 @@ export async function sendAdminNewRequestEmail(paymentId: string): Promise<boole
     console.warn("[email] admin new-request skipped: no order row yet for payment", paymentId);
     return false;
   }
+
+  // Shop orders are not in the provider queue until this purchase's intake is done.
+  if (await orderIsHeldForShopIntake(order.id)) return false;
 
   // Add-on medicines are part of the primary checkout email, not a second order.
   if (

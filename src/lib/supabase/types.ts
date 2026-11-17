@@ -32,6 +32,12 @@ export type Database = {
           life_file_error: string | null;
           life_file_pharmacy_id: string | null;
           life_file_submitted_at: string | null;
+          plan_change_token: string | null;
+          plan_change_deadline: string | null;
+          plan_change_delta_cents: number | null;
+          previous_medicine_id: string | null;
+          previous_variant_id: string | null;
+          previous_package_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -60,6 +66,12 @@ export type Database = {
           life_file_error?: string | null;
           life_file_pharmacy_id?: string | null;
           life_file_submitted_at?: string | null;
+          plan_change_token?: string | null;
+          plan_change_deadline?: string | null;
+          plan_change_delta_cents?: number | null;
+          previous_medicine_id?: string | null;
+          previous_variant_id?: string | null;
+          previous_package_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -88,6 +100,12 @@ export type Database = {
           life_file_error?: string | null;
           life_file_pharmacy_id?: string | null;
           life_file_submitted_at?: string | null;
+          plan_change_token?: string | null;
+          plan_change_deadline?: string | null;
+          plan_change_delta_cents?: number | null;
+          previous_medicine_id?: string | null;
+          previous_variant_id?: string | null;
+          previous_package_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };

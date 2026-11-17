@@ -1,6 +1,7 @@
 import "server-only";
 
 import { attachExistingIntakeToOpenOrders } from "@/lib/intake/attach-intake";
+import { shopSubscriptionIdsWithoutOwnIntake } from "@/lib/orders/shop-intake-gate";
 import { resolveMedicineImageSrc } from "@/lib/intake/medicine-image";
 import { planTitleFromDuration } from "@/lib/pricing";
 import { getPatientDisplayIdentity } from "@/lib/profile/identity";
@@ -39,6 +40,7 @@ export async function hasCompletedOnboarding(userId: string): Promise<boolean> {
 
 export async function fetchConsultationsPageData(userId: string): Promise<ConsultationsPageData> {
   const completedIntakeSessionId = await attachExistingIntakeToOpenOrders(userId);
+  const shopWithoutOwnIntake = new Set(await shopSubscriptionIdsWithoutOwnIntake(userId));
   const [identity, onboardingComplete, subsResult, consultsResult, requestsResult, eligibility] =
     await Promise.all([
       getPatientDisplayIdentity(userId),
@@ -260,7 +262,9 @@ export async function fetchConsultationsPageData(userId: string): Promise<Consul
     const endedAt = started?.endedAt || eventCompletedAt || null;
     const hasFormSubmission = Boolean(
       started?.hasFormSubmission ||
-      (completedIntakeSessionId && subscription.session_id === completedIntakeSessionId),
+      (!shopWithoutOwnIntake.has(subscription.id) &&
+        completedIntakeSessionId &&
+        subscription.session_id === completedIntakeSessionId),
     );
 
     return {

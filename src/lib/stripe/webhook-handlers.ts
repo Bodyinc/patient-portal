@@ -164,7 +164,28 @@ async function notifySubscriptionEnded(
 
 async function upsertSubscription(sub: Stripe.Subscription): Promise<void> {
   const meta = sub.metadata ?? {};
+  // The trial subscription was replaced by an active one with the same renewal date.
+  // Ignore the canceled copy so the patient is not told the medicine ended.
+  if (meta.superseded === "1") return;
+
   const priceId = sub.items?.data?.[0]?.price?.id ?? null;
+  const volatile = {
+    stripe_customer_id: customerId(sub),
+    stripe_price_id: priceId,
+    status: sub.status,
+    current_period_end: periodEndIso(sub),
+    cancel_at_period_end: subscriptionWillCancel(sub),
+  };
+
+  const replaces = meta.replaces?.trim();
+  if (replaces && sub.status !== "canceled") {
+    const { data: moved } = await supabaseAdmin
+      .from("subscriptions")
+      .update({ ...volatile, stripe_subscription_id: sub.id })
+      .eq("stripe_subscription_id", replaces)
+      .select("id");
+    if (moved?.length) return;
+  }
 
   const { data: existing } = await supabaseAdmin
     .from("subscriptions")
@@ -174,14 +195,6 @@ async function upsertSubscription(sub: Stripe.Subscription): Promise<void> {
 
   // Only the volatile fields are updated on existing rows, so the user_id/session_id set
   // at checkout (guest subs carry no user_id in metadata) are never clobbered back to null.
-  const volatile = {
-    stripe_customer_id: customerId(sub),
-    stripe_price_id: priceId,
-    status: sub.status,
-    current_period_end: periodEndIso(sub),
-    cancel_at_period_end: subscriptionWillCancel(sub),
-  };
-
   const { data: updated } = await supabaseAdmin
     .from("subscriptions")
     .update(volatile)

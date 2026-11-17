@@ -130,7 +130,7 @@ export default function AdditionalPaymentForm({
           </p>
         ) : null}
         <p className="mt-1 text-xs text-[#152A51]/60">
-          Once this is paid, your prescription will be generated and sent for fulfillment.
+          Once this is paid, the updated order is sent to the pharmacy automatically.
         </p>
       </div>
 

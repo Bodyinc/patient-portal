@@ -1471,8 +1471,8 @@ export async function getOnboardingConfirmationData(): Promise<
   }
 
   const payments = paymentResult.data ?? [];
-  // Add-on plans are trialing subscriptions. Their first invoice is $0 and is recorded
-  // after the real charge, so the newest payment is not the amount the patient paid.
+  // An add-on's first invoice is $0 because that period was already charged on the
+  // primary checkout, so the newest payment is not the amount the patient paid.
   const charged = payments.find((row) => (row.amount_cents ?? 0) > 0);
   const request = requestResult.data;
   const paidCents = charged ? charged.amount_cents : payments.length > 0 ? 0 : null;

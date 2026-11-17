@@ -82,7 +82,7 @@ export async function submitRequestToLifeFile(
     supabaseAdmin
       .from("profiles")
       .select(
-        "full_name, dob, sex, email, phone, street_address, apartment, city, state_code, postal_code, country",
+        "full_name, dob, sex, street_address, apartment, city, state_code, postal_code, country",
       )
       .eq("id", req.user_id)
       .maybeSingle(),
@@ -170,8 +170,6 @@ export async function submitRequestToLifeFile(
         fullName: patient.full_name,
         dob: patient.dob,
         sex: patient.sex,
-        email: patient.email,
-        phone: patient.phone,
         streetAddress: patient.street_address,
         apartment: patient.apartment,
         city: patient.city,

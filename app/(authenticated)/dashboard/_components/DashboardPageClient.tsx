@@ -55,6 +55,7 @@ function HealthGoalHeroCard({ name, imageSrc }: { name: string; imageSrc: string
 export default function DashboardPageClient({ data }: DashboardPageClientProps) {
   const router = useRouter();
   const duePayment = data.pendingPayments[0] ?? null;
+  const dueConsent = data.pendingConsents[0] ?? null;
   const dueAmount = duePayment
     ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
         duePayment.amountCents / 100,
@@ -109,8 +110,8 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
               </h3>
               <p className="mt-3 max-w-xl text-sm leading-relaxed text-[#152A51]/80 sm:text-[15px] sm:leading-7">
                 {dueAmount} is due to continue your {duePayment.medicineName} prescription
-                {duePayment.orderNumber ? ` (${duePayment.orderNumber})` : ""}. Pay now so your care
-                team can send it to the pharmacy.
+                {duePayment.orderNumber ? ` (${duePayment.orderNumber})` : ""}. Pay now, or decline
+                the change. If you decline, you are not charged.
                 {data.pendingPayments.length > 1
                   ? ` You have ${data.pendingPayments.length} payments waiting.`
                   : ""}
@@ -122,6 +123,13 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
                 >
                   <Link href={`/orders/${duePayment.requestId}/pay`}>Pay now</Link>
                 </Button>
+                <Button
+                  asChild
+                  variant="outline"
+                  className="h-[46px] w-full rounded-full border-[#152A51] px-6 text-sm font-medium text-[#152A51] hover:bg-[#F3F6F6] sm:w-fit"
+                >
+                  <Link href={`/orders/${duePayment.requestId}?action=decline`}>Decline</Link>
+                </Button>
                 {data.pendingPayments.length > 1 ? (
                   <Link
                     href="/my-meds"
@@ -130,6 +138,36 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
                     View all on My Meds
                   </Link>
                 ) : null}
+              </div>
+            </>
+          ) : dueConsent ? (
+            <>
+              <h3 className="text-[26px] font-medium leading-snug tracking-[-0.3px] text-[#152A51]">
+                Approve or reject this change
+              </h3>
+              <p className="mt-3 max-w-xl text-sm leading-relaxed text-[#152A51]/80 sm:text-[15px] sm:leading-7">
+                Your clinician changed your medicine to {dueConsent.medicineName}
+                {dueConsent.orderNumber ? ` (${dueConsent.orderNumber})` : ""}. Nothing extra is
+                due. Approve sends the updated order to the pharmacy. Reject restores the previous
+                medicine and plan, and you are not charged.
+                {dueConsent.creditCents > 0
+                  ? ` If you approve, a credit of ${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(dueConsent.creditCents / 100)} applies on your next bill.`
+                  : ""}
+              </p>
+              <div className="mt-auto flex flex-col gap-3 pt-5 sm:flex-row sm:items-center">
+                <Button
+                  asChild
+                  className="h-[46px] w-full rounded-full bg-[#152A51] px-6 text-sm font-medium text-white hover:bg-[#152A51]/90 sm:w-fit"
+                >
+                  <Link href={`/orders/${dueConsent.requestId}?action=approve`}>Approve</Link>
+                </Button>
+                <Button
+                  asChild
+                  variant="outline"
+                  className="h-[46px] w-full rounded-full border-[#152A51] px-6 text-sm font-medium text-[#152A51] hover:bg-[#F3F6F6] sm:w-fit"
+                >
+                  <Link href={`/orders/${dueConsent.requestId}?action=reject`}>Reject</Link>
+                </Button>
               </div>
             </>
           ) : data.consultationRequired || data.consultationVisit ? (
@@ -251,7 +289,7 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
                 {showConsultationCta && consultationStatus === "none" ? (
                   <DashboardConsultationButton
                     subscriptionId={data.treatment.subscriptionId!}
-                    label="Start consultation"
+                    label={data.intakeSubmitted ? "Start consultation" : "Complete intake form"}
                   />
                 ) : null}
                 {showConsultationCta &&

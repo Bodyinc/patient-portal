@@ -65,11 +65,30 @@ export function passwordResetEmail(params: { resetUrl: string; fullName?: string
   };
 }
 
+const LIVE_PATIENT_PORTAL = "https://patient.bodyinc.com";
+
+/**
+ * Host the patient can open without a Vercel login.
+ * Preview and admin hosts (pre-admin.bodyinc.com, *.vercel.app) sit behind
+ * Vercel Authentication, so a reset link built from those never reaches the portal.
+ */
+function patientPortalOrigin(): string {
+  const configured = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "") ?? "";
+  if (!configured) return LIVE_PATIENT_PORTAL;
+  try {
+    const url = new URL(configured);
+    const host = url.hostname.toLowerCase();
+    if (host === "localhost" || host === "127.0.0.1") return url.origin;
+    if (host === "patient.bodyinc.com") return url.origin;
+  } catch {
+    // A bad env value must not leak into the email.
+  }
+  return LIVE_PATIENT_PORTAL;
+}
+
 /** App URL the patient opens. The token is verified in the browser so inbox scanners cannot burn it. */
 export function patientPasswordResetUrl(tokenHash: string): string {
-  const configured = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "");
-  const origin = configured && configured.length > 0 ? configured : "http://localhost:3000";
-  const url = new URL("/reset-password", origin);
+  const url = new URL("/reset-password", patientPortalOrigin());
   url.searchParams.set("token_hash", tokenHash);
   return url.toString();
 }

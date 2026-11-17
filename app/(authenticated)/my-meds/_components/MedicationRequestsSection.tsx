@@ -245,12 +245,35 @@ export default function MedicationRequestsSection({
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-3">
                       {payRequestId(request) ? (
-                        <Link
-                          href={`/orders/${payRequestId(request)}/pay`}
-                          className="rounded-full bg-[#152A51] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#152A51]/90"
-                        >
-                          Pay now
-                        </Link>
+                        <>
+                          <Link
+                            href={`/orders/${payRequestId(request)}/pay`}
+                            className="rounded-full bg-[#152A51] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#152A51]/90"
+                          >
+                            Pay now
+                          </Link>
+                          <Link
+                            href={`/orders/${payRequestId(request)}?action=decline`}
+                            className="rounded-full border border-[#152A51] px-3 py-1.5 text-sm font-medium text-[#152A51] hover:bg-[#F3F6F6]"
+                          >
+                            Decline
+                          </Link>
+                        </>
+                      ) : request.status === "awaiting_additional_payment" ? (
+                        <>
+                          <Link
+                            href={`/orders/${request.id}?action=approve`}
+                            className="rounded-full bg-[#152A51] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#152A51]/90"
+                          >
+                            Approve
+                          </Link>
+                          <Link
+                            href={`/orders/${request.id}?action=reject`}
+                            className="rounded-full border border-[#152A51] px-3 py-1.5 text-sm font-medium text-[#152A51] hover:bg-[#F3F6F6]"
+                          >
+                            Reject
+                          </Link>
+                        </>
                       ) : null}
                       <button
                         type="button"
@@ -335,16 +358,44 @@ export default function MedicationRequestsSection({
               ) : (
                 <div className="pt-1">
                   {active.pendingPaymentCents && payRequestId(active) ? (
-                    <div className="mb-4 flex items-center justify-between gap-3 rounded-[14px] border border-[#E8EEED] bg-[#FFF6D6] p-3">
+                    <div className="mb-4 flex flex-col gap-3 rounded-[14px] border border-[#E8EEED] bg-[#FFF6D6] p-3 sm:flex-row sm:items-center sm:justify-between">
                       <span className="text-sm text-[#786C46]">
                         {money(active.pendingPaymentCents)} due to continue
                       </span>
-                      <Link
-                        href={`/orders/${payRequestId(active)}/pay`}
-                        className="rounded-full bg-[#152A51] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#152A51]/90"
-                      >
-                        Pay now
-                      </Link>
+                      <div className="flex gap-2">
+                        <Link
+                          href={`/orders/${payRequestId(active)}/pay`}
+                          className="rounded-full bg-[#152A51] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#152A51]/90"
+                        >
+                          Pay now
+                        </Link>
+                        <Link
+                          href={`/orders/${payRequestId(active)}?action=decline`}
+                          className="rounded-full border border-[#152A51] bg-white px-3 py-1.5 text-sm font-medium text-[#152A51] hover:bg-[#F3F6F6]"
+                        >
+                          Decline
+                        </Link>
+                      </div>
+                    </div>
+                  ) : active.status === "awaiting_additional_payment" ? (
+                    <div className="mb-4 flex flex-col gap-3 rounded-[14px] border border-[#E8EEED] bg-[#FFF6D6] p-3 sm:flex-row sm:items-center sm:justify-between">
+                      <span className="text-sm text-[#786C46]">
+                        Nothing extra is due. Approve or reject this change.
+                      </span>
+                      <div className="flex gap-2">
+                        <Link
+                          href={`/orders/${active.id}?action=approve`}
+                          className="rounded-full bg-[#152A51] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#152A51]/90"
+                        >
+                          Approve
+                        </Link>
+                        <Link
+                          href={`/orders/${active.id}?action=reject`}
+                          className="rounded-full border border-[#152A51] bg-white px-3 py-1.5 text-sm font-medium text-[#152A51] hover:bg-[#F3F6F6]"
+                        >
+                          Reject
+                        </Link>
+                      </div>
                     </div>
                   ) : null}
 

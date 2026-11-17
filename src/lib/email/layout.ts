@@ -78,6 +78,20 @@ export function emailButton(label: string, href: string): string {
 </table>`;
 }
 
+/** Outline action stacked under the primary pill. */
+export function emailSecondaryButton(label: string, href: string): string {
+  const t = EMAIL_THEME;
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 8px;">
+  <tr>
+    <td align="left" bgcolor="${t.card}" height="46" class="email-btn-secondary-cell" style="background-color:${t.card};background:${t.card};border-radius:105px;height:46px;border:1px solid ${t.navy};mso-padding-alt:13px 19px;">
+      <a href="${href}" target="_blank" class="email-btn-secondary" style="display:inline-block;background-color:${t.card};background:${t.card};border:1px solid ${t.navy};color:${t.navy};padding:13px 19px;border-radius:105px;text-decoration:none;font-weight:500;font-size:14px;line-height:18px;font-family:${FONT};">
+        <!--[if mso]>&nbsp;&nbsp;<![endif]-->${label}<!--[if mso]>&nbsp;&nbsp;<![endif]-->
+      </a>
+    </td>
+  </tr>
+</table>`;
+}
+
 /** Soft gray chip matching onboarding input fills. */
 export function emailChip(text: string): string {
   const t = EMAIL_THEME;
@@ -118,6 +132,7 @@ export function emailLayout(title: string, bodyHtml: string): string {
       a { color: ${t.navy}; }
       .email-btn { background-color: ${t.cta} !important; color: ${t.navy} !important; }
       .email-btn-cell { background-color: ${t.cta} !important; }
+      .email-btn-secondary, .email-btn-secondary-cell { background-color: ${t.card} !important; color: ${t.navy} !important; }
       .email-chip { background-color: ${t.inputBg} !important; color: ${t.navy} !important; }
       .email-panel { background-color: ${t.inputBg} !important; }
       .email-logo { filter: none !important; }
@@ -130,6 +145,7 @@ export function emailLayout(title: string, bodyHtml: string): string {
         `background-color:${t.card} !important;background:${t.card} !important;color:${t.navy} !important;`,
       )}
       ${darkModeLock(".email-btn, .email-btn-cell", `background-color:${t.cta} !important;color:${t.navy} !important;`)}
+      ${darkModeLock(".email-btn-secondary, .email-btn-secondary-cell", `background-color:${t.card} !important;color:${t.navy} !important;`)}
       ${darkModeLock(".email-chip, .email-panel", `background-color:${t.inputBg} !important;color:${t.navy} !important;`)}
     </style>
   </head>

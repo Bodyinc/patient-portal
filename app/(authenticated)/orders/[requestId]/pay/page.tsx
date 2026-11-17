@@ -48,6 +48,16 @@ export default async function AdditionalPaymentPage({
               discountCents={intent.discountCents}
               promoLabel={intent.promoLabel}
             />
+            <p className="text-sm text-[#152A51]/70">
+              If you decline, you are not charged and the order returns to the previous medicine and
+              plan.{" "}
+              <Link
+                href={`/orders/${requestId}?action=decline`}
+                className="font-medium text-[#152A51] underline underline-offset-2"
+              >
+                Decline this change
+              </Link>
+            </p>
           </>
         )}
       </div>

@@ -14,6 +14,11 @@ export type CreatedSubscription = {
   /** Null when the first invoice was already paid with a saved card. */
   clientSecret: string | null;
   paid: boolean;
+  /**
+   * The first invoice is already settled, including a promo that zeros it.
+   * A SetupIntent may still be returned so the patient can save a card for renewal.
+   */
+  invoiceSettled: boolean;
 };
 
 export async function createSubscriptionForPrice(params: {
@@ -23,6 +28,12 @@ export async function createSubscriptionForPrice(params: {
   // Human-readable label shown on the subscription in the Stripe dashboard.
   description?: string;
   promotionCodeId?: string | null;
+  /**
+   * When true, the cart total after promo is $0. If Stripe still opens a chargeable
+   * PaymentIntent, cancel and fail instead of sending the patient a bank OTP for the
+   * full plan amount.
+   */
+  expectZeroFirstInvoice?: boolean;
   oneTimeFees?: Array<{ amountCents: number; description: string }>;
   // >0 adds shipping as a recurring subscription item. shippingOnFirstInvoice=true bills it
   // from the first invoice (shop orders); false starts it on the first renewal (onboarding).
@@ -37,6 +48,7 @@ export async function createSubscriptionForPrice(params: {
     metadata,
     description,
     promotionCodeId,
+    expectZeroFirstInvoice = false,
     oneTimeFees,
     recurringShippingCents = 0,
     shippingOnFirstInvoice = false,
@@ -53,10 +65,10 @@ export async function createSubscriptionForPrice(params: {
     if (!item.invoice) await stripe.invoiceItems.del(item.id);
   }
 
-  // Pending invoice items on the customer get pulled into the subscription's first
-  // invoice, so the first charge equals the cart total (plan + one-time fees).
+  // Positive one-time lines only (consultation, add-ons). Promos go through promotionCodeId —
+  // a negative pending invoice item was what let the UI say $0 while the bank still saw $181.
   for (const fee of oneTimeFees ?? []) {
-    if (fee.amountCents === 0) continue; // keep negative items (discounts); skip only zero
+    if (fee.amountCents <= 0) continue;
     await stripe.invoiceItems.create({
       customer: customerId,
       amount: fee.amountCents,
@@ -111,34 +123,71 @@ export async function createSubscriptionForPrice(params: {
     });
   }
 
-  if (defaultPaymentMethodId) {
+  const amountDue = invoiceAmountDue(subscription);
+  if (expectZeroFirstInvoice && (amountDue ?? 0) > 0) {
+    try {
+      await stripe.subscriptions.cancel(subscription.id);
+    } catch (error) {
+      console.error("[stripe] failed to cancel non-zero promo subscription:", error);
+    }
+    throw new Error(
+      "This promo could not be applied to the card charge. Nothing was charged. Please try again.",
+    );
+  }
+
+  // A 100% promo can activate the subscription with a $0 invoice and still return a
+  // SetupIntent. The invoice is settled either way; the secret is only for the renewal card.
+  const invoiceSettled = invoiceSettledWithoutPayment(subscription);
+
+  if (defaultPaymentMethodId && !invoiceSettled) {
     const charged = await tryChargeSavedPaymentMethod({
       subscription,
       paymentMethodId: defaultPaymentMethodId,
     });
     if (charged.paid) {
-      return { subscriptionId: subscription.id, clientSecret: null, paid: true };
+      return {
+        subscriptionId: subscription.id,
+        clientSecret: null,
+        paid: true,
+        invoiceSettled: true,
+      };
     }
     if (charged.clientSecret) {
       return {
         subscriptionId: subscription.id,
         clientSecret: charged.clientSecret,
         paid: false,
+        invoiceSettled,
       };
     }
   }
 
-  // A promo that zeros the first invoice has no PaymentIntent. Stripe still returns a
-  // SetupIntent so the patient can save a card for the renewal.
+  // Free first invoice: never hand the browser a PaymentIntent (that is what triggered
+  // the $181 bank OTP). SetupIntent only saves the card for renewal.
+  if (invoiceSettled || (amountDue ?? 0) === 0) {
+    const setupSecret = setupIntentClientSecret(subscription);
+    if (setupSecret) {
+      return {
+        subscriptionId: subscription.id,
+        clientSecret: setupSecret,
+        paid: false,
+        invoiceSettled: true,
+      };
+    }
+    return {
+      subscriptionId: subscription.id,
+      clientSecret: null,
+      paid: true,
+      invoiceSettled: true,
+    };
+  }
+
   const clientSecret = extractClientSecret(subscription) ?? setupIntentClientSecret(subscription);
   if (!clientSecret) {
-    if (invoiceSettledWithoutPayment(subscription)) {
-      return { subscriptionId: subscription.id, clientSecret: null, paid: true };
-    }
     throw new Error("Stripe returned no client secret for the subscription's first invoice.");
   }
 
-  return { subscriptionId: subscription.id, clientSecret, paid: false };
+  return { subscriptionId: subscription.id, clientSecret, paid: false, invoiceSettled };
 }
 
 async function tryChargeSavedPaymentMethod(params: {
@@ -466,11 +515,20 @@ function setupIntentClientSecret(subscription: Stripe.Subscription): string | nu
   return setup.client_secret ?? null;
 }
 
+function invoiceAmountDue(subscription: Stripe.Subscription): number | null {
+  const invoice = subscription.latest_invoice;
+  if (!invoice || typeof invoice === "string") return null;
+  const amountDue = (invoice as { amount_due?: number | null }).amount_due;
+  return typeof amountDue === "number" ? amountDue : null;
+}
+
 function invoiceSettledWithoutPayment(subscription: Stripe.Subscription): boolean {
-  if (subscription.status !== "active" && subscription.status !== "trialing") return false;
   const invoice = subscription.latest_invoice;
   if (!invoice || typeof invoice === "string") return false;
-  const amountDue = (invoice as { amount_due?: number | null }).amount_due;
+  const amountDue = invoiceAmountDue(subscription);
   const status = (invoice as { status?: string | null }).status;
-  return status === "paid" || amountDue === 0;
+  if (status === "paid" || amountDue === 0) return true;
+  return (
+    (subscription.status === "active" || subscription.status === "trialing") && amountDue === 0
+  );
 }

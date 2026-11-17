@@ -21,8 +21,6 @@ export type LifeFileOrderInput = {
     fullName: string;
     dob: string | null;
     sex: string | null;
-    email: string | null;
-    phone: string | null;
     streetAddress: string | null;
     apartment: string | null;
     city: string | null;
@@ -148,16 +146,12 @@ export async function createLifeFileOrder(input: LifeFileOrderInput) {
         state: input.patient.stateCode ?? undefined,
         zip: input.patient.postalCode ?? undefined,
         country: input.patient.country ?? undefined,
-        phoneHome: input.patient.phone ?? undefined,
-        email: input.patient.email ?? undefined,
       },
 
       shipping: {
         recipientType: "patient",
         recipientLastName: patientName.lastName,
         recipientFirstName: patientName.firstName,
-        recipientPhone: input.patient.phone ?? undefined,
-        recipientEmail: input.patient.email ?? undefined,
         addressLine1: input.patient.streetAddress ?? undefined,
         addressLine2: input.patient.apartment ?? undefined,
         city: input.patient.city ?? undefined,

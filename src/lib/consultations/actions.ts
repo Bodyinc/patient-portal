@@ -30,6 +30,8 @@ import {
   fetchQuickbloxUserName,
   type QbClientSession,
 } from "./quickblox";
+import { releaseShopCheckoutAfterIntake } from "@/lib/orders/shop-intake-gate";
+
 import { checkJotformSubmission, fetchJotformSubmissionAnswers, getJotformConfig } from "./jotform";
 import { readQbClientSession, saveQbClientSession } from "./session-cookie";
 import { sendTransactionalEmail } from "@/lib/email/send";
@@ -196,7 +198,10 @@ export async function updateConsultationFormSubmittedRecord(params: {
       })
       .eq("user_id", userId)
       .eq("subscription_id", subscriptionId);
+    return;
   }
+
+  await releaseShopCheckoutAfterIntake(subscriptionId);
 }
 
 async function insertPatientConsultationRecord(params: {

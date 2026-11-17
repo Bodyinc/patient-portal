@@ -11,7 +11,7 @@ import {
   ensureNoActiveDuplicate,
   prepareCheckoutSubscription,
 } from "@/lib/stripe/subscriptions";
-import { resolveCheckoutDiscount } from "@/lib/stripe/promos";
+import { ensureStripePromotionCode, resolveCheckoutDiscount } from "@/lib/stripe/promos";
 import { getPlatformSettings, effectiveShippingCents } from "@/lib/settings/platform-settings";
 
 export type OnboardingSubscriptionResult =
@@ -141,16 +141,15 @@ export async function createOnboardingSubscription(
     allowAuto: true,
   });
 
+  // Add-ons are positive one-time lines. The promo is a Stripe promotion code so the
+  // PaymentIntent amount matches the cart (negative invoice lines did not).
   const oneTimeFees: Array<{ amountCents: number; description: string }> = addons.map((line) => ({
     amountCents: Math.round(Number(line.packagePrice ?? 0) * 100),
     description: `${line.medicineName} · ${line.packageName ?? line.categoryName}`,
   }));
-  if (discount) {
-    oneTimeFees.push({
-      amountCents: -discount.discountCents,
-      description: `Discount (${discount.label})`,
-    });
-  }
+  const discountCents = discount?.discountCents ?? 0;
+  const firstInvoiceCents = Math.max(0, subtotalCents - discountCents);
+  const promotionCodeId = discount ? await ensureStripePromotionCode(discount.promo) : null;
 
   const customerId =
     session.stripe_customer_id ??
@@ -170,13 +169,16 @@ export async function createOnboardingSubscription(
   let subscriptionId: string;
   let clientSecret: string | null;
   let paid: boolean;
+  let invoiceSettled = false;
   try {
-    ({ subscriptionId, clientSecret, paid } = await createSubscriptionForPrice({
+    ({ subscriptionId, clientSecret, paid, invoiceSettled } = await createSubscriptionForPrice({
       customerId,
       priceId: pkg.stripe_price_id,
       description: `${medicineName}${variantName ? ` — ${variantName}` : ""} · ${planLabel}${
         addons.length ? ` + ${addons.length} more` : ""
       }`,
+      promotionCodeId,
+      expectZeroFirstInvoice: firstInvoiceCents === 0,
       oneTimeFees,
       // First onboarding invoice is medication-only; shipping recurs from the first renewal.
       recurringShippingCents: effectiveShippingCents(settings),
@@ -207,7 +209,8 @@ export async function createOnboardingSubscription(
     };
   }
 
-  if (!clientSecret && !paid) {
+  const settledFree = paid || invoiceSettled;
+  if (!clientSecret && !settledFree) {
     return { ok: false, message: "Unable to start payment. Please try again." };
   }
 
@@ -221,7 +224,8 @@ export async function createOnboardingSubscription(
 
   // Opening the card form is not a completed purchase. Never downgrade a session
   // the webhook already marked completed while this request was in flight.
-  if (!paid) {
+  // A $0 promo may still return a SetupIntent so the renewal card can be saved.
+  if (!settledFree || clientSecret) {
     await supabaseAdmin
       .from("intake_sessions")
       .update({ status: "payment_pending" })
@@ -239,7 +243,7 @@ export async function createOnboardingSubscription(
         stripe_price_id: pkg.stripe_price_id,
         package_id: pkg.id,
         medicine_id: pkg.medicine_id,
-        status: paid ? "active" : "incomplete",
+        status: settledFree && !clientSecret ? "active" : "incomplete",
         is_checkout_primary: true,
       },
       { onConflict: "stripe_subscription_id" },
@@ -254,10 +258,10 @@ export async function createOnboardingSubscription(
       .eq("id", subRow.id);
   }
 
-  if (paid || !clientSecret) {
+  if (settledFree && !clientSecret) {
     return { ok: true, paid: true, clientSecret: null };
   }
-  return { ok: true, paid: false, clientSecret };
+  return { ok: true, paid: false, clientSecret: clientSecret! };
 }
 
 // Client-facing discount preview for the checkout cart. code=null returns the auto-apply

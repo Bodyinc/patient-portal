@@ -307,7 +307,10 @@ async function ensurePrescription(
 }
 
 // Payment of a medicine-change difference generates the prescription in this portal.
-async function prescribeRequestAfterAdditionalPayment(requestId: string): Promise<void> {
+async function prescribeRequestAfterAdditionalPayment(
+  requestId: string,
+  prescriptionNote = "Additional payment received. Prescription generated.",
+): Promise<void> {
   const { data: stillPending } = await supabaseAdmin
     .from("additional_payments")
     .select("id")
@@ -349,7 +352,7 @@ async function prescribeRequestAfterAdditionalPayment(requestId: string): Promis
     request_id: requestId,
     status: "prescribed",
     actor_role: "system",
-    note: "Additional payment received. Prescription generated.",
+    note: prescriptionNote,
   });
 }
 
@@ -387,16 +390,19 @@ async function markSentToPharmacy(requestId: string, note: string): Promise<void
 
 // An unpaid difference blocks fulfillment. Once it is paid, submit the same LifeFile
 // order the admin app sends, and only then mark the request sent to the pharmacy.
-async function prescribeAndSendToPharmacy(requestId: string): Promise<void> {
+async function prescribeAndSendToPharmacy(
+  requestId: string,
+  prescriptionNote?: string,
+): Promise<{ sent: boolean; error: string | null }> {
   const { data: stillPending } = await supabaseAdmin
     .from("additional_payments")
     .select("id")
     .eq("request_id", requestId)
     .eq("status", "pending")
     .maybeSingle();
-  if (stillPending) return;
+  if (stillPending) return { sent: false, error: "A payment is still pending." };
 
-  await prescribeRequestAfterAdditionalPayment(requestId);
+  await prescribeRequestAfterAdditionalPayment(requestId, prescriptionNote);
 
   const { data: req } = await supabaseAdmin
     .from("medication_requests")
@@ -405,19 +411,31 @@ async function prescribeAndSendToPharmacy(requestId: string): Promise<void> {
     )
     .eq("id", requestId)
     .maybeSingle();
-  if (!req) return;
+  if (!req) return { sent: false, error: "Order not found." };
   if (req.life_file_order_id && req.life_file_status && req.life_file_status !== "failed") {
     await markSentToPharmacy(requestId, `Life File order ID: ${req.life_file_order_id}`);
-    return;
+    return { sent: true, error: null };
   }
 
   try {
     const lf = await submitRequestToLifeFile(supabaseAdmin, req, { allowRetry: true });
     const pharmacy = lf.pharmacyName ? ` (${lf.pharmacyName})` : "";
     await markSentToPharmacy(requestId, `Life File order ID: ${lf.lifeFileOrderId}${pharmacy}`);
+    return { sent: true, error: null };
   } catch (error) {
     console.error("[lifefile] additional payment submission failed:", error);
+    const message =
+      error instanceof Error ? error.message : "The pharmacy send did not go through.";
+    return { sent: false, error: message };
   }
+}
+
+/** Prescribe a confirmed medicine change and submit it to LifeFile. */
+export async function sendMedicineChangeToPharmacy(
+  requestId: string,
+  prescriptionNote?: string,
+): Promise<{ sent: boolean; error: string | null }> {
+  return prescribeAndSendToPharmacy(requestId, prescriptionNote);
 }
 
 async function notifyAdditionalPaymentReceived(
@@ -561,6 +579,16 @@ async function cancelOpenIntent(paymentIntentId: string | null): Promise<void> {
   } catch (error) {
     console.error("[additional-payment] cancel intent failed:", error);
   }
+}
+
+/** Drop an open card charge when the patient declines a more expensive medicine. */
+export async function cancelPendingAdditionalCharge(
+  userId: string,
+  requestId: string,
+): Promise<void> {
+  const loaded = await loadOwnedPendingPayment(userId, requestId);
+  if (!loaded.ok) return;
+  await cancelOpenIntent(loaded.pay.stripe_payment_intent_id);
 }
 
 async function loadOwnedPendingPayment(
