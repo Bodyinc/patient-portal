@@ -91,26 +91,6 @@ export async function createOnboardingSubscription(
     return { ok: false, message: "This plan is not available for purchase yet." };
   }
 
-  // Same browser keeps this intake. If they left on payment_pending without paying,
-  // reopen that card form. "Already purchased" only applies once money was collected.
-  // An email that already has an account is rejected earlier, on the contact step.
-  if (session.stripe_subscription_id) {
-    const prior = await prepareCheckoutSubscription({
-      subscriptionId: session.stripe_subscription_id,
-      packageId: pkg.id,
-    });
-    if (prior.action === "paid") {
-      return { ok: true, paid: true, clientSecret: null };
-    }
-    if (prior.action === "resume") {
-      return { ok: true, paid: false, clientSecret: prior.clientSecret };
-    }
-    const { alreadyPaid } = await ensureNoActiveDuplicate(session.stripe_subscription_id);
-    if (alreadyPaid) {
-      return { ok: true, paid: true, clientSecret: null };
-    }
-  }
-
   const cart = await loadCheckoutCart(session.id);
   const hasPrimary = cart.some((line) => line.isPrimary);
   const addons = hasPrimary
@@ -140,6 +120,31 @@ export async function createOnboardingSubscription(
     subtotalCents,
     allowAuto: true,
   });
+  const discountCents = discount?.discountCents ?? 0;
+  const firstInvoiceCents = Math.max(0, subtotalCents - discountCents);
+
+  // Same browser keeps this intake. If they left on payment_pending without paying,
+  // reopen that card form — but only when the promo/total still match. Applying 100OFF
+  // after the form opened must replace the old PaymentIntent, not resume a $471 charge.
+  // An email that already has an account is rejected earlier, on the contact step.
+  if (session.stripe_subscription_id) {
+    const prior = await prepareCheckoutSubscription({
+      subscriptionId: session.stripe_subscription_id,
+      packageId: pkg.id,
+      expectedAmountDueCents: firstInvoiceCents,
+      expectedPromoCode: discount?.label ?? null,
+    });
+    if (prior.action === "paid") {
+      return { ok: true, paid: true, clientSecret: null };
+    }
+    if (prior.action === "resume") {
+      return { ok: true, paid: false, clientSecret: prior.clientSecret };
+    }
+    const { alreadyPaid } = await ensureNoActiveDuplicate(session.stripe_subscription_id);
+    if (alreadyPaid) {
+      return { ok: true, paid: true, clientSecret: null };
+    }
+  }
 
   // Add-ons are positive one-time lines. The promo is a Stripe promotion code so the
   // PaymentIntent amount matches the cart (negative invoice lines did not).
@@ -147,8 +152,6 @@ export async function createOnboardingSubscription(
     amountCents: Math.round(Number(line.packagePrice ?? 0) * 100),
     description: `${line.medicineName} · ${line.packageName ?? line.categoryName}`,
   }));
-  const discountCents = discount?.discountCents ?? 0;
-  const firstInvoiceCents = Math.max(0, subtotalCents - discountCents);
   const promotionCodeId = discount ? await ensureStripePromotionCode(discount.promo) : null;
 
   const customerId =

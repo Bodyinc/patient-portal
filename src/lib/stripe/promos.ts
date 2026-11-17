@@ -100,17 +100,24 @@ export async function incrementPromoRedemption(promoId: string): Promise<void> {
  * Stripe still opened a PaymentIntent for the full plan (bank OTP for $181 with 100OFF).
  * Attach a real Stripe promotion code so the first invoice amount_due matches the cart.
  */
+async function stripeCouponMatchesPromo(
+  coupon: { percent_off?: number | null; amount_off?: number | null; currency?: string | null },
+  promo: PromoCodeRow,
+): Promise<boolean> {
+  if (promo.discount_type === "percent") {
+    return Number(coupon.percent_off ?? -1) === Number(promo.percent_off ?? -2);
+  }
+  if (promo.discount_type === "amount") {
+    return (
+      Number(coupon.amount_off ?? -1) === Number(promo.amount_off_cents ?? -2) &&
+      (coupon.currency ?? "usd").toLowerCase() === (promo.currency || "usd").toLowerCase()
+    );
+  }
+  return false;
+}
+
 export async function ensureStripePromotionCode(promo: PromoCodeRow): Promise<string> {
   const { stripe } = await import("./server");
-
-  if (promo.stripe_promotion_code_id) {
-    try {
-      const existing = await stripe.promotionCodes.retrieve(promo.stripe_promotion_code_id);
-      if (existing.active) return existing.id;
-    } catch {
-      // Recreate below when the saved id is missing from this Stripe account.
-    }
-  }
 
   async function rememberPromotionCode(promotionCodeId: string, couponId: string) {
     await supabaseAdmin
@@ -123,22 +130,44 @@ export async function ensureStripePromotionCode(promo: PromoCodeRow): Promise<st
     return promotionCodeId;
   }
 
+  async function usablePromotionCodeId(promotionCodeId: string): Promise<string | null> {
+    try {
+      const existing = await stripe.promotionCodes.retrieve(promotionCodeId, {
+        expand: ["promotion.coupon"],
+      });
+      if (!existing.active) return null;
+      const couponRef = existing.promotion?.coupon;
+      if (!couponRef || typeof couponRef === "string") return null;
+      if (!(await stripeCouponMatchesPromo(couponRef, promo))) return null;
+      return rememberPromotionCode(existing.id, couponRef.id);
+    } catch {
+      return null;
+    }
+  }
+
+  if (promo.stripe_promotion_code_id) {
+    const reused = await usablePromotionCodeId(promo.stripe_promotion_code_id);
+    if (reused) return reused;
+  }
+
   const listed = await stripe.promotionCodes.list({
     code: promo.code,
-    limit: 1,
+    limit: 5,
+    expand: ["data.promotion.coupon"],
   });
-  const found = listed.data[0];
-  if (found?.active) {
+  for (const found of listed.data) {
+    if (!found.active) continue;
     const couponRef = found.promotion?.coupon;
-    const couponId = typeof couponRef === "string" ? couponRef : couponRef?.id;
-    if (!couponId) throw new Error("Stripe promotion code is missing its coupon.");
-    return rememberPromotionCode(found.id, couponId);
+    if (!couponRef || typeof couponRef === "string") continue;
+    if (!(await stripeCouponMatchesPromo(couponRef, promo))) continue;
+    return rememberPromotionCode(found.id, couponRef.id);
   }
 
   let couponId = promo.stripe_coupon_id;
   if (couponId) {
     try {
-      await stripe.coupons.retrieve(couponId);
+      const coupon = await stripe.coupons.retrieve(couponId);
+      if (!(await stripeCouponMatchesPromo(coupon, promo))) couponId = null;
     } catch {
       couponId = null;
     }
@@ -163,6 +192,24 @@ export async function ensureStripePromotionCode(promo: PromoCodeRow): Promise<st
     couponId = coupon.id;
   }
 
+  // An old Stripe "100OFF" linked to the wrong coupon must not stay active, or create()
+  // fails on the duplicate code and checkout keeps charging the full plan.
+  for (const stale of listed.data) {
+    if (!stale.active) continue;
+    const couponRef = stale.promotion?.coupon;
+    const matches =
+      couponRef &&
+      typeof couponRef !== "string" &&
+      (await stripeCouponMatchesPromo(couponRef, promo));
+    if (!matches) {
+      try {
+        await stripe.promotionCodes.update(stale.id, { active: false });
+      } catch (error) {
+        console.error("[promos] failed to deactivate mismatched Stripe code:", error);
+      }
+    }
+  }
+
   try {
     const promotionCode = await stripe.promotionCodes.create({
       promotion: { type: "coupon", coupon: couponId },
@@ -174,14 +221,18 @@ export async function ensureStripePromotionCode(promo: PromoCodeRow): Promise<st
     });
     return rememberPromotionCode(promotionCode.id, couponId);
   } catch (error) {
-    // Another checkout may have created the same code; reuse it.
-    const again = await stripe.promotionCodes.list({ code: promo.code, limit: 1 });
-    const existing = again.data[0];
-    if (existing?.active) {
+    // Another checkout may have created the same code; reuse only if the coupon matches.
+    const again = await stripe.promotionCodes.list({
+      code: promo.code,
+      limit: 5,
+      expand: ["data.promotion.coupon"],
+    });
+    for (const existing of again.data) {
+      if (!existing.active) continue;
       const couponRef = existing.promotion?.coupon;
-      const existingCoupon = typeof couponRef === "string" ? couponRef : couponRef?.id;
-      if (!existingCoupon) throw error;
-      return rememberPromotionCode(existing.id, existingCoupon);
+      if (!couponRef || typeof couponRef === "string") continue;
+      if (!(await stripeCouponMatchesPromo(couponRef, promo))) continue;
+      return rememberPromotionCode(existing.id, couponRef.id);
     }
     throw error;
   }

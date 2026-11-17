@@ -291,6 +291,10 @@ export type CheckoutSubscriptionPlan =
 export async function prepareCheckoutSubscription(params: {
   subscriptionId: string;
   packageId: string;
+  /** Current cart total after promo. Mismatch means replace (e.g. 100OFF applied after open). */
+  expectedAmountDueCents?: number | null;
+  /** Current promo label, or empty when none. Mismatch means replace. */
+  expectedPromoCode?: string | null;
 }): Promise<CheckoutSubscriptionPlan> {
   let existing: Stripe.Subscription;
   try {
@@ -307,11 +311,14 @@ export async function prepareCheckoutSubscription(params: {
 
   const latest = existing.latest_invoice;
   let amountPaid = 0;
+  let amountDue: number | null = null;
   if (latest && typeof latest !== "string") {
     amountPaid = latest.amount_paid ?? 0;
+    amountDue = latest.amount_due ?? null;
   } else if (typeof latest === "string") {
     const invoice = await stripe.invoices.retrieve(latest);
     amountPaid = invoice.amount_paid ?? 0;
+    amountDue = invoice.amount_due ?? null;
   }
   const secret = extractClientSecret(existing) ?? setupIntentClientSecret(existing);
   const action = unpaidCheckoutAction({
@@ -322,7 +329,21 @@ export async function prepareCheckoutSubscription(params: {
     hasClientSecret: Boolean(secret),
   });
   if (action === "paid") return { action: "paid" };
-  if (action === "resume" && secret) return { action: "resume", clientSecret: secret };
+  if (action === "resume" && secret) {
+    // Applying 100OFF after the card form opened used to resume the old $471 PaymentIntent
+    // while the UI showed $0. Only resume when promo + amount still match this checkout.
+    const metaPromo = (existing.metadata?.promo_code ?? "").trim().toUpperCase();
+    const expectedPromo = (params.expectedPromoCode ?? "").trim().toUpperCase();
+    if (expectedPromo !== metaPromo) return { action: "replace" };
+    if (
+      params.expectedAmountDueCents != null &&
+      amountDue != null &&
+      Math.abs(amountDue - params.expectedAmountDueCents) > 1
+    ) {
+      return { action: "replace" };
+    }
+    return { action: "resume", clientSecret: secret };
+  }
   return { action: "replace" };
 }
 
