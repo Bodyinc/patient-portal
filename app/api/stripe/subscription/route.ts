@@ -240,7 +240,6 @@ export async function POST(request: Request) {
     // A promo that covers the whole first invoice has no PaymentIntent, so invoice.paid
     // can lag or never be what the provider is waiting on. Record the $0 payment and
     // open the medication request now, the same way a fully waived additional payment does.
-    // The SetupIntent, when present, is only so the renewal card can still be saved.
     if (settledFree) {
       try {
         await reconcileSubscription(subscriptionId);
@@ -252,10 +251,10 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         orderId: order.id,
-        // Keep paid=false when a SetupIntent secret is present so the client still
-        // shows "save card" for renewal. The shop order row is already marked paid above.
-        clientSecret: clientSecret ?? null,
-        paid: Boolean(paid && !clientSecret),
+        // $0 / full promo is already paid — skip the card modal and go to confirmation.
+        // Non-zero checkouts still return the PaymentIntent client secret.
+        clientSecret: settledFree ? null : (clientSecret ?? null),
+        paid: settledFree || Boolean(paid && !clientSecret),
         savedCardLabel: savedPaymentMethod ? formatSavedCardLabel(savedPaymentMethod) : null,
       },
       { status: 201 },

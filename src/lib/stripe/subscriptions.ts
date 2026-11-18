@@ -16,7 +16,7 @@ export type CreatedSubscription = {
   paid: boolean;
   /**
    * The first invoice is already settled, including a promo that zeros it.
-   * A SetupIntent may still be returned so the patient can save a card for renewal.
+   * Checkout treats this as paid immediately (no card form required).
    */
   invoiceSettled: boolean;
 };
@@ -135,8 +135,8 @@ export async function createSubscriptionForPrice(params: {
     );
   }
 
-  // A 100% promo can activate the subscription with a $0 invoice and still return a
-  // SetupIntent. The invoice is settled either way; the secret is only for the renewal card.
+  // A 100% promo can activate the subscription with a $0 invoice (and may still attach a
+  // SetupIntent in Stripe). Treat the invoice as settled for checkout completion.
   const invoiceSettled = invoiceSettledWithoutPayment(subscription);
 
   if (defaultPaymentMethodId && !invoiceSettled) {
@@ -163,17 +163,10 @@ export async function createSubscriptionForPrice(params: {
   }
 
   // Free first invoice: never hand the browser a PaymentIntent (that is what triggered
-  // the $181 bank OTP). SetupIntent only saves the card for renewal.
+  // the bank OTP for the full plan). Do not require SetupIntent here either — the purchase
+  // is already complete and checkout should go straight to confirmation. Patients can save
+  // a renewal card later from Billing.
   if (invoiceSettled || (amountDue ?? 0) === 0) {
-    const setupSecret = setupIntentClientSecret(subscription);
-    if (setupSecret) {
-      return {
-        subscriptionId: subscription.id,
-        clientSecret: setupSecret,
-        paid: false,
-        invoiceSettled: true,
-      };
-    }
     return {
       subscriptionId: subscription.id,
       clientSecret: null,
@@ -329,6 +322,10 @@ export async function prepareCheckoutSubscription(params: {
     hasClientSecret: Boolean(secret),
   });
   if (action === "paid") return { action: "paid" };
+  // Full promo / $0 first invoice is already complete — never reopen a SetupIntent as unpaid.
+  if (amountDue === 0) {
+    return { action: "paid" };
+  }
   if (action === "resume" && secret) {
     // Applying 100OFF after the card form opened used to resume the old $471 PaymentIntent
     // while the UI showed $0. Only resume when promo + amount still match this checkout.
@@ -340,6 +337,10 @@ export async function prepareCheckoutSubscription(params: {
       amountDue != null &&
       Math.abs(amountDue - params.expectedAmountDueCents) > 1
     ) {
+      return { action: "replace" };
+    }
+    // Never resume a SetupIntent as a charge — only PaymentIntents belong on the card form.
+    if (secret.startsWith("seti_")) {
       return { action: "replace" };
     }
     return { action: "resume", clientSecret: secret };
@@ -363,7 +364,11 @@ export async function ensureNoActiveDuplicate(
 
   if (existing.status === "active" || existing.status === "trialing") {
     if (await subscriptionCollectedPayment(existing)) return { alreadyPaid: true };
-    // Active only because nothing was due (a $0 invoice). Nothing was purchased.
+    // Active with a $0 first invoice (e.g. 100% promo) is a completed purchase — keep it.
+    const latest = existing.latest_invoice;
+    const due = latest && typeof latest !== "string" ? (latest.amount_due ?? null) : null;
+    if (due === 0) return { alreadyPaid: true };
+    // Active with nothing due and no settled $0 invoice — abandon and start fresh.
     await stripe.subscriptions.cancel(subscriptionId);
     return { alreadyPaid: false };
   }
