@@ -7,7 +7,8 @@ import { fetchShopCatalogData, fetchShopCategoriesData } from "@/lib/shop/servic
 import type { ShopSortOption } from "@/lib/shop/types";
 import ShopCatalogClient from "./_components/ShopCatalogClient";
 
-const PAGE_SIZE = 6;
+/** One scrollable catalog — no patient-facing pagination. */
+const CATALOG_LIMIT = 100;
 
 function toPatientId(userId: string) {
   const compact = userId.replace(/-/g, "").toUpperCase();
@@ -27,7 +28,6 @@ export default async function ShopPage({
   searchParams?: Promise<{
     category?: string;
     sort?: string;
-    page?: string;
     q?: string;
   }>;
 }) {
@@ -37,7 +37,6 @@ export default async function ShopPage({
   const resolvedSearchParams = (await searchParams) ?? {};
   const category = resolvedSearchParams.category ?? null;
   const sortBy = getSortOption(resolvedSearchParams.sort);
-  const page = Math.max(1, Number(resolvedSearchParams.page ?? "1") || 1);
   const searchQuery = (resolvedSearchParams.q ?? "").trim();
 
   try {
@@ -46,8 +45,8 @@ export default async function ShopPage({
       fetchShopCatalogData({
         categorySlug: category,
         sortBy,
-        page,
-        pageSize: PAGE_SIZE,
+        page: 1,
+        pageSize: CATALOG_LIMIT,
         searchQuery,
       }),
       fetchActivePortalOffer().catch((err) => {
@@ -67,7 +66,7 @@ export default async function ShopPage({
           <ShopCatalogClient
             categories={categories}
             initialList={list}
-            pageSize={PAGE_SIZE}
+            pageSize={CATALOG_LIMIT}
             fullName={identity.fullName}
             patientId={patientId}
             avatarUrl={identity.avatarUrl}

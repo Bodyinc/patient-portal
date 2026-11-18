@@ -1,7 +1,6 @@
 import "server-only";
 
 import { attachExistingIntakeToOpenOrders } from "@/lib/intake/attach-intake";
-import { shopSubscriptionIdsWithoutOwnIntake } from "@/lib/orders/shop-intake-gate";
 import { resolveMedicineImageSrc } from "@/lib/intake/medicine-image";
 import { planTitleFromDuration } from "@/lib/pricing";
 import { getPatientDisplayIdentity } from "@/lib/profile/identity";
@@ -39,8 +38,7 @@ export async function hasCompletedOnboarding(userId: string): Promise<boolean> {
 }
 
 export async function fetchConsultationsPageData(userId: string): Promise<ConsultationsPageData> {
-  const completedIntakeSessionId = await attachExistingIntakeToOpenOrders(userId);
-  const shopWithoutOwnIntake = new Set(await shopSubscriptionIdsWithoutOwnIntake(userId));
+  await attachExistingIntakeToOpenOrders(userId);
   const [identity, onboardingComplete, subsResult, consultsResult, requestsResult, eligibility] =
     await Promise.all([
       getPatientDisplayIdentity(userId),
@@ -260,12 +258,9 @@ export async function fetchConsultationsPageData(userId: string): Promise<Consul
       ? "closed"
       : (started?.visitStatus ?? null);
     const endedAt = started?.endedAt || eventCompletedAt || null;
-    const hasFormSubmission = Boolean(
-      started?.hasFormSubmission ||
-      (!shopWithoutOwnIntake.has(subscription.id) &&
-        completedIntakeSessionId &&
-        subscription.session_id === completedIntakeSessionId),
-    );
+    // Only the consultation intake form (Jotform / QuickBlox submission) counts —
+    // not the onboarding questionnaire on the intake session.
+    const hasFormSubmission = Boolean(started?.hasFormSubmission);
 
     return {
       subscriptionId: subscription.id,

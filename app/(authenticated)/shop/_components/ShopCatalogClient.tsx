@@ -11,9 +11,7 @@ import type { ShopCategoryDto, ShopMedicinesListDto, ShopSortOption } from "@/li
 import { buildShopHref } from "./shop-query";
 import ShopCategoryTabs from "./ShopCategoryTabs";
 import ShopHeader from "./ShopHeader";
-import ShopPagination from "./ShopPagination";
 import ShopProductCard from "./ShopProductCard";
-import ShopSortBar from "./ShopSortBar";
 
 type ShopCatalogClientProps = {
   categories: ShopCategoryDto[];
@@ -48,7 +46,6 @@ export default function ShopCatalogClient({
 
   const [category, setCategory] = useState<string | null>(initialList.currentCategorySlug);
   const [sortBy, setSortBy] = useState<ShopSortOption>(initialList.sortBy);
-  const [page, setPage] = useState<number>(initialList.page);
   const [searchInput, setSearchInput] = useState(initialList.searchQuery);
   const [debouncedSearch, setDebouncedSearch] = useState(initialList.searchQuery);
 
@@ -56,7 +53,6 @@ export default function ShopCatalogClient({
     const nextCategory = searchParams.get("category");
     setCategory(nextCategory);
     setSortBy(parseSort(searchParams.get("sort")));
-    setPage(Math.max(1, Number(searchParams.get("page") ?? "1") || 1));
     const nextQuery = (searchParams.get("q") ?? "").trim();
     setSearchInput(nextQuery);
     setDebouncedSearch(nextQuery);
@@ -71,8 +67,8 @@ export default function ShopCatalogClient({
   }, [searchInput]);
 
   const queryKey = useMemo(
-    () => ["shop", "catalog", category, sortBy, page, debouncedSearch],
-    [category, sortBy, page, debouncedSearch],
+    () => ["shop", "catalog", category, sortBy, debouncedSearch],
+    [category, sortBy, debouncedSearch],
   );
 
   const catalogQuery = useQuery({
@@ -81,7 +77,7 @@ export default function ShopCatalogClient({
       return getShopCatalogFromService({
         category,
         sort: sortBy,
-        page,
+        page: 1,
         pageSize,
         q: debouncedSearch,
       });
@@ -90,7 +86,6 @@ export default function ShopCatalogClient({
     initialData:
       category === initialList.currentCategorySlug &&
       sortBy === initialList.sortBy &&
-      page === initialList.page &&
       debouncedSearch === initialList.searchQuery
         ? initialList
         : undefined,
@@ -100,7 +95,6 @@ export default function ShopCatalogClient({
     const href = buildShopHref({
       category,
       sort: sortBy,
-      page,
       q: debouncedSearch,
     });
     const nextUrl = `${pathname}${href.replace("/shop", "")}`;
@@ -108,7 +102,7 @@ export default function ShopCatalogClient({
     if (nextUrl !== currentUrl) {
       window.history.replaceState(window.history.state, "", nextUrl);
     }
-  }, [category, sortBy, page, debouncedSearch, pathname, searchParams]);
+  }, [category, sortBy, debouncedSearch, pathname, searchParams]);
 
   const list = catalogQuery.data ?? initialList;
   const isPending = catalogQuery.isFetching;
@@ -127,11 +121,9 @@ export default function ShopCatalogClient({
         offer={offer}
         onSearchChange={(value) => {
           setSearchInput(value);
-          setPage(1);
         }}
         onSearchSubmit={() => {
           setDebouncedSearch(searchInput.trim());
-          setPage(1);
         }}
       />
 
@@ -143,18 +135,9 @@ export default function ShopCatalogClient({
             currentCategorySlug={category}
             onSelectCategory={(nextCategory) => {
               setCategory(nextCategory);
-              setPage(1);
             }}
             isPending={isPending}
           />
-          {/* <ShopSortBar
-            sortBy={sortBy}
-            onSelectSort={(nextSort) => {
-              setSortBy(nextSort);
-              setPage(1);
-            }}
-            isPending={isPending}
-          /> */}
         </div>
         {isPending ? (
           <div className="rounded-[14px] border border-[#E8EEED] bg-[#F3F6F6] px-3 py-2 text-xs text-[#152A51]/80">
@@ -174,7 +157,7 @@ export default function ShopCatalogClient({
             No medicines found for this category.
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-5">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 lg:gap-5">
             {list.items.map((item) => (
               <ShopProductCard
                 key={item.id}
@@ -184,15 +167,6 @@ export default function ShopCatalogClient({
             ))}
           </div>
         )}
-
-        <ShopPagination
-          page={list.page}
-          totalPages={list.totalPages}
-          total={list.total}
-          pageSize={list.pageSize}
-          onChangePage={(nextPage) => setPage(nextPage)}
-          isPending={isPending}
-        />
       </section>
     </section>
   );

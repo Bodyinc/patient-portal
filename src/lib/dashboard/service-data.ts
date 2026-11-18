@@ -11,7 +11,6 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 import { consultationAnchorId } from "@/lib/checkout/group";
 import { attachExistingIntakeToOpenOrders } from "@/lib/intake/attach-intake";
-import { shopSubscriptionIdsWithoutOwnIntake } from "@/lib/orders/shop-intake-gate";
 import { isQuickbloxConfigured } from "@/lib/consultations/config";
 import { loadConsultationEligibility } from "@/lib/consultations/eligibility";
 import { isConsultationFinishedEvent } from "@/lib/consultations/finished";
@@ -156,7 +155,6 @@ function isClosedOrderStatus(status: string | null | undefined): boolean {
 
 export async function fetchDashboardPageData(userId: string): Promise<DashboardPageDataDto> {
   await attachExistingIntakeToOpenOrders(userId);
-  const shopWithoutOwnIntake = new Set(await shopSubscriptionIdsWithoutOwnIntake(userId));
   const [
     didReconcile,
     pendingPayments,
@@ -222,32 +220,11 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
 
   const currentMed = visibleMeds[0] ?? null;
   let consultationStatus: DashboardTreatmentDto["consultationStatus"] = "none";
+  // Consultation intake only — onboarding questionnaire answers do not count.
   let intakeSubmitted = false;
   const consultationSubscriptionId = currentMed?.subscriptionId
     ? await consultationAnchorId(currentMed.subscriptionId)
     : null;
-  const latestShopOrderNeedsIntake = Boolean(
-    (consultationSubscriptionId && shopWithoutOwnIntake.has(consultationSubscriptionId)) ||
-    (currentMed?.subscriptionId && shopWithoutOwnIntake.has(currentMed.subscriptionId)),
-  );
-  // Onboarding already finished its questionnaire before payment. A shop order
-  // has not, even when an older questionnaire was copied onto the subscription.
-  if (consultationSubscriptionId && !latestShopOrderNeedsIntake) {
-    const { data: ownSub } = await supabaseAdmin
-      .from("subscriptions")
-      .select("session_id")
-      .eq("id", consultationSubscriptionId)
-      .maybeSingle();
-    if (ownSub?.session_id) {
-      const { data: answer } = await supabaseAdmin
-        .from("intake_session_questionnaire_responses")
-        .select("session_id")
-        .eq("session_id", ownSub.session_id)
-        .limit(1)
-        .maybeSingle();
-      if (answer?.session_id) intakeSubmitted = true;
-    }
-  }
   if (consultationSubscriptionId) {
     let visit: {
       qb_appointment_id: string;

@@ -58,7 +58,9 @@ export async function fetchShopCatalogData(options: {
   const categorySlug = options.categorySlug ?? null;
   const sortBy = options.sortBy ?? "popular";
   const page = Math.max(1, options.page ?? 1);
-  const pageSize = Math.max(1, Math.min(24, options.pageSize ?? 6));
+  // Patient shop shows one continuous scroll (no pagination UI). Cap stays high enough
+  // for the full catalog while still bounding the query.
+  const pageSize = Math.max(1, Math.min(200, options.pageSize ?? 100));
   const searchQuery = (options.searchQuery ?? "").trim();
 
   let filteredMedicineIds: string[] | null = null;

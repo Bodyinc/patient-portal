@@ -152,7 +152,8 @@ export async function createSubscriptionForPrice(params: {
         invoiceSettled: true,
       };
     }
-    if (charged.clientSecret) {
+    // 3-D Secure / bank confirm only — never a SetupIntent "save card" when one is on file.
+    if (charged.clientSecret && !charged.clientSecret.startsWith("seti_")) {
       return {
         subscriptionId: subscription.id,
         clientSecret: charged.clientSecret,
@@ -173,6 +174,23 @@ export async function createSubscriptionForPrice(params: {
       paid: true,
       invoiceSettled: true,
     };
+  }
+
+  // Card already on file: only a PaymentIntent (e.g. 3DS) may go to the browser — never
+  // SetupIntent, which would re-ask them to save card details in shop.
+  if (defaultPaymentMethodId) {
+    const paymentSecret = extractClientSecret(subscription);
+    if (paymentSecret && !paymentSecret.startsWith("seti_")) {
+      return {
+        subscriptionId: subscription.id,
+        clientSecret: paymentSecret,
+        paid: false,
+        invoiceSettled,
+      };
+    }
+    throw new Error(
+      "We couldn't charge your saved card. Please update your card in Billing and try again.",
+    );
   }
 
   const clientSecret = extractClientSecret(subscription) ?? setupIntentClientSecret(subscription);
