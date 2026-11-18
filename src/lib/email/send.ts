@@ -102,6 +102,11 @@ async function sendViaBrevoApi(params: {
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     console.error(`[email] Brevo API ${res.status}:`, text.slice(0, 400));
+    if (/unrecognised ip|unrecognized ip|unauthorised|unauthorized/i.test(text)) {
+      console.error(
+        "[email] Brevo API key is blocking this server IP. In Brevo → SMTP & API → API keys, authorize this IP (or remove the IP allowlist), or rely on SMTP fallback with BREVO_SMTP_LOGIN=…@smtp-brevo.com.",
+      );
+    }
     return false;
   }
   return true;
