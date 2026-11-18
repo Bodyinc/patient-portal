@@ -52,7 +52,7 @@ export async function GET(request: Request) {
     categorySlug: url.searchParams.get("category"),
     sortBy: parseSort(url.searchParams.get("sort")),
     page: Math.max(1, parseNumber(url.searchParams.get("page"), 1)),
-    pageSize: Math.max(1, Math.min(24, parseNumber(url.searchParams.get("pageSize"), 6))),
+    pageSize: Math.max(1, Math.min(200, parseNumber(url.searchParams.get("pageSize"), 100))),
     searchQuery: (url.searchParams.get("q") ?? "").trim(),
   };
 
