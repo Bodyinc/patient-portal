@@ -248,13 +248,20 @@ export async function POST(request: Request) {
       }
     }
 
+    const finishedPaid = settledFree || Boolean(paid && !clientSecret);
+    // Never open a "save card" SetupIntent when the patient already has a card on file.
+    // $0 / paid still finishes with no modal (previous fix). Non-zero without a saved card
+    // still gets the PaymentIntent for the post-discount amount.
+    let responseSecret = finishedPaid ? null : (clientSecret ?? null);
+    if (savedPaymentMethod && responseSecret?.startsWith("seti_")) {
+      responseSecret = null;
+    }
+
     return NextResponse.json(
       {
         orderId: order.id,
-        // $0 / full promo is already paid — skip the card modal and go to confirmation.
-        // Non-zero checkouts still return the PaymentIntent client secret.
-        clientSecret: settledFree ? null : (clientSecret ?? null),
-        paid: settledFree || Boolean(paid && !clientSecret),
+        clientSecret: responseSecret,
+        paid: finishedPaid,
         savedCardLabel: savedPaymentMethod ? formatSavedCardLabel(savedPaymentMethod) : null,
       },
       { status: 201 },
