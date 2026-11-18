@@ -227,7 +227,7 @@ export async function createOnboardingSubscription(
 
   // Opening the card form is not a completed purchase. Never downgrade a session
   // the webhook already marked completed while this request was in flight.
-  // A $0 promo may still return a SetupIntent so the renewal card can be saved.
+  // $0 / full promo skips the card form entirely.
   if (!settledFree || clientSecret) {
     await supabaseAdmin
       .from("intake_sessions")
@@ -261,7 +261,9 @@ export async function createOnboardingSubscription(
       .eq("id", subRow.id);
   }
 
-  if (settledFree && !clientSecret) {
+  // $0 / full promo: finish immediately. Do not keep a SetupIntent card form in the way
+  // of confirmation (Complete intake form / View Treatment Details).
+  if (settledFree) {
     return { ok: true, paid: true, clientSecret: null };
   }
   return { ok: true, paid: false, clientSecret: clientSecret! };

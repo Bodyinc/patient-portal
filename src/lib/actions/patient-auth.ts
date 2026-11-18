@@ -21,11 +21,34 @@ import {
 import { appUrl } from "@/lib/email/recipients";
 import { sendOnce, wasEmailSent } from "@/lib/email/idempotency";
 import { sendTransactionalEmail } from "@/lib/email/send";
+import { EMAIL_TRANSPORT_HINT, isEmailTransportConfigured } from "@/lib/email/transport";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { userFacingMessage } from "@/lib/user-message";
 import { userHasSetPassword } from "@/lib/auth/password-state";
 import { stripe } from "@/lib/stripe/server";
+
+const AUTH_EMAIL_SEND_FAILED = "Could not send email. Please try again.";
+
+async function deliverClaimedAuthEmail(params: {
+  claim: string;
+  userId: string | undefined;
+  periodKey: string;
+  deliver: () => Promise<boolean>;
+}): Promise<boolean> {
+  const { claim, userId, periodKey, deliver } = params;
+  if (userId && (await wasEmailSent(claim, userId, periodKey))) return true;
+
+  if (!isEmailTransportConfigured()) {
+    console.error(`[email] auth send blocked: ${EMAIL_TRANSPORT_HINT}`);
+    // The Supabase Send Email hook may have already claimed+sent during generateLink.
+    return Boolean(userId && (await wasEmailSent(claim, userId, periodKey)));
+  }
+
+  const sent = userId ? await sendOnce(claim, userId, deliver, periodKey) : await deliver();
+  if (sent) return true;
+  return Boolean(userId && (await wasEmailSent(claim, userId, periodKey)));
+}
 
 export type { CheckEmailResult };
 
@@ -452,10 +475,6 @@ export async function sendPatientLoginOtp(
   }
 
   const userId = data.user?.id;
-  if (userId && (await wasEmailSent(AUTH_MAGICLINK_CLAIM, userId, code))) {
-    return { ok: true };
-  }
-
   let fullName: string | null = null;
   if (userId) {
     const { data: profile } = await supabaseAdmin
@@ -471,14 +490,14 @@ export async function sendPatientLoginOtp(
     fullName,
     purpose,
   });
-  const deliver = () => sendTransactionalEmail({ to: parsed.data, subject, html });
-  const sent = userId
-    ? await sendOnce(AUTH_MAGICLINK_CLAIM, userId, deliver, code)
-    : await deliver();
-  if (sent || (userId && (await wasEmailSent(AUTH_MAGICLINK_CLAIM, userId, code)))) {
-    return { ok: true };
-  }
-  return { ok: false, message: "Could not send email. Please try again." };
+  const delivered = await deliverClaimedAuthEmail({
+    claim: AUTH_MAGICLINK_CLAIM,
+    userId,
+    periodKey: code,
+    deliver: () => sendTransactionalEmail({ to: parsed.data, subject, html }),
+  });
+  if (delivered) return { ok: true };
+  return { ok: false, message: AUTH_EMAIL_SEND_FAILED };
 }
 
 /** Sends a password-reset link using the Body Inc email theme (not the Supabase Auth template). */
@@ -495,7 +514,7 @@ export async function sendPatientPasswordReset(
     return { ok: false, message: "Enter a valid email" };
   }
   if (check.status === "error") {
-    return { ok: false, message: "Could not send email. Please try again." };
+    return { ok: false, message: AUTH_EMAIL_SEND_FAILED };
   }
   if (check.status === "wrong_portal") {
     return { ok: false, message: wrongPortalMessage(check.role) };
@@ -517,10 +536,6 @@ export async function sendPatientPasswordReset(
   const resetUrl = patientPasswordResetUrl(tokenHash);
 
   const userId = data.user?.id;
-  if (userId && tokenHash && (await wasEmailSent(AUTH_RECOVERY_CLAIM, userId, tokenHash))) {
-    return { ok: true };
-  }
-
   let fullName: string | null = null;
   if (userId) {
     const { data: profile } = await supabaseAdmin
@@ -532,16 +547,12 @@ export async function sendPatientPasswordReset(
   }
 
   const { subject, html } = passwordResetEmail({ resetUrl, fullName });
-  const deliver = () => sendTransactionalEmail({ to: parsed.data, subject, html });
-  const sent =
-    userId && tokenHash
-      ? await sendOnce(AUTH_RECOVERY_CLAIM, userId, deliver, tokenHash)
-      : await deliver();
-  if (
-    sent ||
-    (userId && tokenHash && (await wasEmailSent(AUTH_RECOVERY_CLAIM, userId, tokenHash)))
-  ) {
-    return { ok: true };
-  }
-  return { ok: false, message: "Could not send email. Please try again." };
+  const delivered = await deliverClaimedAuthEmail({
+    claim: AUTH_RECOVERY_CLAIM,
+    userId,
+    periodKey: tokenHash,
+    deliver: () => sendTransactionalEmail({ to: parsed.data, subject, html }),
+  });
+  if (delivered) return { ok: true };
+  return { ok: false, message: AUTH_EMAIL_SEND_FAILED };
 }
