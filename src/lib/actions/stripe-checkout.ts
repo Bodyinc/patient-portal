@@ -67,13 +67,16 @@ export async function createOnboardingSubscription(
     return { ok: false, message: "Select a treatment plan first." };
   }
 
-  const { data: pkg, error: pkgError } = await supabaseAdmin
-    .from("packages")
-    .select(
-      "id, medicine_id, variant_id, is_active, stripe_price_id, duration_months, price, medicines(name), medicine_variants(name)",
-    )
-    .eq("id", session.selected_plan_id)
-    .maybeSingle();
+  const [{ data: pkg, error: pkgError }, cart] = await Promise.all([
+    supabaseAdmin
+      .from("packages")
+      .select(
+        "id, medicine_id, variant_id, is_active, stripe_price_id, duration_months, price, medicines(name), medicine_variants(name)",
+      )
+      .eq("id", session.selected_plan_id)
+      .maybeSingle(),
+    loadCheckoutCart(session.id),
+  ]);
 
   if (pkgError) {
     return {
@@ -90,8 +93,6 @@ export async function createOnboardingSubscription(
   if (!pkg.stripe_price_id) {
     return { ok: false, message: "This plan is not available for purchase yet." };
   }
-
-  const cart = await loadCheckoutCart(session.id);
   const hasPrimary = cart.some((line) => line.isPrimary);
   const addons = hasPrimary
     ? cart.filter(
@@ -152,15 +153,17 @@ export async function createOnboardingSubscription(
     amountCents: Math.round(Number(line.packagePrice ?? 0) * 100),
     description: `${line.medicineName} · ${line.packageName ?? line.categoryName}`,
   }));
-  const promotionCodeId = discount ? await ensureStripePromotionCode(discount.promo) : null;
-
-  const customerId =
-    session.stripe_customer_id ??
-    (await createGuestStripeCustomer({
-      email: session.email,
-      name: session.full_name,
-      intakeSessionId: session.id,
-    }));
+  // Promo ensure and guest customer create are independent Stripe calls.
+  const [promotionCodeId, customerId] = await Promise.all([
+    discount ? ensureStripePromotionCode(discount.promo) : Promise.resolve(null),
+    session.stripe_customer_id
+      ? Promise.resolve(session.stripe_customer_id)
+      : createGuestStripeCustomer({
+          email: session.email,
+          name: session.full_name,
+          intakeSessionId: session.id,
+        }),
+  ]);
 
   const medicineName =
     (pkg as { medicines?: { name: string } | null }).medicines?.name ?? "Treatment";
@@ -217,23 +220,27 @@ export async function createOnboardingSubscription(
     return { ok: false, message: "Unable to start payment. Please try again." };
   }
 
-  await supabaseAdmin
-    .from("intake_sessions")
-    .update({
-      stripe_customer_id: customerId,
-      stripe_subscription_id: subscriptionId,
-    })
-    .eq("id", session.id);
-
   // Opening the card form is not a completed purchase. Never downgrade a session
   // the webhook already marked completed while this request was in flight.
   // $0 / full promo skips the card form entirely.
   if (!settledFree || clientSecret) {
     await supabaseAdmin
       .from("intake_sessions")
-      .update({ status: "payment_pending" })
+      .update({
+        stripe_customer_id: customerId,
+        stripe_subscription_id: subscriptionId,
+        status: "payment_pending",
+      })
       .eq("id", session.id)
       .neq("status", "completed");
+  } else {
+    await supabaseAdmin
+      .from("intake_sessions")
+      .update({
+        stripe_customer_id: customerId,
+        stripe_subscription_id: subscriptionId,
+      })
+      .eq("id", session.id);
   }
 
   const { data: subRow } = await supabaseAdmin

@@ -9,12 +9,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ELIGIBLE_SUBSCRIPTION_STATUSES, isQuickbloxConfigured } from "./config";
 import { loadConsultationEligibility } from "./eligibility";
 import { isConsultationFinishedEvent } from "./finished";
-import { checkJotformSubmission } from "./jotform";
-import {
-  ensureQuickbloxClient,
-  fetchAppointmentStatuses,
-  getCachedClientSession,
-} from "./quickblox";
+import { fetchAppointmentStatuses, getCachedClientSession } from "./quickblox";
 import { readQbClientSession } from "./session-cookie";
 import type { ConsultationPlanState, ConsultationsPageData } from "./types";
 
@@ -38,7 +33,6 @@ export async function hasCompletedOnboarding(userId: string): Promise<boolean> {
 }
 
 export async function fetchConsultationsPageData(userId: string): Promise<ConsultationsPageData> {
-  await attachExistingIntakeToOpenOrders(userId);
   const [identity, onboardingComplete, subsResult, consultsResult, requestsResult, eligibility] =
     await Promise.all([
       getPatientDisplayIdentity(userId),
@@ -59,6 +53,11 @@ export async function fetchConsultationsPageData(userId: string): Promise<Consul
         .eq("user_id", userId),
       supabaseAdmin.from("medication_requests").select("id, subscription_id").eq("user_id", userId),
       loadConsultationEligibility(userId),
+      // Heal beside reads — do not block the consultations list on intake attach.
+      attachExistingIntakeToOpenOrders(userId).catch((err) => {
+        console.error("[consultations] intake attach failed:", err);
+        return null;
+      }),
     ]);
 
   if (subsResult.error) throw new Error(subsResult.error.message);
@@ -143,26 +142,20 @@ export async function fetchConsultationsPageData(userId: string): Promise<Consul
     }
   }
 
+  // List page: only reuse existing QuickBlox sessions. Creating/logging in a client here
+  // made every consultations load wait on external auth — that belongs in "start visit".
   const clientTokens: string[] = [];
   if (isQuickbloxConfigured()) {
-    for (const row of consultRows) {
-      let token =
-        getCachedClientSession(userId, row.subscription_id)?.token ??
-        (await readQbClientSession(userId, row.subscription_id))?.token;
-      if (!token && !row.ended_at && row.qb_appointment_id) {
-        try {
-          const session = await ensureQuickbloxClient({
-            userId,
-            subscriptionId: row.subscription_id,
-            fullName: identity.fullName,
-            dob: "2000-01-01",
-            sex: null,
-          });
-          token = session.token;
-        } catch {
-          // Non-fatal
-        }
-      }
+    const tokens = await Promise.all(
+      consultRows.map(async (row) => {
+        return (
+          getCachedClientSession(userId, row.subscription_id)?.token ??
+          (await readQbClientSession(userId, row.subscription_id))?.token ??
+          null
+        );
+      }),
+    );
+    for (const token of tokens) {
       if (token) clientTokens.push(token);
     }
   }

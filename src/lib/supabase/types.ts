@@ -641,6 +641,7 @@ export type Database = {
           notice_text: string | null;
           sort_order: number;
           is_active: boolean;
+          shop_only: boolean;
           created_at: string;
           updated_at: string;
           requires_questionnaire: boolean;
@@ -660,6 +661,7 @@ export type Database = {
           notice_text?: string | null;
           sort_order?: number;
           is_active?: boolean;
+          shop_only?: boolean;
           created_at?: string;
           updated_at?: string;
           requires_questionnaire?: boolean;
@@ -679,6 +681,7 @@ export type Database = {
           notice_text?: string | null;
           sort_order?: number;
           is_active?: boolean;
+          shop_only?: boolean;
           created_at?: string;
           updated_at?: string;
           requires_questionnaire?: boolean;

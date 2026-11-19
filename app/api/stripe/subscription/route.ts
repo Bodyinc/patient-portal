@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -82,9 +82,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: missingDetails }, { status: 400 });
     }
 
-    // These three reads are independent — package details, order fees, and the Stripe customer
-    // all only depend on inputs we already have, so fetch them in one parallel wave.
-    const [{ data: pkg, error: pkgError }, fees, customerId] = await Promise.all([
+    // Package, fees, Stripe customer, and refill gate are independent — one parallel wave.
+    const [{ data: pkg, error: pkgError }, fees, customerId, refillBlock] = await Promise.all([
       supabaseAdmin
         .from("packages")
         .select(
@@ -100,6 +99,7 @@ export async function POST(request: Request) {
           name: identity.stripeName,
         }),
       ),
+      getManualRefillBlock(user.id, medicineId),
     ]);
 
     if (pkgError) {
@@ -123,7 +123,6 @@ export async function POST(request: Request) {
       );
     }
 
-    const refillBlock = await getManualRefillBlock(user.id, medicineId);
     if (refillBlock) {
       return NextResponse.json({ error: refillBlock }, { status: 400 });
     }
@@ -238,14 +237,14 @@ export async function POST(request: Request) {
     ]);
 
     // A promo that covers the whole first invoice has no PaymentIntent, so invoice.paid
-    // can lag or never be what the provider is waiting on. Record the $0 payment and
-    // open the medication request now, the same way a fully waived additional payment does.
+    // can lag or never be what the provider is waiting on. Record the $0 payment after we
+    // return confirmation — same settle rules, without blocking the patient on reconcile.
     if (settledFree) {
-      try {
-        await reconcileSubscription(subscriptionId);
-      } catch (error) {
-        console.error("[shop] settle zero-invoice checkout failed:", error);
-      }
+      after(() => {
+        void reconcileSubscription(subscriptionId).catch((error) => {
+          console.error("[shop] settle zero-invoice checkout failed:", error);
+        });
+      });
     }
 
     const finishedPaid = settledFree || Boolean(paid && !clientSecret);
