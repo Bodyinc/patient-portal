@@ -26,7 +26,8 @@ function parseRules(value: Json): CategoryEligibilityRules {
   return value as CategoryEligibilityRules;
 }
 
-function isVisible(medicine: { is_active: boolean; status: string }) {
+function isVisible(medicine: { is_active: boolean; status: string; shop_only?: boolean | null }) {
+  if (medicine.shop_only) return false;
   return medicine.is_active && (medicine.status === "active" || medicine.status === "published");
 }
 
@@ -178,7 +179,9 @@ export async function getAdditionalProductOptions(
     await Promise.all([
       supabaseAdmin
         .from("medicines")
-        .select("id, name, short_description, image_url, from_price_cents, is_active, status")
+        .select(
+          "id, name, short_description, image_url, from_price_cents, is_active, status, shop_only",
+        )
         .in("id", medicineIds),
       supabaseAdmin
         .from("medicine_variants")
@@ -401,8 +404,11 @@ export async function saveAdditionalProducts(input: {
 
     const linkedIds = (links ?? []).map((link) => link.medicine_id);
     const { data: linkedMedicines } = linkedIds.length
-      ? await supabaseAdmin.from("medicines").select("id, is_active, status").in("id", linkedIds)
-      : { data: [] as { id: string; is_active: boolean; status: string }[] };
+      ? await supabaseAdmin
+          .from("medicines")
+          .select("id, is_active, status, shop_only")
+          .in("id", linkedIds)
+      : { data: [] as { id: string; is_active: boolean; status: string; shop_only: boolean }[] };
 
     const visible = new Set(
       (linkedMedicines ?? [])

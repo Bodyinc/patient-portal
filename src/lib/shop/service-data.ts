@@ -23,6 +23,9 @@ import type {
   ShopCheckoutOrderDto,
 } from "./service-types";
 
+// Active medicines, plus shop-only medicines that stay off onboarding (even if Inactive).
+const SHOP_LISTED = "and(is_active.eq.true,status.eq.active),shop_only.eq.true";
+
 function parseImportantInfo(value: Json | null | undefined): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
@@ -113,8 +116,7 @@ export async function fetchShopCatalogData(options: {
         count: "exact",
       },
     )
-    .eq("is_active", true)
-    .eq("status", "active");
+    .or(SHOP_LISTED);
 
   if (filteredMedicineIds) query = query.in("id", filteredMedicineIds);
   if (searchQuery) {
@@ -232,8 +234,7 @@ export async function fetchShopCheckoutBootstrapData(options: {
       .from("medicines")
       .select("id, name, short_description, image_url, from_price_cents")
       .eq("id", medicineId)
-      .eq("is_active", true)
-      .eq("status", "active")
+      .or(SHOP_LISTED)
       .maybeSingle(),
   ]);
 

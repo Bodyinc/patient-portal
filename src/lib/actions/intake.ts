@@ -85,7 +85,12 @@ function categoryHasEligibilityRules(rules: CategoryEligibilityRules): boolean {
   );
 }
 
-function isMedicineCatalogVisible(medicine: { is_active: boolean; status: string }) {
+function isMedicineCatalogVisible(medicine: {
+  is_active: boolean;
+  status: string;
+  shop_only?: boolean | null;
+}) {
+  if (medicine.shop_only) return false;
   if (!medicine.is_active) return false;
   return medicine.status === "active" || medicine.status === "published";
 }
@@ -460,7 +465,7 @@ export async function getMedicinesForCategory(
     supabaseAdmin
       .from("medicines")
       .select(
-        "id, name, short_description, long_description, image_url, from_price_cents, important_info, notice_text, is_active, status, sort_order",
+        "id, name, short_description, long_description, image_url, from_price_cents, important_info, notice_text, is_active, status, shop_only, sort_order",
       )
       .in("id", medicineIds),
     supabaseAdmin
@@ -729,7 +734,7 @@ export async function saveIntakeMedicine(
 
   const { data: medicine, error: medError } = await supabaseAdmin
     .from("medicines")
-    .select("id, is_active, status")
+    .select("id, is_active, status, shop_only")
     .eq("id", medicineId)
     .maybeSingle();
 
