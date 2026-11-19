@@ -61,21 +61,26 @@ export async function createSubscriptionForPrice(params: {
     pending: true,
     limit: 100,
   });
-  for (const item of pendingItems.data) {
-    if (!item.invoice) await stripe.invoiceItems.del(item.id);
-  }
+  await Promise.all(
+    pendingItems.data
+      .filter((item) => !item.invoice)
+      .map((item) => stripe.invoiceItems.del(item.id)),
+  );
 
   // Positive one-time lines only (consultation, add-ons). Promos go through promotionCodeId —
   // a negative pending invoice item was what let the UI say $0 while the bank still saw $181.
-  for (const fee of oneTimeFees ?? []) {
-    if (fee.amountCents <= 0) continue;
-    await stripe.invoiceItems.create({
-      customer: customerId,
-      amount: fee.amountCents,
-      currency: "usd",
-      description: fee.description,
-    });
-  }
+  await Promise.all(
+    (oneTimeFees ?? [])
+      .filter((fee) => fee.amountCents > 0)
+      .map((fee) =>
+        stripe.invoiceItems.create({
+          customer: customerId,
+          amount: fee.amountCents,
+          currency: "usd",
+          description: fee.description,
+        }),
+      ),
+  );
 
   // A recurring shipping item must share the plan's billing interval, so mirror it.
   let shippingPriceId: string | null = null;

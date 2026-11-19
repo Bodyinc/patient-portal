@@ -90,11 +90,12 @@ export default async function ShopCheckoutPage({
       getPatientDisplayIdentity(user.id),
       (async () => {
         try {
-          const identity = await getPatientDisplayIdentity(user.id);
+          // Same-request cache as the identity fetch above.
+          const display = await getPatientDisplayIdentity(user.id);
           const customerId = await getOrCreateStripeCustomer({
             userId: user.id,
             email: user.email ?? null,
-            name: identity.stripeName,
+            name: display.stripeName,
           });
           const pm = await getDefaultPaymentMethod(customerId);
           return pm ? formatSavedCardLabel(pm) : null;

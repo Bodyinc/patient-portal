@@ -154,7 +154,7 @@ function isClosedOrderStatus(status: string | null | undefined): boolean {
 }
 
 export async function fetchDashboardPageData(userId: string): Promise<DashboardPageDataDto> {
-  await attachExistingIntakeToOpenOrders(userId);
+  // Intake attach is heal work — run beside reads, not before them.
   const [
     didReconcile,
     pendingPayments,
@@ -186,6 +186,10 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
       .eq("user_id", userId)
       .order("created_at", { ascending: false }),
     loadConsultationEligibility(userId),
+    attachExistingIntakeToOpenOrders(userId).catch((err) => {
+      console.error("[dashboard] intake attach failed:", err);
+      return null;
+    }),
   ]);
 
   const requests = requestRows.data ?? [];
@@ -259,19 +263,9 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
 
     if (visit?.qb_appointment_id) {
       consultationStatus = visit.ended_at ? "closed" : "open";
-      // A still-open QuickBlox room must not undo a visit the provider already finished.
-      if (consultationStatus !== "closed" && isQuickbloxConfigured()) {
-        const clientToken =
-          getCachedClientSession(userId, consultationSubscriptionId)?.token ??
-          (await readQbClientSession(userId, consultationSubscriptionId))?.token;
-        const live = (
-          await fetchAppointmentStatuses([visit.qb_appointment_id], { clientToken })
-        ).get(visit.qb_appointment_id);
-        if (live?.hasFormSubmission || live?.formSubmissionId) intakeSubmitted = true;
-        if (live && !live.open) consultationStatus = "closed";
-      }
     }
 
+    // Prefer DB/events before an external QuickBlox round-trip.
     if (visit && consultationStatus !== "closed") {
       const subscriptionIds = new Set<string>([consultationSubscriptionId]);
       const { data: anchorSub } = await supabaseAdmin
@@ -299,6 +293,18 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
           consultationStatus = "closed";
         }
       }
+    }
+
+    // Only hit QuickBlox when the visit still looks open after DB/events.
+    if (visit?.qb_appointment_id && consultationStatus !== "closed" && isQuickbloxConfigured()) {
+      const clientToken =
+        getCachedClientSession(userId, consultationSubscriptionId)?.token ??
+        (await readQbClientSession(userId, consultationSubscriptionId))?.token;
+      const live = (await fetchAppointmentStatuses([visit.qb_appointment_id], { clientToken })).get(
+        visit.qb_appointment_id,
+      );
+      if (live?.hasFormSubmission || live?.formSubmissionId) intakeSubmitted = true;
+      if (live && !live.open) consultationStatus = "closed";
     }
   }
 
