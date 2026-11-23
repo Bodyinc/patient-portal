@@ -17,16 +17,23 @@ export async function sessionRequiresConsultation(
 export type ConsultationEligibility = {
   /** Show the Consultations nav when a medicine needs one, or a visit already exists. */
   showNav: boolean;
+  /** Shop stays hidden until onboarding checkout has actually settled. */
+  showShop: boolean;
   needingSubscriptionIds: Set<string>;
   visitSubscriptionIds: Set<string>;
 };
 
 type SubscriptionEligibilityRow = {
   id: string;
+  status: string;
   checkout_group_id: string | null;
   is_checkout_primary: boolean | null;
   medicines: { requires_consultation: boolean } | { requires_consultation: boolean }[] | null;
 };
+
+function checkoutSettled(status: string) {
+  return status !== "incomplete" && status !== "incomplete_expired";
+}
 
 function medicineRequiresConsultation(row: SubscriptionEligibilityRow): boolean {
   const medicine = row.medicines;
@@ -44,7 +51,9 @@ export const loadConsultationEligibility = cache(
     const [subsResult, requestsResult, visitsResult] = await Promise.all([
       supabaseAdmin
         .from("subscriptions")
-        .select("id, checkout_group_id, is_checkout_primary, medicines(requires_consultation)")
+        .select(
+          "id, status, checkout_group_id, is_checkout_primary, medicines(requires_consultation)",
+        )
         .eq("user_id", userId),
       supabaseAdmin
         .from("medication_requests")
@@ -99,6 +108,7 @@ export const loadConsultationEligibility = cache(
 
     return {
       showNav: needingSubscriptionIds.size > 0 || visitSubscriptionIds.size > 0,
+      showShop: subs.some((row) => checkoutSettled(row.status)),
       needingSubscriptionIds,
       visitSubscriptionIds,
     };

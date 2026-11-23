@@ -170,6 +170,24 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
                 </Button>
               </div>
             </>
+          ) : !data.treatment && data.activeTreatmentCount === 0 && !data.latestOrderClosed ? (
+            <>
+              <h3 className="text-[26px] font-medium leading-snug tracking-[-0.3px] text-[#152A51]">
+                No treatment yet
+              </h3>
+              <p className="mt-3 max-w-xl text-sm leading-relaxed text-[#152A51]/80 sm:text-[15px] sm:leading-7">
+                Your account is ready. Choose a treatment whenever you want to start care. You can
+                browse plans and check out when you are ready.
+              </p>
+              <div className="mt-auto pt-5">
+                <Button
+                  asChild
+                  className="h-[46px] w-full rounded-full bg-[#E3E084] px-6 text-sm font-medium text-[#152A51] hover:bg-[#D9D674] sm:w-fit"
+                >
+                  <Link href="/onboarding/goal">Get started</Link>
+                </Button>
+              </div>
+            </>
           ) : data.consultationRequired || data.consultationVisit ? (
             <>
               <h3 className="text-[26px] font-medium leading-snug tracking-[-0.3px] text-[#152A51]">

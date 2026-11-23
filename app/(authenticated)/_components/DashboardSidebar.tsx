@@ -12,12 +12,14 @@ type DashboardSidebarProps = {
   className?: string;
   onNavigate?: () => void;
   showConsultations?: boolean;
+  showShop?: boolean;
 };
 
 export default function DashboardSidebar({
   className,
   onNavigate,
   showConsultations = false,
+  showShop = false,
 }: DashboardSidebarProps) {
   const pathname = usePathname();
 
@@ -45,21 +47,23 @@ export default function DashboardSidebar({
         <div className="my-5 border-b border-[#E5E7EB]" />
 
         <nav className="mt-3 space-y-2 sm:mt-6">
-          {DASHBOARD_NAV.filter((item) => showConsultations || item.href !== "/consultations").map(
-            (item) => {
-              const active = isNavItemActive(pathname, item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={onNavigate}
-                  className={cn(navItemClass, active && "bg-[#E8EEED]")}
-                >
-                  {item.label}
-                </Link>
-              );
-            },
-          )}
+          {DASHBOARD_NAV.filter((item) => {
+            if (item.href === "/consultations") return showConsultations;
+            if (item.href === "/shop") return showShop;
+            return true;
+          }).map((item) => {
+            const active = isNavItemActive(pathname, item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={onNavigate}
+                className={cn(navItemClass, active && "bg-[#E8EEED]")}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
         </nav>
       </div>
 

@@ -14,11 +14,13 @@ import { PushEnableBanner } from "./PushNotifications";
 type DashboardShellProps = {
   children: ReactNode;
   showConsultations?: boolean;
+  showShop?: boolean;
 };
 
 export default function DashboardShell({
   children,
   showConsultations = false,
+  showShop = false,
 }: DashboardShellProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -37,6 +39,7 @@ export default function DashboardShell({
             <DashboardSidebar
               className="h-full"
               showConsultations={showConsultations}
+              showShop={showShop}
               onNavigate={() => setMobileNavOpen(false)}
             />
           </SheetContent>
@@ -45,7 +48,11 @@ export default function DashboardShell({
 
       {/* Sidebar container strictly locked to full height */}
       <aside className="hidden lg:flex lg:h-full lg:w-[260px] lg:min-w-[260px] lg:max-w-[260px] lg:shrink-0">
-        <DashboardSidebar className="h-full w-full" showConsultations={showConsultations} />
+        <DashboardSidebar
+          className="h-full w-full"
+          showConsultations={showConsultations}
+          showShop={showShop}
+        />
       </aside>
 
       {/* Dashboard area scrolls independently when content overflows */}

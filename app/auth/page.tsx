@@ -64,6 +64,12 @@ function AuthPageContent() {
             Get started
           </Link>
         </p>
+        <p className="text-center text-sm text-[#152A51]/80">
+          Want an account without a purchase?{" "}
+          <Link href="/signup" className="font-medium text-[#152A51] hover:underline">
+            Create an account
+          </Link>
+        </p>
       </div>
     </AuthPageShell>
   );
@@ -104,7 +110,7 @@ function LoginForm() {
         const check = await checkPatientEmail(parsed.data.email);
         if (check.status === "new") {
           toast.error("No account exists with this email.", {
-            description: "Get started below to create your account.",
+            description: "Create an account below to get started.",
             duration: 8000,
           });
           return;

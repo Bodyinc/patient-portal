@@ -7,5 +7,9 @@ export const dynamic = "force-dynamic";
 export default async function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const { user } = await requirePatientSession();
   const eligibility = await loadConsultationEligibility(user.id);
-  return <DashboardShell showConsultations={eligibility.showNav}>{children}</DashboardShell>;
+  return (
+    <DashboardShell showConsultations={eligibility.showNav} showShop={eligibility.showShop}>
+      {children}
+    </DashboardShell>
+  );
 }
