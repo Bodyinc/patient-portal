@@ -4,6 +4,7 @@ import { requirePatientSession } from "@/lib/auth/require-patient";
 import { userFacingMessage } from "@/lib/user-message";
 import { getManualRefillBlock } from "@/lib/orders/refill-eligibility";
 import { getPatientDisplayIdentity } from "@/lib/profile/identity";
+import { fetchActivePortalOffer } from "@/lib/offers/service-data";
 import { fetchShopCheckoutBootstrapData } from "@/lib/shop/service-data";
 import { getCustomerCreditCents, getOrCreateStripeCustomer } from "@/lib/stripe/customers";
 import { formatSavedCardLabel, getDefaultPaymentMethod } from "@/lib/stripe/payment-methods";
@@ -84,7 +85,7 @@ export default async function ShopCheckoutPage({
       );
     }
 
-    const [bootstrap, walletCreditCents, identity, savedCardLabel] = await Promise.all([
+    const [bootstrap, walletCreditCents, identity, savedCardLabel, offer] = await Promise.all([
       fetchShopCheckoutBootstrapData({ medicineId, variantId }),
       getCustomerCreditCents(user.id),
       getPatientDisplayIdentity(user.id),
@@ -103,6 +104,10 @@ export default async function ShopCheckoutPage({
           return null;
         }
       })(),
+      fetchActivePortalOffer().catch((err) => {
+        console.error("[portal_offers] Checkout load failed:", err);
+        return null;
+      }),
     ]);
 
     return (
@@ -117,6 +122,7 @@ export default async function ShopCheckoutPage({
           initialPackageId={packageId}
           walletCreditCents={walletCreditCents}
           savedCardLabel={savedCardLabel}
+          offer={offer}
         />
       </main>
     );
