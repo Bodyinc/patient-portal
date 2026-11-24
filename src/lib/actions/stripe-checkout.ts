@@ -127,7 +127,8 @@ export async function createOnboardingSubscription(
   // Same browser keeps this intake. If they left on payment_pending without paying,
   // reopen that card form — but only when the promo/total still match. Applying 100OFF
   // after the form opened must replace the old PaymentIntent, not resume a $471 charge.
-  // An email that already has an account is rejected earlier, on the contact step.
+  // A guest email that already has an account is rejected on the contact step.
+  // A signed-in patient may continue with their own email.
   if (session.stripe_subscription_id) {
     const prior = await prepareCheckoutSubscription({
       subscriptionId: session.stripe_subscription_id,

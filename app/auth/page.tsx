@@ -99,12 +99,11 @@ function LoginForm() {
       });
       if (error) {
         // Supabase returns the same generic error for a wrong password and a
-        // non-existent email. Classify the email so new visitors get a clear path
-        // to create an account instead of a vague login failure.
+        // non-existent email. Classify the email so new visitors are sent to Get started.
         const check = await checkPatientEmail(parsed.data.email);
         if (check.status === "new") {
           toast.error("No account exists with this email.", {
-            description: "Get started below to create your account.",
+            description: "Use Get started below to begin.",
             duration: 8000,
           });
           return;

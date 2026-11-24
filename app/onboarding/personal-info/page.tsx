@@ -2,7 +2,7 @@
 
 import { Check } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -12,6 +12,7 @@ import { RequiredMark } from "@/components/required-mark";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { saveIntakeContact } from "@/lib/actions/intake";
+import { createClient } from "@/lib/supabase/client";
 
 import OnboardingStepLayout from "../_components/OnboardingStepLayout";
 import {
@@ -44,6 +45,9 @@ export default function PersonalInfoPage() {
   const { state, updateState, hydrated } = useOnboarding();
   const [saving, setSaving] = useState(false);
   const [emailError, setEmailError] = useState<ReactNode | null>(null);
+  const [accountLocked, setAccountLocked] = useState(false);
+  const accountEmailRef = useRef<string | null>(null);
+  const accountNameRef = useRef<string | null>(null);
   const [form, setForm] = useState({
     fullName: state.fullName,
     email: state.email,
@@ -59,6 +63,37 @@ export default function PersonalInfoPage() {
     });
   }, [hydrated, state.fullName, state.email]);
 
+  useEffect(() => {
+    if (!hydrated) return;
+    let cancelled = false;
+    const supabase = createClient();
+    void supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (cancelled || !session?.user?.email) return;
+      const email = session.user.email;
+      const { data } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", session.user.id)
+        .maybeSingle();
+      if (cancelled) return;
+      const profile = data as { full_name: string | null } | null;
+      const metaName = session.user.user_metadata?.full_name;
+      const fullName =
+        profile?.full_name?.trim() ||
+        (typeof metaName === "string" ? metaName.trim() : "") ||
+        state.fullName;
+      accountEmailRef.current = email;
+      accountNameRef.current = fullName;
+      setAccountLocked(true);
+      updateState({ fullName, email });
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Fill once from the account created at signup. Later profile edits stay on My Profile.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated]);
+
   async function handleContinue() {
     setEmailError(null);
     const parsed = personalInfoSchema.safeParse(form);
@@ -68,8 +103,8 @@ export default function PersonalInfoPage() {
     }
 
     const contact = {
-      fullName: parsed.data.fullName,
-      email: parsed.data.email,
+      fullName: accountNameRef.current ?? parsed.data.fullName,
+      email: accountEmailRef.current ?? parsed.data.email,
     };
 
     setSaving(true);
@@ -139,12 +174,18 @@ export default function PersonalInfoPage() {
           </Label>
           <Input
             id="fullName"
-            autoFocus
+            autoFocus={!accountLocked}
             value={form.fullName}
             onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
             placeholder="John Doe"
             className={fieldControlClass}
+            readOnly={accountLocked}
           />
+          {accountLocked ? (
+            <p className="text-[13px] text-[#152A51]/70">
+              This name and email are from your account. You can change them later in Profile.
+            </p>
+          ) : null}
         </div>
 
         <div className="grid gap-6 sm:grid-cols-2 sm:gap-4">
@@ -163,6 +204,7 @@ export default function PersonalInfoPage() {
               }}
               placeholder="email@example.com"
               className={fieldControlClass}
+              readOnly={accountLocked}
               aria-invalid={emailError ? true : undefined}
             />
             {emailError ? <p className="text-sm text-red-600">{emailError}</p> : null}
@@ -180,6 +222,7 @@ export default function PersonalInfoPage() {
               onChange={(e) => setForm((f) => ({ ...f, confirmEmail: e.target.value }))}
               placeholder="email@example.com"
               className={fieldControlClass}
+              readOnly={accountLocked}
             />
           </div>
         </div>

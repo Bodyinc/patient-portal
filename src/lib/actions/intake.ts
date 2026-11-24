@@ -818,12 +818,27 @@ export async function saveIntakeContact(
     };
   }
   const data = parsed.data;
-  const email = data.email.toLowerCase();
+  const supabase = await createClient();
+  const {
+    data: { session: authSession },
+  } = await supabase.auth.getSession();
+  // An account created before onboarding keeps that login email. The form cannot swap it.
+  const accountEmail = authSession?.user?.email?.trim().toLowerCase() || null;
+  const email = accountEmail ?? data.email.toLowerCase();
+  let fullName = data.fullName;
+  if (authSession?.user) {
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("full_name")
+      .eq("id", authSession.user.id)
+      .maybeSingle();
+    const savedName = profile?.full_name?.trim();
+    if (savedName) fullName = savedName;
+  }
 
-  // Onboarding is new-patients-only: reject an email that already has an account so a
-  // client-side bypass can't seed an existing identity into the intake session.
+  // Guest onboarding stays new-patients-only. A signed-in patient continues with their own email.
   const emailCheck = await classifyPatientEmail(email);
-  if (emailCheck.status === "patient") {
+  if (emailCheck.status === "patient" && email !== accountEmail) {
     return {
       ok: false,
       code: "email_exists",
@@ -844,7 +859,7 @@ export async function saveIntakeContact(
   const { error } = await supabaseAdmin
     .from("intake_sessions")
     .update({
-      full_name: data.fullName,
+      full_name: fullName,
       email,
       // Only write phone when the caller actually provided one (delivery-address owns this field).
       ...(data.phone !== undefined ? { phone: data.phone || "" } : {}),

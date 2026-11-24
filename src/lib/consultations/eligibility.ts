@@ -17,16 +17,36 @@ export async function sessionRequiresConsultation(
 export type ConsultationEligibility = {
   /** Show the Consultations nav when a medicine needs one, or a visit already exists. */
   showNav: boolean;
+  /** True after a settled checkout. A free account from the medicine step is separate. */
+  showShop: boolean;
   needingSubscriptionIds: Set<string>;
   visitSubscriptionIds: Set<string>;
 };
 
 type SubscriptionEligibilityRow = {
   id: string;
+  status: string;
   checkout_group_id: string | null;
   is_checkout_primary: boolean | null;
   medicines: { requires_consultation: boolean } | { requires_consultation: boolean }[] | null;
 };
+
+function checkoutSettled(status: string) {
+  return status !== "incomplete" && status !== "incomplete_expired";
+}
+
+/** Shop opens after a paid checkout, or after a free account is created on the medicine step. */
+export function patientCanSeeShop(
+  eligibility: Pick<ConsultationEligibility, "showShop">,
+  user: { app_metadata?: object | null },
+): boolean {
+  const metadata = user.app_metadata;
+  const unlocked =
+    metadata != null &&
+    "shop_unlocked" in metadata &&
+    (metadata as { shop_unlocked?: unknown }).shop_unlocked === true;
+  return eligibility.showShop || unlocked;
+}
 
 function medicineRequiresConsultation(row: SubscriptionEligibilityRow): boolean {
   const medicine = row.medicines;
@@ -44,7 +64,9 @@ export const loadConsultationEligibility = cache(
     const [subsResult, requestsResult, visitsResult] = await Promise.all([
       supabaseAdmin
         .from("subscriptions")
-        .select("id, checkout_group_id, is_checkout_primary, medicines(requires_consultation)")
+        .select(
+          "id, status, checkout_group_id, is_checkout_primary, medicines(requires_consultation)",
+        )
         .eq("user_id", userId),
       supabaseAdmin
         .from("medication_requests")
@@ -99,6 +121,7 @@ export const loadConsultationEligibility = cache(
 
     return {
       showNav: needingSubscriptionIds.size > 0 || visitSubscriptionIds.size > 0,
+      showShop: subs.some((row) => checkoutSettled(row.status)),
       needingSubscriptionIds,
       visitSubscriptionIds,
     };

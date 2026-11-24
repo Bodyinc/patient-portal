@@ -1,5 +1,6 @@
 "use server";
 
+import type { User } from "@supabase/supabase-js";
 import { z } from "zod";
 import { PORTAL_ROLE, wrongPortalMessage } from "@/lib/auth/constants";
 import {
@@ -8,7 +9,8 @@ import {
   type CheckEmailResult,
 } from "@/lib/auth/patient-email";
 import { claimIntakeSession } from "@/lib/actions/intake";
-import { requireIntakeSession } from "@/lib/intake/session";
+import { requireIntakeSession, type IntakeSessionRow } from "@/lib/intake/session";
+import { missingOrderDetailsMessage } from "@/lib/profile/shipping-address";
 import {
   AUTH_EMAIL_SKIP_QUERY,
   AUTH_MAGICLINK_CLAIM,
@@ -26,6 +28,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { userFacingMessage } from "@/lib/user-message";
 import { userHasSetPassword } from "@/lib/auth/password-state";
+import { getPlatformSettings } from "@/lib/settings/platform-settings";
 import { stripe } from "@/lib/stripe/server";
 
 const AUTH_EMAIL_SEND_FAILED = "Could not send email. Please try again.";
@@ -171,7 +174,290 @@ export async function markPasswordSet(): Promise<{ ok: boolean }> {
   return { ok: true };
 }
 
+const signupSchema = z.object({
+  fullName: z.string().trim().min(1, "Enter your full name").max(120, "Enter a shorter name"),
+  email: z.string().trim().email("Enter a valid email").max(255),
+  password: z.string().min(8, "Password must be at least 8 characters.").max(72),
+});
+
+export type CreatePatientAccountResult = { ok: true } | { ok: false; message: string };
+
+/** Creates a patient who can sign in before they purchase a treatment. */
+export async function createPatientAccount(input: {
+  fullName: string;
+  email: string;
+  password: string;
+}): Promise<CreatePatientAccountResult> {
+  const parsed = signupSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message: parsed.error.issues[0]?.message ?? "Check the form and try again.",
+    };
+  }
+
+  const settings = await getPlatformSettings();
+  if (settings.maintenance_mode) {
+    return {
+      ok: false,
+      message: "The platform is temporarily unavailable for maintenance. Please try again shortly.",
+    };
+  }
+  if (!settings.new_signups_enabled) {
+    return {
+      ok: false,
+      message: "New patient signups are currently paused. Please check back soon.",
+    };
+  }
+
+  const email = parsed.data.email.toLowerCase();
+  const check = await classifyPatientEmail(email);
+  if (check.status === "invalid") return { ok: false, message: "Enter a valid email" };
+  if (check.status === "error") {
+    return { ok: false, message: "Could not verify account. Try again." };
+  }
+  if (check.status === "wrong_portal") {
+    return { ok: false, message: wrongPortalMessage(check.role) };
+  }
+  if (check.status === "patient") {
+    return {
+      ok: false,
+      message: "An account with this email already exists. Please log in.",
+    };
+  }
+
+  const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+    email,
+    password: parsed.data.password,
+    email_confirm: true,
+    app_metadata: { role: PORTAL_ROLE, password_set: true },
+    user_metadata: { full_name: parsed.data.fullName },
+  });
+
+  if (createErr || !created.user) {
+    if (createErr && isDuplicateEmailError(createErr.message)) {
+      return {
+        ok: false,
+        message: "An account with this email already exists. Please log in.",
+      };
+    }
+    return {
+      ok: false,
+      message: userFacingMessage(createErr?.message, "Could not create account. Please try again."),
+    };
+  }
+
+  const roleResult = await ensurePatientRoleForUser(created.user.id);
+  if (!roleResult.ok) {
+    await supabaseAdmin.auth.admin.deleteUser(created.user.id);
+    if (roleResult.role) {
+      return { ok: false, message: wrongPortalMessage(roleResult.role) };
+    }
+    return { ok: false, message: "Could not create account. Please try again." };
+  }
+
+  return { ok: true };
+}
+
 const passwordSchema = z.string().min(8).max(72);
+
+export type FreeAccountResult =
+  { ok: true; email: string; alreadySignedIn: boolean } | { ok: false; message: string };
+
+async function assertIntakeReadyForFreeAccount(session: IntakeSessionRow): Promise<string | null> {
+  const missing = missingOrderDetailsMessage(
+    {
+      fullName: session.full_name,
+      phone: session.phone,
+      stateCode: session.state_code,
+      streetAddress: session.street_address,
+      city: session.city,
+      postalCode: session.postal_code,
+    },
+    "intake",
+  );
+  if (missing) return missing;
+  if (!session.email?.includes("@") || !session.dob || !session.sex) {
+    return "Finish your personal details before creating an account.";
+  }
+  if (session.height_cm == null || session.weight_kg == null) {
+    return "Finish your height and weight before creating an account.";
+  }
+
+  const [{ data: categoryLink }, { data: eligibility }] = await Promise.all([
+    supabaseAdmin
+      .from("intake_session_categories")
+      .select("category_id")
+      .eq("session_id", session.id)
+      .limit(1)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("intake_session_eligibility_results")
+      .select("result")
+      .eq("session_id", session.id)
+      .order("evaluated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  if (!categoryLink?.category_id) {
+    return "Choose a goal before creating an account.";
+  }
+  if (!eligibility) {
+    return "Finish the earlier steps before creating an account.";
+  }
+  if (eligibility.result === "ineligible") {
+    return "This goal isn't available for your profile. Go back and choose another goal.";
+  }
+  return null;
+}
+
+async function loadFreeAccountContext(): Promise<
+  | { ok: true; session: IntakeSessionRow; email: string; currentUser: User | null }
+  | { ok: false; message: string }
+> {
+  const sessionResult = await requireIntakeSession();
+  if ("error" in sessionResult) {
+    return { ok: false, message: sessionResult.error };
+  }
+
+  const problem = await assertIntakeReadyForFreeAccount(sessionResult.session);
+  if (problem) return { ok: false, message: problem };
+
+  const email = sessionResult.session.email!.trim().toLowerCase();
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  return { ok: true, session: sessionResult.session, email, currentUser: user };
+}
+
+async function newSignupsPausedMessage(): Promise<string | null> {
+  const settings = await getPlatformSettings();
+  if (settings.maintenance_mode) {
+    return "The platform is temporarily unavailable for maintenance. Please try again shortly.";
+  }
+  if (!settings.new_signups_enabled) {
+    return "New patient signups are currently paused. Please check back soon.";
+  }
+  return null;
+}
+
+/** Email shown on the free-account password page. Does not create the account. */
+export async function getFreeAccountPreview(): Promise<FreeAccountResult> {
+  const ready = await loadFreeAccountContext();
+  if (!ready.ok) return ready;
+  if (ready.currentUser && (ready.currentUser.email ?? "").toLowerCase() !== ready.email) {
+    return {
+      ok: false,
+      message: "Go back to personal information and continue with your account email.",
+    };
+  }
+  return {
+    ok: true,
+    email: ready.email,
+    alreadySignedIn: Boolean(ready.currentUser),
+  };
+}
+
+/**
+ * Creates a patient from the details already saved on the intake session, then unlocks Shop.
+ * A signed-in patient keeps their password and only has the session copied onto their profile.
+ */
+export async function createFreeAccountFromIntake(
+  rawPassword?: string,
+): Promise<FreeAccountResult> {
+  const ready = await loadFreeAccountContext();
+  if (!ready.ok) return ready;
+
+  const { session, email, currentUser } = ready;
+
+  if (currentUser) {
+    if ((currentUser.email ?? "").toLowerCase() !== email) {
+      return {
+        ok: false,
+        message: "Go back to personal information and continue with your account email.",
+      };
+    }
+    const roleResult = await ensurePatientRoleForUser(currentUser.id);
+    if (!roleResult.ok) {
+      return {
+        ok: false,
+        message: roleResult.role
+          ? wrongPortalMessage(roleResult.role)
+          : "Could not save your account. Please try again.",
+      };
+    }
+    await supabaseAdmin.auth.admin.updateUserById(currentUser.id, {
+      app_metadata: { ...currentUser.app_metadata, shop_unlocked: true },
+    });
+    await claimIntakeSession(currentUser.id);
+    return { ok: true, email, alreadySignedIn: true };
+  }
+
+  const paused = await newSignupsPausedMessage();
+  if (paused) return { ok: false, message: paused };
+
+  const parsed = passwordSchema.safeParse(rawPassword ?? "");
+  if (!parsed.success) {
+    return { ok: false, message: "Password must be at least 8 characters." };
+  }
+
+  const check = await classifyPatientEmail(email);
+  if (check.status === "invalid") return { ok: false, message: "Enter a valid email" };
+  if (check.status === "error") {
+    return { ok: false, message: "Could not verify account. Try again." };
+  }
+  if (check.status === "wrong_portal") {
+    return { ok: false, message: wrongPortalMessage(check.role) };
+  }
+  if (check.status === "patient") {
+    return {
+      ok: false,
+      message: "An account with this email already exists. Please log in.",
+    };
+  }
+
+  const fullName = session.full_name?.trim() ?? "";
+  const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+    email,
+    password: parsed.data,
+    email_confirm: true,
+    app_metadata: { role: PORTAL_ROLE, password_set: true, shop_unlocked: true },
+    user_metadata: {
+      full_name: fullName,
+      phone: session.phone ?? null,
+      phone_country_code: session.phone_country_code ?? null,
+      dob: session.dob,
+    },
+  });
+
+  if (createErr || !created.user) {
+    if (createErr && isDuplicateEmailError(createErr.message)) {
+      return {
+        ok: false,
+        message: "An account with this email already exists. Please log in.",
+      };
+    }
+    return {
+      ok: false,
+      message: userFacingMessage(createErr?.message, "Could not create account. Please try again."),
+    };
+  }
+
+  const roleResult = await ensurePatientRoleForUser(created.user.id);
+  if (!roleResult.ok) {
+    await supabaseAdmin.auth.admin.deleteUser(created.user.id);
+    if (roleResult.role) {
+      return { ok: false, message: wrongPortalMessage(roleResult.role) };
+    }
+    return { ok: false, message: "Could not create account. Please try again." };
+  }
+
+  await claimIntakeSession(created.user.id);
+  return { ok: true, email, alreadySignedIn: false };
+}
 
 export type SetInitialPasswordResult = { ok: true } | { ok: false; message: string };
 

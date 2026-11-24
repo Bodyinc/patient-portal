@@ -73,7 +73,9 @@ export async function updateSession(request: NextRequest) {
 
   if (pathname.startsWith("/onboarding")) {
     // Checkout authenticates a new patient before showing these final onboarding
-    // pages, so they must remain available. All other onboarding pages are guest-only.
+    // pages, so they must remain available. A signed-in patient with no live
+    // subscription can start onboarding from the dashboard. Patients who already
+    // have a treatment stay on the dashboard.
     const isCheckoutCompletionPath =
       pathname === "/onboarding/checkout-complete" || pathname === "/onboarding/order-confirmation";
 
@@ -82,7 +84,17 @@ export async function updateSession(request: NextRequest) {
       // visitor whose account was deleted or deactivated while a stale cookie remains.
       const { data: verified } = await supabase.auth.getUser();
       if (verified.user) {
-        return redirectWithCookies(request, "/dashboard", supabaseResponse);
+        const role = verified.user.app_metadata?.role;
+        const { data: activeSub, error: subError } = await supabase
+          .from("subscriptions")
+          .select("id")
+          .eq("user_id", verified.user.id)
+          .in("status", ["active", "trialing", "past_due"])
+          .limit(1)
+          .maybeSingle();
+        if (subError || activeSub || (role && role !== "patient")) {
+          return redirectWithCookies(request, "/dashboard", supabaseResponse);
+        }
       }
     }
 

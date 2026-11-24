@@ -14,6 +14,7 @@ import { getCheckoutDiscount } from "@/lib/actions/stripe-checkout";
 import { userFacingMessage } from "@/lib/user-message";
 import { getShopOrderFees } from "@/lib/actions/fees";
 import { getStripeJs } from "@/lib/stripe/client";
+import type { PortalOfferDto } from "@/lib/offers/types";
 import type { CheckoutBootstrap, CheckoutPlanId } from "./types";
 
 type ShopCheckoutClientProps = {
@@ -26,6 +27,7 @@ type ShopCheckoutClientProps = {
   initialPackageId?: string | null;
   walletCreditCents?: number;
   savedCardLabel?: string | null;
+  offer?: PortalOfferDto | null;
 };
 
 function checkoutBackHref(from: string | null | undefined): string {
@@ -45,6 +47,7 @@ export default function ShopCheckoutClient({
   initialPackageId,
   walletCreditCents = 0,
   savedCardLabel = null,
+  offer = null,
 }: ShopCheckoutClientProps) {
   const router = useRouter();
   const isUpgradeFromBilling = from === "billing";
@@ -199,6 +202,7 @@ export default function ShopCheckoutClient({
                 ? "Confirm your plan and complete checkout to place your refill order."
                 : "Choose your plan and complete payment."
           }
+          offer={offer}
         />
       </div>
 
