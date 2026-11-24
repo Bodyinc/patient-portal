@@ -561,7 +561,16 @@ export async function startConsultation(subscriptionId: string): Promise<StartCo
       const isRoom = Boolean(isFinished || hasFormSubmission);
 
       let dialogId = forThisSub?.qb_dialog_id ?? activeVisit?.dialogId ?? null;
-      if (!dialogId && appointmentId && /^[a-f0-9]{24}$/i.test(appointmentId)) {
+      if (forThisSub?.qb_user_id && forThisSub.qb_user_id !== client.userId) {
+        // App or user changed - dialog from previous user/app is invalid in new app
+        dialogId = null;
+      }
+      if (
+        !dialogId &&
+        appointmentId &&
+        /^[a-f0-9]{24}$/i.test(appointmentId) &&
+        (!forThisSub?.qb_user_id || forThisSub.qb_user_id === client.userId)
+      ) {
         dialogId = appointmentId;
       }
       if (!dialogId) {

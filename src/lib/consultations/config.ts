@@ -12,21 +12,21 @@ export function getQuickbloxConfig() {
   const apiKey = process.env.QUICKBLOX_API_KEY?.trim() || "";
   const userSecret =
     process.env.QUICKBLOX_USER_SECRET?.trim() || "qwe12rty34uio56p5asd67fgh7jklz8xcv5bnm8";
-  const providerIdRaw = process.env.QUICKBLOX_PROVIDER_ID?.trim() || "142814409";
-  const providerId = providerIdRaw ? Number(providerIdRaw) : 142814409;
+  const providerIdRaw = process.env.QUICKBLOX_PROVIDER_ID?.trim() || "143129220";
+  const providerId = providerIdRaw ? Number(providerIdRaw) : 143129220;
   const appIdRaw =
     process.env.QUICKBLOX_APP_ID?.trim() ||
     process.env.NEXT_PUBLIC_QUICKBLOX_APP_ID?.trim() ||
-    "108471";
-  const appId = Number(appIdRaw) || 108471;
+    "108171";
+  const appId = Number(appIdRaw) || 108171;
   const authKey =
     process.env.QUICKBLOX_AUTH_KEY?.trim() ||
     process.env.NEXT_PUBLIC_QUICKBLOX_AUTH_KEY?.trim() ||
-    "ak_xjJy9Tuv9jDgdEw";
+    "ak_A7AYRVwvcRncutL";
   const authSecret =
     process.env.QUICKBLOX_AUTH_SECRET?.trim() ||
     process.env.NEXT_PUBLIC_QUICKBLOX_AUTH_SECRET?.trim() ||
-    "as_S6-E5A6Dwz-T2qb";
+    "as_HwzVstSPOLFsC9q";
   const accountKey =
     process.env.QUICKBLOX_ACCOUNT_KEY?.trim() ||
     process.env.NEXT_PUBLIC_QUICKBLOX_ACCOUNT_KEY?.trim() ||
@@ -37,7 +37,7 @@ export function getQuickbloxConfig() {
     providerPassword,
     apiKey,
     userSecret,
-    providerId: Number.isFinite(providerId) ? providerId : 142814409,
+    providerId: Number.isFinite(providerId) ? providerId : 143129220,
     appId,
     authKey,
     authSecret,

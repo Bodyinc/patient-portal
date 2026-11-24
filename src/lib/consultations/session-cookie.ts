@@ -38,11 +38,14 @@ export async function readQbClientSession(
     const data = JSON.parse(Buffer.from(payload, "base64url").toString()) as {
       u?: string;
       s?: string;
+      a?: number;
       t?: string;
       i?: number;
       e?: number;
     };
-    if (data.u !== portalUserId || data.s !== subscriptionId) return null;
+    const currentAppId = getQuickbloxConfig().appId;
+    if (data.u !== portalUserId || data.s !== subscriptionId || data.a !== currentAppId)
+      return null;
     if (!data.t || typeof data.i !== "number") return null;
     if (typeof data.e !== "number" || data.e <= Date.now()) return null;
     return { token: data.t, userId: data.i };
@@ -56,10 +59,12 @@ export async function saveQbClientSession(
   subscriptionId: string,
   session: QbClientSession,
 ) {
+  const currentAppId = getQuickbloxConfig().appId;
   const payload = Buffer.from(
     JSON.stringify({
       u: portalUserId,
       s: subscriptionId,
+      a: currentAppId,
       t: session.token,
       i: session.userId,
       e: Date.now() + MAX_AGE_SEC * 1000,

@@ -36,7 +36,8 @@ const clientSessionCache = new Map<string, { token: string; userId: number; expi
 const loginLockUntil = new Map<string, number>();
 
 function sessionCacheKey(portalUserId: string, subscriptionId: string) {
-  return `${portalUserId}:${subscriptionId}`;
+  const { appId } = getQuickbloxConfig();
+  return `${appId}:${portalUserId}:${subscriptionId}`;
 }
 
 function lockKey(role: "client" | "provider", email: string) {
@@ -331,7 +332,7 @@ export async function createQuickbloxAppointment(params: {
   reuseOpenVisit?: boolean;
 }): Promise<QbAppointment> {
   const cfg = getQuickbloxConfig();
-  const providerId = cfg.providerId || 142814409;
+  const providerId = cfg.providerId || 143129220;
 
   const dialog = await createQbRestDialog({
     clientToken: params.clientToken,
@@ -434,7 +435,7 @@ export function buildConsultationEmbedUrl(params: { token: string; appointmentId
 
 export async function fetchQuickbloxUserName(userId: number): Promise<string | null> {
   if (!userId || userId <= 0) return null;
-  if (userId === 142814409) return "Admin";
+  if (userId === 143129220 || userId === 142814409) return "Admin";
 
   const cfg = getQuickbloxConfig();
   try {

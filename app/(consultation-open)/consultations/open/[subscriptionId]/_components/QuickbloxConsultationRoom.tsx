@@ -97,6 +97,10 @@ interface QuickBloxClient {
     creds: { email?: string; id?: number; login?: string; password?: string },
     callback: (err: unknown, res: { token: string; user_id?: number }) => void,
   ) => void;
+  startSessionWithToken?: (
+    token: string,
+    callback: (err: unknown, res?: { token?: string; user_id?: number }) => void,
+  ) => void;
   users?: {
     get: (
       paramsOrId: number | { login?: string; full_name?: string; email?: string },
@@ -262,6 +266,22 @@ declare global {
   }
 }
 
+function formatQbError(err: unknown): string {
+  if (!err) return "";
+  if (err instanceof Error) return err.message;
+  if (typeof err === "object") {
+    const obj = err as Record<string, unknown>;
+    if (typeof obj.message === "string") return obj.message;
+    if (typeof obj.detail === "string") return obj.detail;
+    try {
+      return JSON.stringify(err);
+    } catch {
+      return String(err);
+    }
+  }
+  return String(err);
+}
+
 function getDateDividerLabel(timestamp: number): string {
   return formatPortalDate(new Date(timestamp));
 }
@@ -293,6 +313,7 @@ export default function QuickbloxConsultationRoom({
   // User display names mapping (id -> display name, e.g. Admin, Test Provider, You)
   const [userNames, setUserNames] = useState<Record<number, string>>(() => {
     const initial: Record<number, string> = {
+      143129220: "Admin",
       142814409: "Admin",
       [sdkConfig.userId]: "You",
     };
@@ -324,7 +345,7 @@ export default function QuickbloxConsultationRoom({
       toFetch.forEach((id) => {
         resolvingUsersRef.current.add(id);
 
-        if (id === 142814409) {
+        if (id === 143129220 || id === 142814409) {
           setUserNames((prev) => ({ ...prev, [id]: "Admin" }));
           return;
         }
@@ -350,6 +371,7 @@ export default function QuickbloxConsultationRoom({
                   u.user_tags?.includes("admin") ||
                   u.full_name?.toLowerCase().includes("admin") ||
                   u.email?.toLowerCase().includes("admin") ||
+                  u.id === 143129220 ||
                   u.id === 142814409;
                 const name = isAdmin
                   ? "Admin"
@@ -375,7 +397,7 @@ export default function QuickbloxConsultationRoom({
   const getSenderDisplayName = useCallback(
     (senderId: number, isSelf: boolean) => {
       if (isSelf || senderId === sdkConfig.userId) return "You";
-      if (senderId === 142814409) return "Admin";
+      if (senderId === 143129220 || senderId === 142814409) return "Admin";
       if (userNames[senderId]) return userNames[senderId];
       if (senderId === sdkConfig.providerId) {
         return sdkConfig.providerName || "Provider";
@@ -453,7 +475,9 @@ export default function QuickbloxConsultationRoom({
   const [providerInRoom, setProviderInRoom] = useState(false);
   // Claimed in the portal, or already present in the QuickBlox room.
   const providerReady = Boolean(sdkConfig.dialogId && sdkConfig.caseAssigned && providerInRoom);
-  const canMessage = providerReady && connected;
+  // After consultation is finished, Admin remains in the room — allow messaging so
+  // the patient can continue the conversation with Admin without requiring providerInRoom.
+  const canMessage = connected && (providerReady || (isFinished && Boolean(sdkConfig.dialogId)));
   const resolveUserNamesRef = useRef(resolveUserNames);
   resolveUserNamesRef.current = resolveUserNames;
   const isJoinedMessageRef = useRef(isJoinedMessage);
@@ -911,20 +935,7 @@ export default function QuickbloxConsultationRoom({
         };
       }
 
-      // Step 1: Create Session with Client Email & Plan Password
-      QB.createSession({ email: config.email, password: config.password }, (sessErr, sessRes) => {
-        if (sessErr) {
-          console.error("[QuickBlox] createSession error:", sessErr);
-          isConnectingRef.current = false;
-          setConnectionError("Could not authenticate consultation session. Please try again.");
-          setConnecting(false);
-          return;
-        }
-
-        console.log("[QuickBlox] createSession success:", sessRes?.token);
-        const targetUserId = sessRes?.user_id ? Number(sessRes.user_id) : Number(config.userId);
-
-        // Step 2: Connect to Chat Server
+      const connectChat = (targetUserId: number) => {
         if (QB.chat?.isConnected) {
           console.log("[QuickBlox] Chat is already connected, skipping chat.connect.");
           hasConnectedRef.current = true;
@@ -936,12 +947,30 @@ export default function QuickbloxConsultationRoom({
           return;
         }
 
-        QB.chat.connect({ userId: targetUserId, password: config.password }, (chatErr) => {
+        const primaryPassword = config.password || config.token;
+        QB.chat.connect({ userId: targetUserId, password: primaryPassword }, (chatErr) => {
           if (chatErr) {
-            if (QB.chat?.isConnected) {
-              console.log("[QuickBlox] chat reported status notice but isConnected is true.");
-            } else {
-              console.error("[QuickBlox] chat.connect error:", chatErr);
+            // If primary connect failed and token is available, retry with token as password
+            if (config.token && primaryPassword !== config.token) {
+              console.warn(
+                "[QuickBlox] chat.connect with password failed, trying with token:",
+                chatErr,
+              );
+              QB.chat.connect({ userId: targetUserId, password: config.token }, (retryErr) => {
+                if (retryErr && !QB.chat?.isConnected) {
+                  console.error("[QuickBlox] chat.connect retry error:", formatQbError(retryErr));
+                  isConnectingRef.current = false;
+                  setConnectionError("Could not establish chat connection. Please try again.");
+                  setConnecting(false);
+                  return;
+                }
+                onChatConnected(targetUserId);
+              });
+              return;
+            }
+
+            if (!QB.chat?.isConnected) {
+              console.error("[QuickBlox] chat.connect error:", formatQbError(chatErr));
               isConnectingRef.current = false;
               setConnectionError("Could not establish chat connection. Please try again.");
               setConnecting(false);
@@ -949,16 +978,65 @@ export default function QuickbloxConsultationRoom({
             }
           }
 
-          hasConnectedRef.current = true;
-          isConnectingRef.current = false;
-          console.log("[QuickBlox] chat.connect success!");
-          setConnected(true);
-          setConnecting(false);
-          setConnectionError(null);
-
-          setupChatListeners(targetUserId);
+          onChatConnected(targetUserId);
         });
-      });
+      };
+
+      const onChatConnected = (targetUserId: number) => {
+        hasConnectedRef.current = true;
+        isConnectingRef.current = false;
+        console.log("[QuickBlox] chat.connect success!");
+        setConnected(true);
+        setConnecting(false);
+        setConnectionError(null);
+        setupChatListeners(targetUserId);
+      };
+
+      const targetUserId = Number(config.userId);
+
+      // Step 1: Start/Create Session
+      // When server already provided client token, use startSessionWithToken (recommended and avoids client-side auth errors)
+      if (config.token && typeof QB.startSessionWithToken === "function") {
+        QB.startSessionWithToken(config.token, (sessErr) => {
+          if (sessErr) {
+            console.warn("[QuickBlox] startSessionWithToken notice:", formatQbError(sessErr));
+            // Fallback: try createSession with email & password
+            QB.createSession(
+              { email: config.email, password: config.password },
+              (fallbackErr, sessRes) => {
+                if (fallbackErr) {
+                  console.error(
+                    "[QuickBlox] createSession fallback error:",
+                    formatQbError(fallbackErr),
+                  );
+                  // Still try connecting to chat if we have targetUserId and token
+                  connectChat(targetUserId);
+                  return;
+                }
+                const resolvedUserId = sessRes?.user_id ? Number(sessRes.user_id) : targetUserId;
+                connectChat(resolvedUserId);
+              },
+            );
+            return;
+          }
+          console.log("[QuickBlox] startSessionWithToken success!");
+          connectChat(targetUserId);
+        });
+      } else {
+        QB.createSession({ email: config.email, password: config.password }, (sessErr, sessRes) => {
+          if (sessErr) {
+            console.error("[QuickBlox] createSession error:", formatQbError(sessErr));
+            isConnectingRef.current = false;
+            setConnectionError("Could not authenticate consultation session. Please try again.");
+            setConnecting(false);
+            return;
+          }
+
+          console.log("[QuickBlox] createSession success:", sessRes?.token);
+          const resolvedUserId = sessRes?.user_id ? Number(sessRes.user_id) : targetUserId;
+          connectChat(resolvedUserId);
+        });
+      }
     } catch (e) {
       console.error("[QuickBlox] init exception:", e);
       isConnectingRef.current = false;
@@ -1010,7 +1088,9 @@ export default function QuickbloxConsultationRoom({
     e?.preventDefault();
     const text = inputText.trim();
     if (!text || !canMessage) return;
-    if (!sdkConfig.caseAssigned || !sdkConfig.dialogId) return;
+    // Allow messaging when finished (Admin remains in room) or when case is assigned
+    if (!sdkConfig.dialogId) return;
+    if (!isFinished && !sdkConfig.caseAssigned) return;
 
     const QB = window.QB;
     if (!QB || !QB.chat?.isConnected) return;
@@ -1062,13 +1142,13 @@ export default function QuickbloxConsultationRoom({
     const QB = window.QB;
     if (!QB || !canMessage) {
       setUploadError(
-        providerReady
+        providerReady || isFinished
           ? "Chat connection is not ready. Please wait."
           : "Waiting for your provider to join before you can send messages.",
       );
       return;
     }
-    if (!sdkConfig.caseAssigned || !sdkConfig.dialogId) {
+    if (!sdkConfig.dialogId) {
       setUploadError("Waiting for your provider to join before you can send messages.");
       return;
     }
@@ -1370,13 +1450,15 @@ export default function QuickbloxConsultationRoom({
                 <div className="flex items-center gap-2">
                   <span
                     className={`flex h-2 w-2 rounded-full ${
-                      providerReady ? "bg-emerald-500" : "bg-amber-500 animate-pulse"
+                      providerReady || isFinished ? "bg-emerald-500" : "bg-amber-500 animate-pulse"
                     }`}
                   />
                   <span>
-                    {providerReady
-                      ? "Clinician assigned. If your provider initiates an audio or video call, it will ring automatically here."
-                      : "Waiting for your provider to join. Messaging unlocks once they claim your consultation."}
+                    {isFinished
+                      ? "Consultation concluded. You can continue messaging with your care team (Admin) in this room."
+                      : providerReady
+                        ? "Clinician assigned. If your provider initiates an audio or video call, it will ring automatically here."
+                        : "Waiting for your provider to join. Messaging unlocks once they claim your consultation."}
                   </span>
                 </div>
                 <button
@@ -1427,9 +1509,11 @@ export default function QuickbloxConsultationRoom({
             <div className="space-y-3">
               {messages.length === 0 ? (
                 <div className="py-8 text-center text-xs text-[#152A51]/50">
-                  {providerReady
-                    ? "No messages yet. Send a greeting to your provider below!"
-                    : "Waiting for your provider to join. Messaging unlocks once they claim your consultation."}
+                  {isFinished
+                    ? "Consultation concluded. You can send messages to Admin below."
+                    : providerReady
+                      ? "No messages yet. Send a greeting to your provider below!"
+                      : "Waiting for your provider to join. Messaging unlocks once they claim your consultation."}
                 </div>
               ) : (
                 messages.map((msg, index) => {
@@ -1586,7 +1670,7 @@ export default function QuickbloxConsultationRoom({
               </div>
             ) : null}
 
-            {!providerReady ? (
+            {!providerReady && !isFinished ? (
               <div className="mx-auto mb-3 max-w-4xl rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-xs font-medium leading-relaxed text-amber-900 sm:text-[13px]">
                 Waiting for your provider to join. Messaging unlocks once they claim your
                 consultation.
@@ -1627,9 +1711,11 @@ export default function QuickbloxConsultationRoom({
                 placeholder={
                   !connected
                     ? "Connecting to secure chat…"
-                    : !providerReady
-                      ? "Waiting for your provider to join…"
-                      : "Type your message or question here…"
+                    : isFinished && !providerReady
+                      ? "Continue your conversation with your care team…"
+                      : !providerReady
+                        ? "Waiting for your provider to join…"
+                        : "Type your message or question here…"
                 }
                 className="h-11 flex-1 rounded-full border border-[#E8EEED] bg-[#F9FBFA] px-4 text-sm text-[#152A51] outline-none transition placeholder:text-[#152A51]/40 focus:border-[#152A51] focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
               />
