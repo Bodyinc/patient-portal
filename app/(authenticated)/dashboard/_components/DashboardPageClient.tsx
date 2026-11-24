@@ -19,6 +19,7 @@ import TrackingIdValue from "../../_components/TrackingIdValue";
 
 type DashboardPageClientProps = {
   data: DashboardPageDataDto;
+  showShop?: boolean;
 };
 
 function formatDate(value: string | null): string {
@@ -52,7 +53,7 @@ function HealthGoalHeroCard({ name, imageSrc }: { name: string; imageSrc: string
   );
 }
 
-export default function DashboardPageClient({ data }: DashboardPageClientProps) {
+export default function DashboardPageClient({ data, showShop = false }: DashboardPageClientProps) {
   const router = useRouter();
   const duePayment = data.pendingPayments[0] ?? null;
   const dueConsent = data.pendingConsents[0] ?? null;
@@ -176,15 +177,18 @@ export default function DashboardPageClient({ data }: DashboardPageClientProps) 
                 No treatment yet
               </h3>
               <p className="mt-3 max-w-xl text-sm leading-relaxed text-[#152A51]/80 sm:text-[15px] sm:leading-7">
-                Your account is ready. Choose a treatment whenever you want to start care. You can
-                browse plans and check out when you are ready.
+                {showShop
+                  ? "Your account is ready. Choose a medicine in the shop and enter your card at checkout."
+                  : "Your account is ready. Choose a treatment whenever you want to start care. You can browse plans and check out when you are ready."}
               </p>
               <div className="mt-auto pt-5">
                 <Button
                   asChild
                   className="h-[46px] w-full rounded-full bg-[#E3E084] px-6 text-sm font-medium text-[#152A51] hover:bg-[#D9D674] sm:w-fit"
                 >
-                  <Link href="/onboarding/goal">Get started</Link>
+                  <Link href={showShop ? "/shop" : "/onboarding/goal"}>
+                    {showShop ? "Shop treatments" : "Get started"}
+                  </Link>
                 </Button>
               </div>
             </>

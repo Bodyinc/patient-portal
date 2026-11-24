@@ -141,6 +141,16 @@ export function canAccessStep(pathname: string, state: OnboardingState): boolean
   if (isRedirectOnlyPath(pathname)) return true;
 
   const earliest = getEarliestIncompleteStep(state);
+
+  // Free-account password page sits beside the medicine step. Same gate as that screen.
+  if (
+    pathname === "/onboarding/create-account" ||
+    pathname.startsWith("/onboarding/create-account/")
+  ) {
+    const medicationsIndex = getStepIndex("/onboarding/medications");
+    const earliestIndex = getStepIndex(earliest);
+    return medicationsIndex >= 0 && earliestIndex >= medicationsIndex;
+  }
   const requestedIndex = getStepIndex(pathname);
   const earliestIndex = getStepIndex(earliest);
 

@@ -17,7 +17,7 @@ export async function sessionRequiresConsultation(
 export type ConsultationEligibility = {
   /** Show the Consultations nav when a medicine needs one, or a visit already exists. */
   showNav: boolean;
-  /** Shop stays hidden until onboarding checkout has actually settled. */
+  /** True after a settled checkout. A free account from the medicine step is separate. */
   showShop: boolean;
   needingSubscriptionIds: Set<string>;
   visitSubscriptionIds: Set<string>;
@@ -33,6 +33,19 @@ type SubscriptionEligibilityRow = {
 
 function checkoutSettled(status: string) {
   return status !== "incomplete" && status !== "incomplete_expired";
+}
+
+/** Shop opens after a paid checkout, or after a free account is created on the medicine step. */
+export function patientCanSeeShop(
+  eligibility: Pick<ConsultationEligibility, "showShop">,
+  user: { app_metadata?: object | null },
+): boolean {
+  const metadata = user.app_metadata;
+  const unlocked =
+    metadata != null &&
+    "shop_unlocked" in metadata &&
+    (metadata as { shop_unlocked?: unknown }).shop_unlocked === true;
+  return eligibility.showShop || unlocked;
 }
 
 function medicineRequiresConsultation(row: SubscriptionEligibilityRow): boolean {

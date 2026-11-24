@@ -178,6 +178,16 @@ export default function MedicationsPage() {
               ))
             )}
           </div>
+
+          <div className="mx-auto w-full max-w-[1220px] px-4 pb-6 text-center sm:px-6">
+            <button
+              type="button"
+              onClick={() => pushOnboardingRoute(router, "/onboarding/create-account")}
+              className="text-[14px] font-medium text-[#152A51] underline-offset-2 hover:underline"
+            >
+              Didn&apos;t find your medicine? Create a free account
+            </button>
+          </div>
         </div>
       </OnboardingFrame>
 

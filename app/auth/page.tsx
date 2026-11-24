@@ -64,12 +64,6 @@ function AuthPageContent() {
             Get started
           </Link>
         </p>
-        <p className="text-center text-sm text-[#152A51]/80">
-          Want an account without a purchase?{" "}
-          <Link href="/signup" className="font-medium text-[#152A51] hover:underline">
-            Create an account
-          </Link>
-        </p>
       </div>
     </AuthPageShell>
   );
@@ -105,12 +99,11 @@ function LoginForm() {
       });
       if (error) {
         // Supabase returns the same generic error for a wrong password and a
-        // non-existent email. Classify the email so new visitors get a clear path
-        // to create an account instead of a vague login failure.
+        // non-existent email. Classify the email so new visitors are sent to Get started.
         const check = await checkPatientEmail(parsed.data.email);
         if (check.status === "new") {
           toast.error("No account exists with this email.", {
-            description: "Create an account below to get started.",
+            description: "Use Get started below to begin.",
             duration: 8000,
           });
           return;
